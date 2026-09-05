@@ -1,0 +1,25 @@
+xtb-6.7.1
+./xtb-6.7.1/**
+Pymol-script-repo
+./Pymol-script-repo/**
+pymol-src
+./pymol-src/**
+
+# v2 VMD reference material (UIUC license, internal learning only)
+vmd-ref
+./vmd-ref/**
+
+*.env
+*.pyc
+*.npy
+*.npz
+
+**/secrets.toml
+**/auth.json
+
+#./dev_env_note.txt
+./3rd_party_lib/**
+tmp
+*.zip
+cache
+**/cache/**
