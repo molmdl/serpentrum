@@ -1,0 +1,37 @@
+{
+  "mode": "yolo",
+  "depth": "comprehensive",
+  "parallelization": true,
+  "commit_docs": true,
+  "model_profile": "quality",
+  "profiles": {
+    "active_profile": "quality",
+    "presets": {
+      "quality": {
+        "planning": "synthetic/hf:zai-org/GLM-5.3-Flash",
+        "execution": "synthetic/hf:zai-org/GLM-5.3-Flash",
+        "verification": "synthetic/hf:zai-org/GLM-5.3-Flash"
+      },
+      "balanced": {
+        "planning": "synthetic/hf:zai-org/GLM-5.3-Flash",
+        "execution": "synthetic/hf:zai-org/GLM-5.3-Flash",
+        "verification": "synthetic/hf:zai-org/GLM-5.3-Flash"
+      },
+      "budget": {
+        "planning": "synthetic/hf:zai-org/GLM-5.3-Flash",
+        "execution": "synthetic/hf:zai-org/GLM-5.3-Flash",
+        "verification": "synthetic/hf:zai-org/GLM-5.3-Flash"
+      }
+    },
+    "custom_overrides": {
+      "quality": {},
+      "balanced": {},
+      "budget": {}
+    }
+  },
+  "workflow": {
+    "research": true,
+    "plan_check": true,
+    "verifier": true
+  }
+}
