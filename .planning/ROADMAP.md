@@ -41,7 +41,7 @@ A PyMOL plugin game: steer a molecular head around a bounded box, stack real sma
 **Plans**: 6 plans (4 waves)
 
 Plans:
-- [ ] 01-01-PLAN.md — Plugin package skeleton: anchored single-instance entry point + zero-stub import test (Wave 1)
+- [x] 01-01-PLAN.md — Plugin package skeleton: anchored single-instance entry point + zero-stub import test (Wave 1)
 - [ ] 01-02-PLAN.md — 3-tab modeless dialog shell, Setup / Game / Spectra placeholders (Wave 2, parallel)
 - [ ] 01-03-PLAN.md — Purity gate: AST checker + run_gates runner (syntax walk, plugin-path safety, scoped unittest, --smoke) (Wave 2, parallel)
 - [ ] 01-04-PLAN.md — Headless Windows PyMOL skeleton smoke: loader namespace, anchor reload/double-import, flushed sentinels (Wave 2, parallel)
@@ -194,7 +194,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Plugin Skeleton & Purity Harness | 0/6 | Not started | - |
+| 1. Plugin Skeleton & Purity Harness | 1/6 | In progress | - |
 | 2. Pure Core — Game & Chemistry Logic | 0/TBD | Not started | - |
 | 3. Molecules in the Viewer & Setup Tab | 0/TBD | Not started | - |
 | 4. Game Loop & Input | 0/TBD | Not started | - |
