@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 1 of 8 (Plugin Skeleton & Purity Harness)
-Plan: 5 of 6 in current phase (01-01..01-05 complete)
-Status: In progress
-Last activity: 2026-09-06 — Completed 01-05-PLAN.md (--xtb gate + winpath + offscreen-dialog verdict)
+Plan: 6 of 6 in current phase (01-01..01-06 complete)
+Status: Phase complete — pending verification
+Last activity: 2026-09-06 — Completed 01-06-PLAN.md (AGENTS.md gate docs + full gate run + human-verify checkpoint approved)
 
-Progress: [██░░░░░░░░] ~18% (5 of ~28 estimated plans — Phase 1 firm at 6; Phases 2–8 TBD)
+Progress: [██░░░░░░░░] ~21% (6 of ~28 estimated plans — Phase 1 firm at 6; Phases 2–8 TBD)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 20 min
-- Total execution time: 100 min
+- Total plans completed: 6
+- Average duration: 17 min
+- Total execution time: 104 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Plugin Skeleton & Purity Harness | 5/6 | 100 min | 20 min |
+| 1. Plugin Skeleton & Purity Harness | 6/6 | 104 min | 17 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-05 (6 min), 01-04 (79 min), 01-03 (7 min), 01-02 (5 min), 01-01 (3 min)
-- Trend: 01-04 included two Windows PyMOL probe round-trips (root-cause debugging)
+- Last 5 plans: 01-06 (4 min auto + human checkpoint), 01-05 (6 min), 01-04 (79 min), 01-03 (7 min), 01-02 (5 min)
+- Trend: 01-04 included two Windows PyMOL probe round-trips (root-cause debugging); 01-06's human checkpoint waited on user GUI verification (3 PyMOL launches)
 
 *Updated after each plan completion*
 
@@ -56,6 +56,8 @@ Recent decisions affecting current work:
 - 01-05 2026-09-06: Offscreen dialog mechanism is a DEAD END — `QApplication([])` constructs OK under `QT_QPA_PLATFORM=offscreen`, but `PluginDialog()` construction kills the process silently (no sentinel, rc 0 through the .bat); smoke 02 stays as the documented experiment, never promote to required; dialog verdicts stay with human-verify
 - 01-05 2026-09-06: Windows-exe probe pattern: `subprocess.run([exe, ...], cwd=ROOT)` with WSL-style exe path + /mnt/c-backed cwd + bare relative args; verdict asserts output content ('xtb version' + 'normal termination') even though direct-exec rc is meaningful
 - 01-05 2026-09-06: winpath is harness/dev-side ONLY (strict ValueError on non-`/mnt` paths, never mangles); the plugin runtime never converts paths (Windows PyMOL + Windows exe + relative names)
+- 01-06 2026-09-06: Human-verify approved in real Windows PyMOL (3 launches): single menu item → 3-tab modeless dialog; single-instance + reload-via-restart hold [SETUP-01, INFRA-03, INFRA-05]
+- 01-06 2026-09-06: Reload phrasing for future docs: "restart PyMOL OR re-add the plugin directory in Plugin Manager" (restart is the simpler, equally valid reload path — step-6 wording confused the user; no code impact)
 
 ### Pending Todos
 
@@ -72,7 +74,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-06T13:00Z (01-05 executor)
-Stopped at: Completed 01-05-PLAN.md
+Last session: 2026-09-06T14:30Z (01-06 continuation executor)
+Stopped at: 01-06 complete (checkpoint approved); Phase 1 executed, awaiting /gsd-execute-phase verification step
 Resume file: None
-Next action: 01-06 — final Phase 1 plan (AGENTS.md gate docs + full gate run + human-verify checkpoint: install, single instance, modeless)
+Next action: Orchestrator phase-verification of Phase 1 (all 6 plans complete), then /gsd-plan-phase 2 (Pure Core — Game & Chemistry Logic; starts demo-data approval track)
