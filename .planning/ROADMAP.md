@@ -45,7 +45,7 @@ Plans:
 - [x] 01-02-PLAN.md — 3-tab modeless dialog shell, Setup / Game / Spectra placeholders (Wave 2, parallel)
 - [x] 01-03-PLAN.md — Purity gate: AST checker + run_gates runner (syntax walk, plugin-path safety, scoped unittest, --smoke) (Wave 2, parallel)
 - [x] 01-04-PLAN.md — Headless Windows PyMOL skeleton smoke: loader namespace, anchor reload/double-import, flushed sentinels (Wave 2, parallel)
-- [ ] 01-05-PLAN.md — Offscreen dialog smoke + xtb probe gate (--xtb) + WSL→Windows path-conversion helper (Wave 3)
+- [x] 01-05-PLAN.md — Offscreen dialog smoke + xtb probe gate (--xtb) + WSL→Windows path-conversion helper (Wave 3)
 - [ ] 01-06-PLAN.md — AGENTS.md gate docs + full gate run + human-verify checkpoint: install, single instance, modeless (Wave 4)
 
 Notes: Avoids the expensive-to-retrofit traps — module identity double-singleton (Pitfall 5), dialog lifetime (7), modeless freeze pattern (2), epoch guards (9). Human-verify: plugin loads via plugin path; exactly one dialog.
@@ -194,7 +194,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Plugin Skeleton & Purity Harness | 1/6 | In progress | - |
+| 1. Plugin Skeleton & Purity Harness | 5/6 | In progress | - |
 | 2. Pure Core — Game & Chemistry Logic | 0/TBD | Not started | - |
 | 3. Molecules in the Viewer & Setup Tab | 0/TBD | Not started | - |
 | 4. Game Loop & Input | 0/TBD | Not started | - |
