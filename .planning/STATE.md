@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 1 of 8 (Plugin Skeleton & Purity Harness)
-Plan: 2 of 6 in current phase
+Plan: 3 of 6 in current phase (01-01, 01-02, 01-03 complete; 01-04 branch merging next)
 Status: In progress
-Last activity: 2026-09-06 — Completed 01-02-PLAN.md (modeless 3-tab dialog shell)
+Last activity: 2026-09-06 — Merged 01-02 + 01-03 from Wave 2 worktrees (dialog shell + purity gates)
 
-Progress: [██░░░░░░░░] ~7% (2 of ~28 estimated plans — Phase 1 firm at 6; Phases 2–8 TBD)
+Progress: [███░░░░░░░] ~11% (3 of ~28 estimated plans — Phase 1 firm at 6; Phases 2–8 TBD)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 4 min
-- Total execution time: 8 min
+- Total plans completed: 3
+- Average duration: 5 min
+- Total execution time: 15 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Plugin Skeleton & Purity Harness | 2/6 | 8 min | 4 min |
+| 1. Plugin Skeleton & Purity Harness | 3/6 | 15 min | 5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (5 min), 01-01 (3 min)
+- Last 5 plans: 01-03 (7 min), 01-02 (5 min), 01-01 (3 min)
 - Trend: — (early)
 
 *Updated after each plan completion*
@@ -51,6 +51,7 @@ Recent decisions affecting current work:
 - 01-01 2026-09-06: Entry module is stdlib-only at module level; pymol imported inside `__init_plugin__`, Qt lazily inside `run_plugin_gui` (INFRA-02 — zero-stub py3.6 gate green from commit one)
 - 01-01 2026-09-06: tests/ has NO `__init__.py`; discovery = `python3.6 -m unittest discover -s tests -p "test_*.py" -v` (never `-t .` — fails on py3.6 non-package start dir); every test file repeats the sys.path self-insert
 - 01-02 2026-09-06: gui.py docstrings stay free of banned literals (exec_(, from PyQt5, import PyQt5) — plan verify + 01-03 AST checker grep the raw text and docstring literals false-positive (research §1.4); contracts are documented in checker-safe wording instead
+- 01-03 2026-09-06: Purity gate is AST-based, not grep (docstring-proof; splits module-level vs lazy); "module level" = direct Module.body children only; GUI allowlist accepts only `pymol.Qt`/`pymol.Qt.*` import paths — extend GUI_MODULES deliberately, everything else defaults PURE
 
 ### Pending Todos
 
@@ -66,7 +67,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-06 11:22
-Stopped at: Completed 01-02-PLAN.md (SUMMARY written; STATE updated)
+Last session: 2026-09-06 (orchestrator merge)
+Stopped at: Wave 2 merged (01-02 + 01-03); exec/01-04 branch pending merge
 Resume file: None
-Next action: Merge wave 2 (01-02 ∥ 01-03 ∥ 01-04 branches), then Wave 3 — 01-05 (offscreen dialog smoke + xtb probe gate)
+Next action: Merge exec/01-04 (headless smoke), then Wave 3 — 01-05 (offscreen dialog smoke + xtb probe gate). Note: `run_gates.py --smoke` passes fully only after 01-04's smoke lands on main.
