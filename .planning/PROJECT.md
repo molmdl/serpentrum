@@ -45,12 +45,12 @@ Playing snake by stacking real molecules with known stacking geometry, then seei
 ## Context
 
 - Sibling project AA-match established the GSD workflow patterns for PyMOL plugins in this environment (pure-module gates, headless smokes, module-identity rules); its AGENTS.md is prior art worth mirroring.
-- `tmp/bioCHEMeleon` is the author's previous PyMOL game plugin — similar UI and mechanisms; code may be borrowed. `Pymol-script-repo` and `pymol-src` symlinks provide plugin and PyMOL 2.5.0 source references (git-ignored).
+- `tmp/bioCHEMeleon` is the author's previous PyMOL game plugin — its popup UI (3-tab dialog patterns) and mechanisms may be borrowed; code may be borrowed. `Pymol-script-repo` and `pymol-src` symlinks provide plugin and PyMOL 2.5.0 source references (git-ignored).
 - `test_wsl_winxtb.sh` + `tmp/xtb_test/` contain a proven Windows-xtb-from-WSL run (phenol, `-o --hess`); xtb 6.7.1 is symlinked at `xtb-6.7.1` (Windows pre-release; 6.7.0 Windows build is missing a library).
 - Code must detect `xtb` vs `xtb.exe` to support multiple OSes.
 - README currently has placeholder sections; the vibe-coding warning block at the top must be preserved in any rewrite. (It also contains a leftover "sECDpent" name from another project — fix when README is rewritten.)
 - All claims, citations, DOIs, PDB IDs, molecule sources MUST be verified against a source and explicitly approved by the human — no fabrication.
-- Open design questions deferred to research: 2D plane vs 3D; movement/steering model (arrow-key mapping); speed behavior (constant vs increasing); stacking fallback for molecules without known stacking data.
+- Decided design points: 2D plane + locked camera; constant speed for v1; turn model = rigid chain pivot (turn sweep refused on collision, no 180° reversal — GAME-10); stacking fallback = refuse-and-skip for v1 (refuse policy, STACK-03); demo set = Set A only; IR broadened plot; 6 buttons (no Generate-and-export).
 
 ## Constraints
 
@@ -71,6 +71,7 @@ Playing snake by stacking real molecules with known stacking geometry, then seei
 | Snake cap: user-set, safe default (~10 molecules / ~100 atoms), warning if exceeded | Hessian cost grows ~N³; atom guard runs before xtb | — Pending |
 | Drop "Generate and export" button (v1 has 6 buttons) | Listed but undefined in spec; inherited from AA-match template | — Pending |
 | Crashed snake still proceeds to spectra | Losing only stops further stacking; the current snake is still calculable | — Pending |
+| Turn model = rigid chain pivot (sweep refused on collision; no 180° reversal) | Only model where the cited stacking geometry survives every frame; simplest collision detection | — Pending |
 | Demo sets: ≤3 rings, known stacking, research proposes / user approves | Verified-source constraint; stacking data must come from a real database | — Pending |
 | Spectra available on any completed snake (win or crash) | Keeps core value reachable in every run | — Pending |
 
