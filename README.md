@@ -27,8 +27,8 @@ For the viewer and UI:
 Install via PyMOL's **Plugin Manager** (universal across Windows/Linux/macOS):
 
 1. In PyMOL: `Plugin → Plugin Manager → Install New Plugin`
-2. Point the file picker at the `sECDpent/` package directory
-3. The plugin registers a **sECDpent** item under the Plugins menu
+2. Point the file picker at the `serpentrum/` package directory
+3. The plugin registers a **serpentrum** item under the Plugins menu
 
 ## Usage
 
