@@ -122,7 +122,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SETUP-01 | Phase 1 | Pending |
+| SETUP-01 | Phase 1 | Complete |
 | SETUP-02 | Phase 3 | Pending |
 | SETUP-03 | Phase 3 | Pending |
 | SETUP-04 | Phase 3 | Pending |
@@ -155,12 +155,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-02 | Phase 8 | Pending |
 | DATA-03 | Phase 3 | Pending |
 | DATA-04 | Phase 8 | Pending |
-| INFRA-01 | Phase 1 | Pending |
-| INFRA-02 | Phase 1 | Pending |
-| INFRA-03 | Phase 1 | Pending |
+| INFRA-01 | Phase 1 | Complete |
+| INFRA-02 | Phase 1 | Complete |
+| INFRA-03 | Phase 1 | Complete |
 | INFRA-04 | Phase 3 | Pending |
-| INFRA-05 | Phase 1 | Pending |
-| INFRA-06 | Phase 1 | Pending |
+| INFRA-05 | Phase 1 | Complete |
+| INFRA-06 | Phase 1 | Complete |
 | DOCS-01 | Phase 8 | Pending |
 | DOCS-02 | Phase 8 | Pending |
 | DOCS-03 | Phase 8 | Pending |

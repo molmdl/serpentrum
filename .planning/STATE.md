@@ -11,8 +11,8 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 
 Phase: 1 of 8 (Plugin Skeleton & Purity Harness)
 Plan: 6 of 6 in current phase (01-01..01-06 complete)
-Status: Phase complete — pending verification
-Last activity: 2026-09-06 — Completed 01-06-PLAN.md (AGENTS.md gate docs + full gate run + human-verify checkpoint approved)
+Status: Phase complete — verified (5/5 must-haves, 01-VERIFICATION.md)
+Last activity: 2026-09-06 — Phase 1 verified: gates green end-to-end + human-verify approved (install/single-instance/modeless)
 
 Progress: [██░░░░░░░░] ~21% (6 of ~28 estimated plans — Phase 1 firm at 6; Phases 2–8 TBD)
 

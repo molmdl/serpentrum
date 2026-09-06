@@ -16,7 +16,7 @@ A PyMOL plugin game: steer a molecular head around a bounded box, stack real sma
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Plugin Skeleton & Purity Harness** - Installable plugin, single-instance modeless 3-tab dialog, purity/test harness built in from commit one *(research A)*
+- [x] **Phase 1: Plugin Skeleton & Purity Harness** - Installable plugin, single-instance modeless 3-tab dialog, purity/test harness built in from commit one *(research A)*
 - [ ] **Phase 2: Pure Core — Game & Chemistry Logic** - All game/chemistry rules as stdlib-only WSL-tested modules; spectra parser fixture-first; demo-data approval track starts *(research B)*
 - [ ] **Phase 3: Molecules in the Viewer & Setup Tab** - Configure a game in the Setup tab; box + head molecule materialize in the viewer; uploads gated *(research C)*
 - [ ] **Phase 4: Game Loop & Input** - Arrow-key steered movement on a 2D locked-camera plane with countdown, HUD, pause/restart *(research D — input spike)*
@@ -194,7 +194,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Plugin Skeleton & Purity Harness | 6/6 | In progress | 2026-09-06 |
+| 1. Plugin Skeleton & Purity Harness | 6/6 | Complete (verified 5/5 must-haves) | 2026-09-06 |
 | 2. Pure Core — Game & Chemistry Logic | 0/TBD | Not started | - |
 | 3. Molecules in the Viewer & Setup Tab | 0/TBD | Not started | - |
 | 4. Game Loop & Input | 0/TBD | Not started | - |
