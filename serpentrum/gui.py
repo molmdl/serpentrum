@@ -33,6 +33,10 @@ class PluginDialog(QtWidgets.QDialog):
 
     Registration contract: each tab page is added with exactly one
     addTab(page, label) call inside __init__, in _TAB_DEFS order.
+
+    Switching contract (later phases): self.tabs (QTabWidget) is the
+    documented handle — setCurrentWidget(page) / setCurrentIndex(i);
+    page order stays fixed Setup -> Game -> Spectra.
     """
 
     def __init__(self, parent=None):
