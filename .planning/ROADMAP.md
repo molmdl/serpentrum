@@ -43,7 +43,7 @@ A PyMOL plugin game: steer a molecular head around a bounded box, stack real sma
 Plans:
 - [x] 01-01-PLAN.md — Plugin package skeleton: anchored single-instance entry point + zero-stub import test (Wave 1)
 - [ ] 01-02-PLAN.md — 3-tab modeless dialog shell, Setup / Game / Spectra placeholders (Wave 2, parallel)
-- [ ] 01-03-PLAN.md — Purity gate: AST checker + run_gates runner (syntax walk, plugin-path safety, scoped unittest, --smoke) (Wave 2, parallel)
+- [x] 01-03-PLAN.md — Purity gate: AST checker + run_gates runner (syntax walk, plugin-path safety, scoped unittest, --smoke) (Wave 2, parallel)
 - [ ] 01-04-PLAN.md — Headless Windows PyMOL skeleton smoke: loader namespace, anchor reload/double-import, flushed sentinels (Wave 2, parallel)
 - [ ] 01-05-PLAN.md — Offscreen dialog smoke + xtb probe gate (--xtb) + WSL→Windows path-conversion helper (Wave 3)
 - [ ] 01-06-PLAN.md — AGENTS.md gate docs + full gate run + human-verify checkpoint: install, single instance, modeless (Wave 4)

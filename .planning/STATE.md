@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 1 of 8 (Plugin Skeleton & Purity Harness)
-Plan: 1 of 6 in current phase
+Plan: 3 of 6 in current phase (01-03 done; 01-02/01-04 in parallel worktrees)
 Status: In progress
-Last activity: 2026-09-06 — Completed 01-01-PLAN.md (plugin skeleton + zero-stub test)
+Last activity: 2026-09-06 — Completed 01-03-PLAN.md (AST purity checker + run_gates harness)
 
-Progress: [█░░░░░░░░░] ~4% (1 of ~28 estimated plans — Phase 1 firm at 6; Phases 2–8 TBD)
+Progress: [██░░░░░░░░] ~7% (2 of ~28 estimated plans — Phase 1 firm at 6; Phases 2–8 TBD)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 3 min
-- Total execution time: 3 min
+- Total plans completed: 2
+- Average duration: 5 min
+- Total execution time: 10 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Plugin Skeleton & Purity Harness | 1/6 | 3 min | 3 min |
+| 1. Plugin Skeleton & Purity Harness | 2/6 | 10 min | 5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (3 min)
-- Trend: — (first plan)
+- Last 5 plans: 01-03 (7 min), 01-01 (3 min)
+- Trend: — (early)
 
 *Updated after each plan completion*
 
@@ -50,6 +50,7 @@ Recent decisions affecting current work:
 - 01-01 2026-09-06: Anchor live state on `pmg_tk.startup._serpentrum` (loader's own plugin namespace) — survives Plugin-Manager reload + double import (Pitfall 7 / INFRA-03); never module globals
 - 01-01 2026-09-06: Entry module is stdlib-only at module level; pymol imported inside `__init_plugin__`, Qt lazily inside `run_plugin_gui` (INFRA-02 — zero-stub py3.6 gate green from commit one)
 - 01-01 2026-09-06: tests/ has NO `__init__.py`; discovery = `python3.6 -m unittest discover -s tests -p "test_*.py" -v` (never `-t .` — fails on py3.6 non-package start dir); every test file repeats the sys.path self-insert
+- 01-03 2026-09-06: Purity gate is AST-based, not grep (docstring-proof; splits module-level vs lazy); "module level" = direct Module.body children only; GUI allowlist accepts only `pymol.Qt`/`pymol.Qt.*` import paths — extend GUI_MODULES deliberately, everything else defaults PURE
 
 ### Pending Todos
 
@@ -65,7 +66,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-06 19:13
-Stopped at: Completed 01-01-PLAN.md (SUMMARY written; STATE updated)
+Last session: 2026-09-06 19:25
+Stopped at: Completed 01-03-PLAN.md (SUMMARY written; STATE updated)
 Resume file: None
-Next action: Execute Wave 2 — 01-02 (dialog shell) ∥ 01-03 (purity gates) ∥ 01-04 (headless smokes)
+Next action: Merge Wave 2 branches (01-02 ∥ 01-03 ∥ 01-04) in dependency order; then 01-05 / 01-06. Note: `run_gates.py --smoke` fails until 01-04 lands smoke/01_skeleton_smoke.py
