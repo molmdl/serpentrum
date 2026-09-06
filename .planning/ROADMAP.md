@@ -38,7 +38,15 @@ A PyMOL plugin game: steer a molecular head around a bounded box, stack real sma
   3. The dialog is modeless: PyMOL's viewer and command line stay responsive while it is open. [INFRA-05]
   4. The WSL python3.6 gate runs green: all modules py_compile under 3.6, pure modules import stdlib only (grep gate), Qt only via `pymol.Qt`. [INFRA-02, INFRA-06]
   5. The environment contract holds: a headless Windows PyMOL smoke via cmd.exe exercises the plugin, the WSL python3.6 suite runs, and Windows xtb is invocable from WSL with path conversion. [INFRA-01]
-**Plans**: TBD (expected 2–3; scaffold → dialog shell + state anchoring, with the smoke harness as a parallelizable plan)
+**Plans**: 6 plans (4 waves)
+
+Plans:
+- [ ] 01-01-PLAN.md — Plugin package skeleton: anchored single-instance entry point + zero-stub import test (Wave 1)
+- [ ] 01-02-PLAN.md — 3-tab modeless dialog shell, Setup / Game / Spectra placeholders (Wave 2, parallel)
+- [ ] 01-03-PLAN.md — Purity gate: AST checker + run_gates runner (syntax walk, plugin-path safety, scoped unittest, --smoke) (Wave 2, parallel)
+- [ ] 01-04-PLAN.md — Headless Windows PyMOL skeleton smoke: loader namespace, anchor reload/double-import, flushed sentinels (Wave 2, parallel)
+- [ ] 01-05-PLAN.md — Offscreen dialog smoke + xtb probe gate (--xtb) + WSL→Windows path-conversion helper (Wave 3)
+- [ ] 01-06-PLAN.md — AGENTS.md gate docs + full gate run + human-verify checkpoint: install, single instance, modeless (Wave 4)
 
 Notes: Avoids the expensive-to-retrofit traps — module identity double-singleton (Pitfall 5), dialog lifetime (7), modeless freeze pattern (2), epoch guards (9). Human-verify: plugin loads via plugin path; exactly one dialog.
 
@@ -186,7 +194,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Plugin Skeleton & Purity Harness | 0/TBD | Not started | - |
+| 1. Plugin Skeleton & Purity Harness | 0/6 | Not started | - |
 | 2. Pure Core — Game & Chemistry Logic | 0/TBD | Not started | - |
 | 3. Molecules in the Viewer & Setup Tab | 0/TBD | Not started | - |
 | 4. Game Loop & Input | 0/TBD | Not started | - |
