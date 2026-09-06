@@ -159,6 +159,12 @@ def gate_smoke(failures, notes):
         passed, out = run_smoke(rel_path)
         if passed:
             notes.append('smoke %s: PASS (sentinel SMOKE-OK)' % rel_path)
+            # Echo the flushed sentinel line itself so captured gate
+            # output carries the literal proof (e.g. 'SMOKE-OK SKELETON').
+            for line in out.splitlines():
+                if 'SMOKE-OK' in line:
+                    notes.append('smoke %s: %s' % (rel_path, line.strip()))
+                    break
         else:
             failures.append('smoke %s: FAIL (no flushed SMOKE-OK sentinel, '
                             'or SMOKE-FAIL present)' % rel_path)
@@ -234,6 +240,11 @@ def gate_xtb(failures, notes):
     for line in out.splitlines():
         if 'xtb version' in line:
             notes.append('xtb gate: %s (rc=%d)' % (line.strip(), rc))
+            break
+    for line in out.splitlines():
+        if 'normal termination' in line:
+            # Echo the literal proof line into the captured gate output.
+            notes.append('xtb gate: %s' % line.strip())
             break
     if has_version and has_termination:
         return True
