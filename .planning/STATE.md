@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 1 of 8 (Plugin Skeleton & Purity Harness)
-Plan: 3 of 6 in current phase (01-01, 01-02, 01-03 complete; 01-04 branch merging next)
+Plan: 4 of 6 in current phase (01-01, 01-02, 01-03, 01-04 complete)
 Status: In progress
-Last activity: 2026-09-06 — Merged 01-02 + 01-03 from Wave 2 worktrees (dialog shell + purity gates)
+Last activity: 2026-09-06 — Wave 2 fully merged (dialog shell + purity gates + headless smoke)
 
-Progress: [███░░░░░░░] ~11% (3 of ~28 estimated plans — Phase 1 firm at 6; Phases 2–8 TBD)
+Progress: [███░░░░░░░] ~14% (4 of ~28 estimated plans — Phase 1 firm at 6; Phases 2–8 TBD)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 5 min
-- Total execution time: 15 min
+- Total plans completed: 4
+- Average duration: 24 min
+- Total execution time: 94 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Plugin Skeleton & Purity Harness | 3/6 | 15 min | 5 min |
+| 1. Plugin Skeleton & Purity Harness | 4/6 | 94 min | 24 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (7 min), 01-02 (5 min), 01-01 (3 min)
-- Trend: — (early)
+- Last 5 plans: 01-04 (79 min), 01-03 (7 min), 01-02 (5 min), 01-01 (3 min)
+- Trend: 01-04 included two Windows PyMOL probe round-trips (root-cause debugging)
 
 *Updated after each plan completion*
 
@@ -52,6 +52,7 @@ Recent decisions affecting current work:
 - 01-01 2026-09-06: tests/ has NO `__init__.py`; discovery = `python3.6 -m unittest discover -s tests -p "test_*.py" -v` (never `-t .` — fails on py3.6 non-package start dir); every test file repeats the sys.path self-insert
 - 01-02 2026-09-06: gui.py docstrings stay free of banned literals (exec_(, from PyQt5, import PyQt5) — plan verify + 01-03 AST checker grep the raw text and docstring literals false-positive (research §1.4); contracts are documented in checker-safe wording instead
 - 01-03 2026-09-06: Purity gate is AST-based, not grep (docstring-proof; splits module-level vs lazy); "module level" = direct Module.body children only; GUI allowlist accepts only `pymol.Qt`/`pymol.Qt.*` import paths — extend GUI_MODULES deliberately, everything else defaults PURE
+- 01-04 2026-09-06: Under `-cq`, `__file__` IS defined but is PyMOL's own launcher (`...\site-packages\pymol\__init__.py`), NOT the script — smokes resolve ROOT by validating candidates against `serpentrum/__init__.py`; never trust `__file__` (probe-verified; append to `pmg_tk.startup.__path__` itself is safe — regular package, plain list)
 
 ### Pending Todos
 
@@ -68,6 +69,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-09-06 (orchestrator merge)
-Stopped at: Wave 2 merged (01-02 + 01-03); exec/01-04 branch pending merge
+Stopped at: Wave 2 fully merged (01-02 + 01-03 + 01-04 on main)
 Resume file: None
-Next action: Merge exec/01-04 (headless smoke), then Wave 3 — 01-05 (offscreen dialog smoke + xtb probe gate). Note: `run_gates.py --smoke` passes fully only after 01-04's smoke lands on main.
+Next action: Wave 3 — 01-05 (offscreen dialog smoke + xtb probe gate + winpath helper); `run_gates.py --smoke` should now pass the required skeleton smoke end-to-end on main.
