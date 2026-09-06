@@ -3,7 +3,7 @@
 
 Usage (from anywhere; ROOT is resolved from this file's location):
 
-    python3.6 tests/run_gates.py [--smoke]
+    python3.6 tests/run_gates.py [--smoke] [--xtb]
 
 Default gates (WSL-native, sub-second):
 
@@ -22,6 +22,15 @@ Flag-gated Windows legs (--smoke, INFRA-01): headless Windows PyMOL smokes
 via `cmd.exe /c C:\src\run-conda-pymol.bat -cq <script>`. Verdicts come
 from printed SMOKE-OK / SMOKE-FAIL sentinels ONLY — exit codes through the
 .bat are always 0 (even after a Qt C-abort) and are never trusted.
+
+Flag-gated Windows leg (--xtb, INFRA-01): direct WSL exec of the Windows
+xtb.exe — invoked by WSL-style path (the repo-root symlink xtb-6.7.1 ->
+/mnt/c/xtb-6.7.1), with a /mnt/c-backed cwd and bare relative args (the
+research-verified pattern [RUN 2026-09-06], as in test_wsl_winxtb.sh; NO
+cmd.exe here). The verdict asserts BOTH 'xtb version' AND 'normal
+termination' in the captured output. For a direct exec the child exit
+code is meaningful (unlike the .bat legs) and is captured, but the gate
+asserts on content anyway.
 
 Exit code: 0 when every default gate (and every required smoke) passes,
 1 otherwise. A missing required smoke is a failure; informational smokes
@@ -47,6 +56,11 @@ REQUIRED_SMOKES = ('smoke/01_skeleton_smoke.py',)
 
 SMOKE_BAT = 'C:\\src\\run-conda-pymol.bat'
 SMOKE_TIMEOUT = 90  # seconds, per research Q3
+
+# Gate 5 (--xtb): the Windows xtb.exe, reached through the repo-root
+# symlink; direct WSL exec, /mnt/c-backed cwd, bare relative args.
+XTB_EXE_REL = os.path.join('xtb-6.7.1', 'bin', 'xtb.exe')
+XTB_TIMEOUT = 60  # seconds, per research Q4
 
 
 def _py_files(dir_name):
@@ -161,12 +175,89 @@ def gate_smoke(failures, notes):
     return ok
 
 
+def gate_xtb(failures, notes):
+    """Flag-gated Windows leg: prove Windows xtb is invocable from WSL.
+
+    The research-verified pattern (INFRA-01, [RUN 2026-09-06]): exec the
+    exe DIRECTLY by WSL-style path (no cmd.exe), with a /mnt/c-backed cwd
+    and bare relative args. Verdict = 'xtb version' AND 'normal
+    termination' in the output; the direct-exec exit code is meaningful
+    and captured, but the gate asserts on content regardless.
+    """
+    # (a) Conversion sanity — exercises tools/winpath from the gate. The
+    # repo must live on /mnt/c for the Windows legs to work at all.
+    tools_dir = os.path.join(ROOT, 'tools')
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    try:
+        import winpath
+    except ImportError as exc:
+        failures.append('xtb gate: cannot import tools/winpath.py: %r' % exc)
+        return False
+    try:
+        win_root = winpath.to_windows_path(ROOT)
+    except ValueError as exc:
+        failures.append('xtb gate: repo root is not a WSL /mnt/<drive> '
+                        'path (%r) — Windows legs cannot work' % exc)
+        return False
+    if not win_root.startswith('C:/'):
+        failures.append('xtb gate: repo root maps to %r, expected C:/... '
+                        '— repo must live on /mnt/c' % win_root)
+        return False
+    notes.append('xtb gate: winpath sanity %s -> %s' % (ROOT, win_root))
+
+    # (b) Resolve the exe.
+    exe = os.path.join(ROOT, XTB_EXE_REL)
+    if not os.path.isfile(exe):
+        failures.append('xtb gate: exe missing at %s (expected repo-root '
+                        'symlink xtb-6.7.1 -> /mnt/c/xtb-6.7.1)' % exe)
+        return False
+
+    # (c) Probe: direct WSL exec, /mnt/c-backed cwd, bare relative args.
+    try:
+        proc = subprocess.run(
+            [exe, '--version'], cwd=ROOT,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            timeout=XTB_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        failures.append('xtb gate: no output within %ss — exe or cwd '
+                        'contract broken' % XTB_TIMEOUT)
+        return False
+    except OSError as exc:
+        failures.append('xtb gate: could not exec %s: %r' % (exe, exc))
+        return False
+
+    out = proc.stdout.decode('utf-8', errors='replace')
+    rc = proc.returncode
+    has_version = 'xtb version' in out
+    has_termination = 'normal termination' in out
+    for line in out.splitlines():
+        if 'xtb version' in line:
+            notes.append('xtb gate: %s (rc=%d)' % (line.strip(), rc))
+            break
+    if has_version and has_termination:
+        return True
+    failures.append(
+        'xtb gate: output contract broken (xtb version found: %s, '
+        'normal termination found: %s, child rc: %s) — expected '
+        "'xtb version 6.7.1pre ...' + 'normal termination of xtb'"
+        % (has_version, has_termination, rc))
+    sys.stdout.write('--- last 20 lines of xtb --version output ---\n')
+    sys.stdout.write('\n'.join(out.splitlines()[-20:]) + '\n')
+    return False
+
+
 def main(argv=None):
     args = argparse.ArgumentParser(
         description='serpentrum gate runner (syntax, safety, purity, '
-                    'unittest; --smoke adds headless Windows PyMOL smokes)')
+                    'unittest; --smoke adds headless Windows PyMOL smokes, '
+                    '--xtb adds the Windows-xtb-from-WSL probe)')
     args.add_argument('--smoke', action='store_true',
                       help='also run headless Windows PyMOL smokes')
+    args.add_argument('--xtb', action='store_true',
+                      help='also probe Windows xtb from WSL '
+                           '(direct exec, asserts xtb version + '
+                           'normal termination)')
     known = args.parse_args(argv if argv is not None else sys.argv[1:])
 
     os.chdir(ROOT)  # subprocesses and cmd.exe inherit the repo cwd
@@ -182,6 +273,9 @@ def main(argv=None):
     if known.smoke:
         results.append(('gate 4: headless smokes (required)',
                         gate_smoke(failures, notes)))
+    if known.xtb:
+        results.append(('gate 5: xtb probe (Windows from WSL)',
+                        gate_xtb(failures, notes)))
 
     for note in notes:
         sys.stdout.write('note: %s\n' % note)
