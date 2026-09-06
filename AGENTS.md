@@ -59,3 +59,17 @@ wave has >1 plan, use this protocol. See `.planning/quick/001-*` for the
 rationale + rejected alternatives (message-board lock, orchestrator commit
 gate).
 
+## serpentrum plugin gates & conventions (Phase 1)
+
+Every future phase runs these gates before committing. Run them from the repo root in WSL.
+
+- **Gates (WSL):**
+  - `python3.6 tests/run_gates.py` — default gate: syntax walk + plugin-path safety + AST purity + scoped unittest discovery.
+  - `python3.6 tests/run_gates.py --smoke` — headless Windows PyMOL smokes via `cmd.exe`. Verdict = flushed `SMOKE-OK` sentinels in output, NEVER exit codes (PyMOL swallows rc through the .bat).
+  - `python3.6 tests/run_gates.py --xtb` — Windows xtb invoked from WSL: direct exec of the .exe, `/mnt/c`-backed cwd, bare relative args; asserts `normal termination` in output.
+- **Smoke one-liner** (debugging a single smoke, no staging copy): `timeout 90 cmd.exe /c "C:\\src\\run-conda-pymol.bat -cq smoke\\01_skeleton_smoke.py"` from repo root.
+- **Plugin-path safety (hard rules):** the dev install points PyMOL's plugin loader at the repo root → **NO `__init__.py`** in `tests/`, `smoke/`, or `tools/`; **NO top-level `*.py`** at the repo root. Either would be autoloaded as a plugin at GUI startup (enforced by `run_gates` gate 1).
+- **Module identity:** the plugin loads as **`pmg_tk.startup.serpentrum`** — `pymol.plugins.startup` is only an attribute alias to the same module object. Smokes/asserts key on the `pmg_tk` name; live state anchors on `pmg_tk.startup._serpentrum` (never module globals — reload/double-import would duplicate them).
+- **Modeless rule:** the main dialog opens via `.show()` only, never `.exec_()`; the AST purity checker fails any `.exec_()` until a later phase adds an explicit child-dialog allowlist.
+- **Purity classes:** entry (`serpentrum/__init__.py`) lazy-imports pymol/pmg_tk inside functions only; GUI modules are an explicit allowlist in `tools/check_purity.py` (pymol.Qt only); everything else under `serpentrum/` is pure — zero pymol/Qt/numpy anywhere.
+

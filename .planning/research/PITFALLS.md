@@ -171,6 +171,8 @@ Intermittent freezes during spectra; `CmdException`s about locks; errors that on
 **What goes wrong:**
 PyMOL imports plugins as **`pymol.plugins.startup.<name>`**, not as the bare package name (`[SRC: pymol/plugins/__init__.py:423-430]` `mod_name = parent.__name__ + '.' + name`; `installation.py:339` `prefix = startup.__name__`; load via `__import__(self.mod_name)`, `__init__.py:277`). If the same code becomes importable under a **second name** — bare `serpentrum` (sys.path leakage, dev `run`-script experiments, tests importing the package directly, the staged dev copy under `tmp/`) — Python creates a **second module object** with its own module-level globals. Consequences:
 
+> CORRECTED 2026-09-06 (phase-1 research [RUN] probe): the actual sys.modules key is pmg_tk.startup.<name>; pymol.plugins.startup is an attribute alias to the same module object. See phases/01-plugin-skeleton-purity-harness/01-RESEARCH-skeleton.md § correction.
+
 - The `dialog = None` module singleton (`[SRC: bioCHEMeleon/__init__.py:3-5]`) exists twice → two plugin windows can be opened; each has its **own** GameController; both drive the same viewer objects.
 - Plugin Manager **reload** (`[SRC: pymol/plugins/__init__.py:274-275]` `reload(self.module)`) re-executes the module: fresh globals, `dialog = None` again, while the old dialog is still on screen → the next menu click opens a **second** dialog, and the orphaned one still holds a live controller/timer.
 
