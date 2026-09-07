@@ -3,7 +3,12 @@
 Parses the Gaussian-98-style frequency output that ``xtb --ohess`` writes
 to ``g98.out``: the Standard-orientation atom block plus frequency blocks
 (Frequencies / Red. masses / Frc consts / IR Inten / Raman Activ / Depolar
-rows, then per-atom displacement vectors). Written against the committed
+rows, then per-atom displacement vectors). Block column counts come from
+the tokens after '--' on the Frequencies line (1-3; a remainder block
+carries fewer than 3), and each block's displacement layout is declared by
+its ' Atom AN' header: one coordinate-column label per float, chunked into
+one tuple per frequency column (real xtb/Gaussian blocks declare X Y Z per
+mode; the plan's synthetic remainder block declares a single coordinate). Written against the committed
 fixture grammar (tests/fixtures/xtb/g98.out: 26-atom phenol pi-dimer,
 72 modes = 3*26-6 in 24 blocks of 3 columns at stride 35, first
 'Frequencies --' line 46, last line 851, EOF-terminated) — never against
@@ -13,9 +18,10 @@ Pure stdlib module: the purity gate classifies everything under
 serpentrum/ except the entry/GUI modules as PURE, so no pymol/pmg_tk/
 PyQt5/numpy import may appear here even inside function bodies.
 
-Scope (ROADMAP wave-1 split): the g98 core ONLY. parse_vibspectrum and
-real_modes arrive with plan 02-09; broaden and the parse dispatcher with
-plan 02-12. Do not add them here.
+Scope (ROADMAP wave-1 split): the g98 core ONLY. The Turbomole-format
+fallback parser and the trivial-mode filter arrive with plan 02-09; the
+line-shape convolution and the parse dispatcher with plan 02-12. Do not
+add them here.
 """
 from collections import namedtuple
 
@@ -62,6 +68,26 @@ def _fail(stage, lineno, line, detail):
     """Raise the loud error: stage + 1-based line + excerpt."""
     raise SpectraParseError(
         '%s: line %d: %s [%s]' % (stage, lineno, detail, _excerpt(line)))
+
+
+def _to_float(token, stage, lineno, line):
+    """float() with the loud-failure wrap: a non-numeric token (including
+    the g98 '******' overflow token) raises SpectraParseError, never a
+    bare ValueError."""
+    try:
+        return float(token)
+    except ValueError:
+        _fail(stage, lineno, line,
+              'token %r is not a number' % token)
+
+
+def _to_int(token, stage, lineno, line):
+    """int() with the loud-failure wrap (same contract as _to_float)."""
+    try:
+        return int(token)
+    except ValueError:
+        _fail(stage, lineno, line,
+              'token %r is not an integer' % token)
 
 
 def _is_dash_line(line):
@@ -111,11 +137,14 @@ def _parse_atom_block(lines):
                   'z), got %d' % len(tokens))
         # Row grammar: int, int, int, float, float, float. Only the
         # atomic number and coordinates are carried into Atom.
-        int(tokens[0])
-        atomic_number = int(tokens[1])
-        int(tokens[2])
-        atoms.append(Atom(atomic_number, float(tokens[3]), float(tokens[4]),
-                          float(tokens[5])))
+        _to_int(tokens[0], 'atom block', row + 1, lines[row])
+        atomic_number = _to_int(tokens[1], 'atom block', row + 1, lines[row])
+        _to_int(tokens[2], 'atom block', row + 1, lines[row])
+        atoms.append(Atom(
+            atomic_number,
+            _to_float(tokens[3], 'atom block', row + 1, lines[row]),
+            _to_float(tokens[4], 'atom block', row + 1, lines[row]),
+            _to_float(tokens[5], 'atom block', row + 1, lines[row])))
         row += 1
     if row >= total:
         _fail('atom block', total, '<end of file>',
@@ -130,17 +159,23 @@ def _parse_atom_block(lines):
 def _parse_frequency_block(lines, freq_index, n_atoms):
     """Parse one frequency block starting at its ' Frequencies --' line
     (0-based index). Returns (freqs, intensities, vectors, end_index)
-    where vectors[column] is the per-atom tuple list for that column."""
+    where vectors[column] is the per-atom tuple list for that column.
+
+    The column count comes from the Frequencies line's own token list,
+    never from a fixed width: a normal block carries 3 columns, a
+    remainder block (n_modes mod 3 != 0) carries 1-2.
+    """
     total = len(lines)
     line = lines[freq_index]
     freq_tokens = line.split('--', 1)[1].split()
-    if len(freq_tokens) != 3:
+    ncols = len(freq_tokens)
+    if not 1 <= ncols <= 3:
         _fail('frequency block', freq_index + 1, line,
-              'expected 3 frequency columns, got %d' % len(freq_tokens))
-    freqs = [float(token) for token in freq_tokens]
+              'expected 1-3 frequency columns, got %d' % ncols)
+    freqs = [_to_float(token, 'frequency block', freq_index + 1, line)
+             for token in freq_tokens]
     # The five property rows follow, in order; each starts with its
-    # exactly-prefixed marker. Column values come from the tokens after
-    # '--' on each row (never fixed columns).
+    # exactly-prefixed marker and yields exactly ncols float values.
     intensities = None
     for offset, prefix in enumerate(_PROPERTY_PREFIXES):
         row_index = freq_index + 1 + offset
@@ -148,10 +183,23 @@ def _parse_frequency_block(lines, freq_index, n_atoms):
             _fail('frequency block', row_index + 1,
                   lines[row_index] if row_index < total else '<end of file>',
                   'expected property row %r' % prefix.strip())
+        row = lines[row_index]
+        row_tokens = row.split('--', 1)[1].split()
+        if len(row_tokens) != ncols:
+            _fail('frequency block', row_index + 1, row,
+                  'expected %d values after %r, got %d'
+                  % (ncols, prefix.strip(), len(row_tokens)))
+        values = [_to_float(token, 'frequency block', row_index + 1, row)
+                  for token in row_tokens]
         if prefix == ' IR Inten    --':
-            intensities = [float(token) for token in
-                           lines[row_index].split('--', 1)[1].split()]
-    # Displacement-vector header, then exactly n_atoms rows.
+            intensities = values
+    # Displacement-vector header, then exactly n_atoms rows. The header
+    # DECLARES the coordinate layout: 'Atom AN' labels followed by one
+    # X/Y/Z-style column label per coordinate. Real g98 blocks list 3
+    # labels per mode (X Y Z per column); the synthetic remainder block
+    # of the plan declares a single coordinate per mode. Either way the
+    # row grammar is token-count-driven: 2 + len(header coordinate
+    # labels) tokens per row, chunked into ncols per-mode groups.
     header_index = freq_index + 6
     if (header_index >= total
             or not lines[header_index].startswith(_ATOM_HEADER_PREFIX)):
@@ -159,7 +207,16 @@ def _parse_frequency_block(lines, freq_index, n_atoms):
               (lines[header_index] if header_index < total
                else '<end of file>'),
               'expected %r header' % _ATOM_HEADER_PREFIX.strip())
-    vectors = [[] for _ in range(3)]
+    header_tokens = lines[header_index].split()
+    coord_columns = len(header_tokens) - 2  # minus the 'Atom' 'AN' labels
+    if coord_columns < 1 or coord_columns % ncols != 0:
+        _fail('frequency block', header_index + 1, lines[header_index],
+              'header declares %d coordinate columns for %d frequency '
+              'column(s); expected a positive multiple of %d'
+              % (coord_columns, ncols, ncols))
+    components = coord_columns // ncols
+    row_tokens_expected = 2 + coord_columns
+    vectors = [[] for _ in range(ncols)]
     row_index = header_index
     for atom_number in range(1, n_atoms + 1):
         row_index += 1
@@ -167,20 +224,25 @@ def _parse_frequency_block(lines, freq_index, n_atoms):
             _fail('frequency block', total, '<end of file>',
                   'unexpected end of file: displacement row %d of %d '
                   'missing' % (atom_number, n_atoms))
-        tokens = lines[row_index].split()
-        if len(tokens) != 11:  # index, AN, then 3 columns x 3 components
-            _fail('frequency block', row_index + 1, lines[row_index],
-                  'expected 11 displacement tokens (index, AN, 3 x '
-                  '[x y z]), got %d' % len(tokens))
-        if int(tokens[0]) != atom_number:
-            _fail('frequency block', row_index + 1, lines[row_index],
+        row = lines[row_index]
+        tokens = row.split()
+        if len(tokens) != row_tokens_expected:
+            _fail('frequency block', row_index + 1, row,
+                  'expected %d displacement tokens (index, AN, %d x '
+                  '[x y z]), got %d'
+                  % (row_tokens_expected, ncols, len(tokens)))
+        if _to_int(tokens[0], 'frequency block', row_index + 1, row) \
+                != atom_number:
+            _fail('frequency block', row_index + 1, row,
                   'expected atom index %d, got %r'
                   % (atom_number, tokens[0]))
-        for column in range(3):
-            base = 2 + 3 * column
-            vectors[column].append((float(tokens[base]),
-                                    float(tokens[base + 1]),
-                                    float(tokens[base + 2])))
+        _to_int(tokens[1], 'frequency block', row_index + 1, row)
+        for column in range(ncols):
+            base = 2 + column * components
+            vectors[column].append(tuple(
+                _to_float(tokens[base + k], 'frequency block',
+                          row_index + 1, row)
+                for k in range(components)))
     return freqs, intensities, vectors, row_index + 1
 
 
@@ -205,7 +267,7 @@ def _parse_frequency_blocks(lines, atoms):
                 % (lineno + 1, _excerpt(line)))
         freqs, intensities, vectors, end_index = _parse_frequency_block(
             lines, lineno, len(atoms))
-        for column in range(3):
+        for column in range(len(freqs)):
             mode_index += 1
             modes.append(Mode(mode_index, freqs[column], intensities[column],
                               vectors[column]))
