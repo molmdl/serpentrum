@@ -1,4 +1,5 @@
-"""serpentrum.xtbenv — xtb success contract + binary detection (PURE).
+"""serpentrum.xtbenv — xtb success contract, binary detection, argv and
+per-run-dir contracts (PURE).
 
 Phase-2 pure half of SPECTRA-02 / SETUP-05 (plan 02-02). Everything in
 this module is stdlib-only (no pymol / pmg_tk / PyQt5 / numpy — enforced
@@ -27,6 +28,7 @@ silently skips the Hessian with exit 0 and no error).
 import collections
 import os
 import shutil
+import tempfile
 
 # Invocation constant (locked 2026-09-06): one word, never '-o --hess'.
 XTB_OHESS = '--ohess'
@@ -163,3 +165,43 @@ def detect_binary(configured_path=None, which_fn=shutil.which):
     if exe:
         return exe
     return None
+
+
+def build_argv(exe_path, input_filename, extra_args=(XTB_OHESS,)):
+    """Build the xtb command line as a LIST of arguments.
+
+    Returns [exe_path, input_filename] + list(extra_args) — never a
+    shell string (Pitfall 3.3 / security table: list args are immune to
+    shell injection and quoting bugs). Raises ValueError if ANY argument
+    contains a quote character (' or ") — same rule as
+    validate_binary_path; quotes in list args would corrupt the argv
+    contract downstream.
+
+    cwd contract (Pitfall 3.1, research-verified [RUN]): input_filename
+    is a BARE relative name. The Phase-6 runner writes snake.xyz INTO
+    the run dir (new_run_dir) and launches xtb with cwd=that dir, so no
+    WSL<->Windows path translation ever happens at runtime. extra_args
+    defaults to (XTB_OHESS,) — the locked --ohess invocation.
+    """
+    argv = [exe_path, input_filename] + list(extra_args)
+    for arg in argv:
+        if '"' in arg or "'" in arg:
+            raise ValueError(
+                "argument contains quote character(s): '%s'" % (arg,))
+    return argv
+
+
+def new_run_dir(base_dir):
+    """Create a fresh per-run directory under base_dir.
+
+    Returns tempfile.mkdtemp(prefix='srp_', dir=base_dir). The 'srp_'
+    prefix makes serpentrum run dirs identifiable at a glance.
+
+    Scope (Pitfall 3.1): this module provides the dir-name contract
+    ONLY. The Phase-6 runner owns writing snake.xyz INTO the dir,
+    launching xtb with cwd=it, copying g98.out / vibspectrum out, and
+    deleting it afterwards. The dir is NEVER the PyMOL session dir —
+    xtb sprays ~10 files into its cwd and must not pollute anything
+    the user can see.
+    """
+    return tempfile.mkdtemp(prefix='srp_', dir=base_dir)

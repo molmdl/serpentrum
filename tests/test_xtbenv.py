@@ -251,5 +251,59 @@ class TestDetectBinary(unittest.TestCase):
         self.assertEqual(fake.queries, ['xtb.exe', 'xtb'])
 
 
+class TestArgvAndRunDir(unittest.TestCase):
+    """build_argv list contract + new_run_dir srp_ contract + constants."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='srp_test_')
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def test_build_argv_default_ohess(self):
+        argv = xtbenv.build_argv('C:\\xtb\\xtb.exe', 'snake.xyz')
+        self.assertIsInstance(argv, list)
+        self.assertEqual(argv, ['C:\\xtb\\xtb.exe', 'snake.xyz', '--ohess'])
+
+    def test_build_argv_custom_extra_args_in_order(self):
+        argv = xtbenv.build_argv(
+            'C:\\xtb\\xtb.exe', 'snake.xyz', ('--ohess', '--gbsa', '1'))
+        self.assertEqual(
+            argv, ['C:\\xtb\\xtb.exe', 'snake.xyz', '--ohess', '--gbsa', '1'])
+
+    def test_build_argv_rejects_quotes(self):
+        for bad in ('C:\\x"tb\\xtb.exe', "C:\\xtb\\xt'b.exe"):
+            self.assertRaises(ValueError, xtbenv.build_argv,
+                              bad, 'snake.xyz')
+        for bad in ('sna"ke.xyz', "snake'.xyz"):
+            self.assertRaises(ValueError, xtbenv.build_argv,
+                              'C:\\xtb\\xtb.exe', bad)
+        # Quote in an extra arg is equally rejected.
+        self.assertRaises(ValueError, xtbenv.build_argv,
+                          'C:\\xtb\\xtb.exe', 'snake.xyz', ("--g'b",))
+
+    def test_new_run_dir_contract(self):
+        run_dir = xtbenv.new_run_dir(self.tmp)
+        self.addCleanup(shutil.rmtree, run_dir, True)
+        self.assertTrue(os.path.exists(run_dir))
+        self.assertTrue(os.path.isdir(run_dir))
+        self.assertTrue(os.path.basename(run_dir).startswith('srp_'))
+        self.assertEqual(os.path.dirname(run_dir), self.tmp)
+
+    def test_new_run_dir_unique_per_call(self):
+        first = xtbenv.new_run_dir(self.tmp)
+        self.addCleanup(shutil.rmtree, first, True)
+        second = xtbenv.new_run_dir(self.tmp)
+        self.addCleanup(shutil.rmtree, second, True)
+        self.assertNotEqual(first, second)
+
+    def test_module_constants_guard_against_drift(self):
+        # These literals must stay consistent with tests/run_gates.py
+        # gate 5 ('normal termination') and the locked --ohess decision
+        # (never '-o --hess' — Pitfall 1).
+        self.assertEqual(xtbenv.XTB_OHESS, '--ohess')
+        self.assertEqual(xtbenv.EXPECTED_FILES, ('g98.out', 'vibspectrum'))
+        self.assertEqual(xtbenv.STDERR_SUCCESS, 'normal termination')
+        self.assertEqual(xtbenv.STDERR_FAILURE, 'abnormal termination')
+
+
 if __name__ == '__main__':
     unittest.main()
