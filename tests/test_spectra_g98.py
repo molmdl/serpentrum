@@ -155,6 +155,119 @@ class TestG98BlockStructure(unittest.TestCase):
                 self.assertEqual(len(vector), 3)
 
 
+def synthetic_remainder_text():
+    """SYNTHETIC 3-atom g98-shaped text carrying a remainder block.
+
+    Clearly labeled synthetic: NO real fixture has a remainder block (the
+    committed dimer is 72 = 24x3) — token-count-driven parsing is the
+    asserted assumption. Block 1 = modes 1-3 in 3 columns; block 2 =
+    mode 4 in 1 column (the 3+1 remainder), per the plan's example row
+    grammar (' Atom AN      X' header, 3-token displacement rows).
+    """
+    return '\n'.join([
+        ' Entering Gaussian System, Link 0.exe',
+        ' Standard orientation:',
+        ' --------------------------------------------------------------------',
+        '  Center     Atomic     Atomic              Coordinates (Angstroms)',
+        '  Number     Number      Type              X           Y           Z',
+        ' --------------------------------------------------------------------',
+        '    1          6             0        0.000000    0.000000    0.000000',
+        '    2          6             0        1.000000    0.000000    0.000000',
+        '    3          1             0        0.000000    1.000000    0.000000',
+        ' --------------------------------------------------------------------',
+        '                      1                      2                      3',
+        ' Frequencies --    10.0000                20.0000                30.0000',
+        ' Red. masses --     1.0                    1.0                    1.0',
+        ' Frc consts  --     0.0                    0.0                    0.0',
+        ' IR Inten    --     1.0                    2.0                    3.0',
+        ' Raman Activ --     0.0                    0.0                    0.0',
+        ' Depolar     --     0.0                    0.0                    0.0',
+        ' Atom AN      X      Y      Z        X      Y      Z        X      Y      Z',
+        '   1   6     0.10   0.11   0.12     0.20   0.21   0.22     0.30   0.31   0.32',
+        '   2   6     0.13   0.14   0.15     0.23   0.24   0.25     0.33   0.34   0.35',
+        '   3   1     0.16   0.17   0.18     0.26   0.27   0.28     0.36   0.37   0.38',
+        '                      4',
+        ' Frequencies --  100.0000',
+        ' Red. masses --  1.0',
+        ' Frc consts  --  0.0',
+        ' IR Inten    --  5.0',
+        ' Raman Activ --  0.0',
+        ' Depolar     --  0.0',
+        ' Atom AN      X',
+        '   1   6    0.10',
+        '   2   6    0.20',
+        '   3   1    0.30',
+    ])
+
+
+class TestG98RemainderBlock(unittest.TestCase):
+    """Behavior case 3 (synthetic input): 3-column block + 1-column
+    remainder block parse as 4 modes with 1-float vector tuples."""
+
+    def test_remainder_block_parses_to_four_modes(self):
+        spectrum = parse_g98_text(synthetic_remainder_text())
+        self.assertEqual(spectrum.n_atoms, 3)
+        self.assertEqual(len(spectrum.modes), 4)
+        # Mode indices stay a running 1-based count across the 3+1 split.
+        self.assertEqual([m.index for m in spectrum.modes],
+                         [1, 2, 3, 4])
+
+    def test_full_block_modes_keep_three_float_vectors(self):
+        spectrum = parse_g98_text(synthetic_remainder_text())
+        for mode in spectrum.modes[:3]:
+            self.assertEqual(len(mode.vectors), 3)
+            for vector in mode.vectors:
+                self.assertEqual(len(vector), 3)
+        self.assertAlmostEqual(spectrum.modes[0].freq, 10.0, places=4)
+        self.assertAlmostEqual(spectrum.modes[2].intensity, 3.0, places=4)
+
+    def test_remainder_mode_carries_one_float_tuples(self):
+        mode = parse_g98_text(synthetic_remainder_text()).modes[3]
+        self.assertAlmostEqual(mode.freq, 100.0, places=4)
+        self.assertAlmostEqual(mode.intensity, 5.0, places=4)
+        vectors = mode.vectors
+        self.assertEqual(len(vectors), 3)
+        # Exact-equality shape: one float per atom, from 3-token rows.
+        for vector, expected in zip(vectors, (0.10, 0.20, 0.30)):
+            self.assertIsInstance(vector, tuple)
+            self.assertEqual(len(vector), 1)
+            self.assertAlmostEqual(vector[0], expected, places=6)
+
+
+class TestG98LoudFailures(unittest.TestCase):
+    """Behavior cases 4-5: corrupt or malformed input fails loudly with
+    SpectraParseError (never a bare ValueError), carrying parser stage,
+    1-based line number, and the offending line's excerpt."""
+
+    def test_bad_log_raises_naming_missing_frequency_section(self):
+        # bad.log: failed xtb run, 105 lines, fatal error at line 97 and
+        # NO frequency section anywhere -> the loud-failure contract.
+        text = read_fixture_text('bad.log')
+        with self.assertRaises(SpectraParseError) as ctx:
+            parse_g98_text(text)
+        self.assertIn('frequency section', str(ctx.exception))
+
+    def test_malformed_property_row_raises_with_line_and_excerpt(self):
+        # Synthetic in-memory corruption of the REAL fixture: block 1's
+        # ' IR Inten    --' row (1-based line 49) becomes garbage.
+        lines = read_fixture_text('g98.out').splitlines()
+        target = None
+        for index, line in enumerate(lines):
+            if line.startswith(' IR Inten    --'):
+                target = index
+                break
+        self.assertIsNotNone(target, 'no IR Inten row found in fixture')
+        self.assertEqual(target, 48, 'fixture grammar shifted: IR Inten '
+                         'expected at 1-based line 49')
+        lines[target] = ' IR Inten    --  garbage not-floats'
+        with self.assertRaises(SpectraParseError) as ctx:
+            parse_g98_text('\n'.join(lines))
+        message = str(ctx.exception)
+        self.assertIn('frequency block', message)   # parser stage
+        self.assertIn(str(target + 1), message)     # 1-based line number
+        self.assertIn('garbage', message)           # offending-line excerpt
+
+
 class TestFixtureByteIdentity(unittest.TestCase):
     """Behavior case 6: the single-copy rule — byte-identical to source."""
 
