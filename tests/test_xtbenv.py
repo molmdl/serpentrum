@@ -19,7 +19,9 @@ the dev plugin path IS the repo root, and findPlugins would treat a
 package dir here as a second plugin.
 """
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -132,6 +134,121 @@ class TestEvaluateRunFixtures(unittest.TestCase):
         start = problem.index("(got: '") + len("(got: '")
         end = problem.rindex("')")
         self.assertLessEqual(len(problem[start:end]), 60)
+
+
+class _RecordingWhich(object):
+    """Fake which_fn: records every query, returns canned answers.
+
+    Dependency injection per plan 02-02 — NO xtb install needed and NO
+    sys.modules stubs (the zero-stub rule bans pymol/Qt module stubbing;
+    a plain injected callable is just a parameter).
+    """
+
+    def __init__(self, answers):
+        self._answers = answers
+        self.queries = []
+
+    def __call__(self, name):
+        self.queries.append(name)
+        return self._answers.get(name)
+
+
+class TestValidateBinaryPath(unittest.TestCase):
+    """Validation rules proven against real tmpdir files (no xtb)."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='srp_test_')
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def _real_file(self):
+        path = os.path.join(self.tmp, 'xtb.exe')
+        with open(path, 'wb') as handle:
+            handle.write(b'MZ')
+        return path
+
+    def test_existing_file_valid(self):
+        self.assertEqual(xtbenv.validate_binary_path(self._real_file()), [])
+
+    def test_missing_path_does_not_exist(self):
+        missing = os.path.join(self.tmp, 'nope.exe')
+        problems = xtbenv.validate_binary_path(missing)
+        self.assertEqual(len(problems), 1)
+        self.assertIn('does not exist', problems[0])
+
+    def test_directory_is_not_a_file(self):
+        problems = xtbenv.validate_binary_path(self.tmp)
+        self.assertEqual(len(problems), 1)
+        self.assertIn('not a file', problems[0])
+
+    def test_quote_characters_rejected(self):
+        quoted = self._real_file() + '"'
+        problems = xtbenv.validate_binary_path(quoted)
+        self.assertTrue(any('quote' in p for p in problems))
+
+    def test_problems_accumulate(self):
+        # Existing DIRECTORY whose name contains a quote: 'not a file'
+        # AND 'quote' both reported.
+        quoted_dir = os.path.join(self.tmp, "di'r")
+        os.makedirs(quoted_dir)
+        problems = xtbenv.validate_binary_path(quoted_dir)
+        self.assertEqual(len(problems), 2)
+        self.assertTrue(any('not a file' in p for p in problems))
+        self.assertTrue(any('quote' in p for p in problems))
+
+    def test_empty_none_and_non_string(self):
+        self.assertEqual(xtbenv.validate_binary_path(''),
+                         ['xtb path is empty'])
+        self.assertEqual(xtbenv.validate_binary_path(None),
+                         ['xtb path is empty'])
+        self.assertEqual(xtbenv.validate_binary_path(42),
+                         ['xtb path is empty'])
+
+
+class TestDetectBinary(unittest.TestCase):
+    """Probe order (configured -> xtb.exe -> xtb) proven with DI fakes."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='srp_test_')
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def _real_file(self):
+        path = os.path.join(self.tmp, 'xtb.exe')
+        with open(path, 'wb') as handle:
+            handle.write(b'MZ')
+        return path
+
+    def test_valid_configured_path_wins_without_probing(self):
+        configured = self._real_file()
+        fake = _RecordingWhich({'xtb.exe': None, 'xtb': None})
+        self.assertEqual(xtbenv.detect_binary(configured, fake), configured)
+        self.assertEqual(fake.queries, [])
+
+    def test_invalid_configured_path_falls_through_to_which(self):
+        # Missing on disk -> validation problem -> which probe runs.
+        missing = os.path.join(self.tmp, 'missing.exe')
+        fake = _RecordingWhich({'xtb.exe': 'C:\\xtb\\xtb.exe'})
+        self.assertEqual(xtbenv.detect_binary(missing, fake),
+                         'C:\\xtb\\xtb.exe')
+        self.assertEqual(fake.queries, ['xtb.exe'])
+
+        # A DIRECTORY configured path also fails validation -> falls
+        # through, and the probe order holds (xtb.exe before xtb).
+        fake2 = _RecordingWhich({'xtb.exe': None, 'xtb': '/usr/bin/xtb'})
+        self.assertEqual(xtbenv.detect_binary(self.tmp, fake2),
+                         '/usr/bin/xtb')
+        self.assertEqual(fake2.queries, ['xtb.exe', 'xtb'])
+
+    def test_windows_conda_env_probed_before_linux(self):
+        fake = _RecordingWhich({'xtb.exe': None, 'xtb': '/usr/bin/xtb'})
+        self.assertEqual(xtbenv.detect_binary(None, fake), '/usr/bin/xtb')
+        self.assertEqual(fake.queries, ['xtb.exe', 'xtb'])
+        self.assertLess(fake.queries.index('xtb.exe'),
+                        fake.queries.index('xtb'))
+
+    def test_nothing_found_returns_none(self):
+        fake = _RecordingWhich({})
+        self.assertIsNone(xtbenv.detect_binary(None, fake))
+        self.assertEqual(fake.queries, ['xtb.exe', 'xtb'])
 
 
 if __name__ == '__main__':

@@ -25,6 +25,8 @@ silently skips the Hessian with exit 0 and no error).
 """
 
 import collections
+import os
+import shutil
 
 # Invocation constant (locked 2026-09-06): one word, never '-o --hess'.
 XTB_OHESS = '--ohess'
@@ -104,3 +106,60 @@ def evaluate_run(exit_code, stderr_text, expected_files, present_files):
                         % ', '.join(missing))
 
     return RunVerdict(ok=not problems, problems=problems)
+
+
+def validate_binary_path(path):
+    """Validate a user-configured xtb binary path.
+
+    Returns a list of problem strings (empty list = valid). Problems
+    accumulate where meaningfully checkable:
+
+      (a) empty / None / non-string -> 'xtb path is empty'
+      (b) missing on disk           -> "'<path>' does not exist"
+      (c) exists but is a directory -> "'<path>' is not a file"
+      (d) contains ' or "           -> "path contains quote character(s):
+                                       '<path>'"
+
+    Quote characters are rejected outright: they would break the
+    list-argv safety contract downstream (see build_argv).
+    """
+    problems = []
+    if not isinstance(path, str) or not path:
+        problems.append('xtb path is empty')
+        return problems
+    if not os.path.exists(path):
+        problems.append("'%s' does not exist" % (path,))
+    elif not os.path.isfile(path):
+        problems.append("'%s' is not a file" % (path,))
+    if '"' in path or "'" in path:
+        problems.append("path contains quote character(s): '%s'" % (path,))
+    return problems
+
+
+def detect_binary(configured_path=None, which_fn=shutil.which):
+    """Resolve the xtb executable path (probe order: research PITFALLS 3
+    / AGENTS.md rule):
+
+      1. configured_path (if given): validate_binary_path; a VALID
+         configured path wins immediately; an invalid one falls through
+         to auto-detection.
+      2. which_fn('xtb.exe') — Windows conda env first (the plugin runs
+         inside Windows PyMOL).
+      3. which_fn('xtb')     — Linux fallback.
+      4. None when nothing resolves.
+
+    which_fn is dependency-injected (default shutil.which) so tests run
+    with NO xtb installed and NO sys.modules stubs — just pass a fake
+    function.
+    """
+    if configured_path:
+        problems = validate_binary_path(configured_path)
+        if not problems:
+            return configured_path
+    exe = which_fn('xtb.exe')
+    if exe:
+        return exe
+    exe = which_fn('xtb')
+    if exe:
+        return exe
+    return None
