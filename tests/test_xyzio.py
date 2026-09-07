@@ -188,5 +188,97 @@ class TestRejections(unittest.TestCase):
         self.assertEqual([a[0] for a in atoms], ['C', 'O'])
 
 
+class TestFixtureRoundTrips(unittest.TestCase):
+    """Round-trip proof: committed xtb-accepted geometries survive
+    write_xyz_file -> read_xyz with comments intact and coordinates
+    within 1e-8 (dimer2's 10-decimal values round by <= 5e-9 through
+    the %15.8f writer; the second write is an exact fixed point)."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp(prefix='xyzio-rt-')
+        self.addCleanup(shutil.rmtree, self.tmpdir, True)
+
+    def _fixture_path(self, name):
+        return os.path.join(FIXTURES, name)
+
+    def _rewrite(self, name, suffix):
+        """read fixture -> write copy -> read copy; return both parses."""
+        comment0, atoms0 = xyzio.read_xyz(self._fixture_path(name))
+        out = os.path.join(self.tmpdir, name + suffix)
+        xyzio.write_xyz_file(out, [a[0] for a in atoms0],
+                             [a[1:] for a in atoms0], comment0)
+        comment1, atoms1 = xyzio.read_xyz(out)
+        return out, comment0, atoms0, comment1, atoms1
+
+    def _assert_within_1e_8(self, atoms0, atoms1):
+        self.assertEqual(len(atoms1), len(atoms0))
+        self.assertEqual([a[0] for a in atoms1], [a[0] for a in atoms0])
+        for (_s0, x0, y0, z0), (_s1, x1, y1, z1) in zip(atoms0, atoms1):
+            self.assertAlmostEqual(x1, x0, delta=1e-8)
+            self.assertAlmostEqual(y1, y0, delta=1e-8)
+            self.assertAlmostEqual(z1, z0, delta=1e-8)
+
+    def test_roundtrip_co2(self):
+        _out, comment0, atoms0, comment1, atoms1 = self._rewrite(
+            'co2.xyz', '.rt')
+        self.assertEqual(comment1, comment0)
+        self.assertEqual(comment1, 'CO2 linear')
+        self._assert_within_1e_8(atoms0, atoms1)
+
+    def test_roundtrip_phenol(self):
+        _out, comment0, atoms0, comment1, atoms1 = self._rewrite(
+            'phenol.xyz', '.rt')
+        self.assertEqual(comment1, comment0)
+        self.assertEqual(comment1, 'Optimized at B3LYP/6-31G* level')
+        self._assert_within_1e_8(atoms0, atoms1)
+
+    def test_roundtrip_dimer2(self):
+        _out, comment0, atoms0, comment1, atoms1 = self._rewrite(
+            'dimer2.xyz', '.rt')
+        self.assertEqual(comment1, comment0)
+        self.assertEqual(comment1, 'stacked phenol dimer 3.4A z-offset')
+        self._assert_within_1e_8(atoms0, atoms1)
+
+    def test_roundtrip_xtbopt_energy_comment(self):
+        _out, comment0, atoms0, comment1, atoms1 = self._rewrite(
+            'xtbopt.xyz', '.rt')
+        self.assertEqual(comment1, comment0)
+        self.assertEqual(comment1, ' energy: -39.914402395930 '
+                                   'gnorm: 0.000144376846 '
+                                   'xtb: 6.7.1pre (5071a88)')
+        self._assert_within_1e_8(atoms0, atoms1)
+
+    def test_cross_consistency_all_fixtures(self):
+        # The xtb-accepted-format proof: read_xyz of the ORIGINAL fixture
+        # equals read_xyz of the rewritten file within 1e-8 for all four
+        # (xtb accepted the originals; our writer's only deviation is the
+        # <= 5e-9 coordinate rounding of %15.8f).
+        for name in ROUND_TRIP_FIXTURES:
+            comment0, atoms0 = xyzio.read_xyz(self._fixture_path(name))
+            _out, _c0, _a0, comment1, atoms1 = self._rewrite(name, '.x')
+            self.assertEqual(comment1, comment0, name)
+            self._assert_within_1e_8(atoms0, atoms1)
+
+    def test_fixed_point_second_write_byte_identical(self):
+        # Write the ALREADY-rewritten atoms a second time: the second
+        # file parses to coordinates exactly equal (==) to the first
+        # rewrite's, and the two written files are byte-identical
+        # (8-decimal values re-serialize identically through %15.8f).
+        for name in ROUND_TRIP_FIXTURES:
+            comment0, atoms0 = xyzio.read_xyz(self._fixture_path(name))
+            path1 = os.path.join(self.tmpdir, name + '.w1')
+            xyzio.write_xyz_file(path1, [a[0] for a in atoms0],
+                                 [a[1:] for a in atoms0], comment0)
+            comment1, atoms1 = xyzio.read_xyz(path1)
+            path2 = os.path.join(self.tmpdir, name + '.w2')
+            xyzio.write_xyz_file(path2, [a[0] for a in atoms1],
+                                 [a[1:] for a in atoms1], comment1)
+            _comment2, atoms2 = xyzio.read_xyz(path2)
+            self.assertEqual(atoms2, atoms1, name)
+            with open(path1, 'rb') as handle1:
+                with open(path2, 'rb') as handle2:
+                    self.assertEqual(handle1.read(), handle2.read(), name)
+
+
 if __name__ == '__main__':
     unittest.main()
