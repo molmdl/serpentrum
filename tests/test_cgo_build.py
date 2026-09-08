@@ -221,5 +221,186 @@ class TestBoxCgo(unittest.TestCase):
         self.assertEqual(stream[5:8], [0.5, 0.5, 0.5])
 
 
+class TestModeArrows(unittest.TestCase):
+    """Vibrational mode arrows: CYLINDER shaft + CONE head per nonzero vec."""
+
+    def test_single_arrow_arithmetic(self):
+        atoms = [(0.0, 0.0, 0.0)]
+        vecs = [(1.0, 0.0, 0.0)]
+        stream = cgo_build.mode_arrows(atoms, vecs)
+        records = _interpret_cgo(stream)
+        # Total: 4 (COLOR) + 14 (CYLINDER) + 17 (CONE) + 1 (STOP) = 36.
+        self.assertEqual(len(stream), 36)
+        # COLOR header.
+        self.assertEqual(stream[0:4], [cgo_build.COLOR, 0.2, 0.6, 1.0])
+        # CYLINDER record starts at index 4.
+        self.assertEqual(stream[4], cgo_build.CYLINDER)
+        # Atom position (shaft start).
+        self.assertAlmostEqual(stream[5], 0.0, delta=1e-9)
+        self.assertAlmostEqual(stream[6], 0.0, delta=1e-9)
+        self.assertAlmostEqual(stream[7], 0.0, delta=1e-9)
+        # Shaft end = p + v_hat * 1.0 * 1.2 * 0.7 = (0.84, 0, 0).
+        self.assertAlmostEqual(stream[8], 0.84, delta=1e-9)
+        self.assertAlmostEqual(stream[9], 0.0, delta=1e-9)
+        self.assertAlmostEqual(stream[10], 0.0, delta=1e-9)
+        # Shaft radius.
+        self.assertAlmostEqual(stream[11], 0.06, delta=1e-9)
+        # Both endpoint colors = arrow color.
+        self.assertEqual(stream[12:15], [0.2, 0.6, 1.0])
+        self.assertEqual(stream[15:18], [0.2, 0.6, 1.0])
+        # CONE record starts at index 18.
+        self.assertEqual(stream[18], cgo_build.CONE)
+        # Cone start = shaft end.
+        self.assertAlmostEqual(stream[19], 0.84, delta=1e-9)
+        self.assertAlmostEqual(stream[20], 0.0, delta=1e-9)
+        self.assertAlmostEqual(stream[21], 0.0, delta=1e-9)
+        # Cone end = tip = p + v_hat * 1.0 * 1.2 = (1.2, 0, 0).
+        self.assertAlmostEqual(stream[22], 1.2, delta=1e-9)
+        self.assertAlmostEqual(stream[23], 0.0, delta=1e-9)
+        self.assertAlmostEqual(stream[24], 0.0, delta=1e-9)
+        # Two radii: base=0.06, tip=0.0.
+        self.assertAlmostEqual(stream[25], 0.06, delta=1e-9)
+        self.assertAlmostEqual(stream[26], 0.0, delta=1e-9)
+        # Two color triplets.
+        self.assertEqual(stream[27:30], [0.2, 0.6, 1.0])
+        self.assertEqual(stream[30:33], [0.2, 0.6, 1.0])
+        # Two cap floats (flat = 1.0).
+        self.assertAlmostEqual(stream[33], 1.0, delta=1e-9)
+        self.assertAlmostEqual(stream[34], 1.0, delta=1e-9)
+        # STOP.
+        self.assertEqual(stream[35], cgo_build.STOP)
+        # Record counts via interpreter.
+        opcodes = [r[0] for r in records]
+        self.assertEqual(opcodes.count(cgo_build.COLOR), 1)
+        self.assertEqual(opcodes.count(cgo_build.CYLINDER), 1)
+        self.assertEqual(opcodes.count(cgo_build.CONE), 1)
+        self.assertEqual(opcodes.count(cgo_build.STOP), 1)
+
+    def test_scaled_arrow(self):
+        atoms = [(0.0, 0.0, 0.0)]
+        vecs = [(1.0, 0.0, 0.0)]
+        stream = cgo_build.mode_arrows(atoms, vecs, scale=2.0)
+        _interpret_cgo(stream)
+        # Shaft end x = 2.0 * 1.2 * 0.7 = 1.68.
+        self.assertAlmostEqual(stream[8], 1.68, delta=1e-9)
+        # Tip x = 2.0 * 1.2 = 2.4.
+        self.assertAlmostEqual(stream[22], 2.4, delta=1e-9)
+
+    def test_diagonal_vector_normalization(self):
+        atoms = [(0.0, 0.0, 0.0)]
+        vecs = [(1.0, 1.0, 0.0)]
+        stream = cgo_build.mode_arrows(atoms, vecs)
+        _interpret_cgo(stream)
+        half = 1.2 / (2.0 ** 0.5)  # 1.2 / sqrt(2)
+        # Tip = p + v_hat * 1.2 = (1.2/sqrt(2), 1.2/sqrt(2), 0).
+        self.assertAlmostEqual(stream[22], half, delta=1e-9)
+        self.assertAlmostEqual(stream[23], half, delta=1e-9)
+        self.assertAlmostEqual(stream[24], 0.0, delta=1e-9)
+
+    def test_zero_vector_skip(self):
+        atoms = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (2.0, 0.0, 0.0)]
+        vecs = [(1.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.5, 0.5, 0.5)]
+        stream = cgo_build.mode_arrows(atoms, vecs)
+        records = _interpret_cgo(stream)
+        opcodes = [r[0] for r in records]
+        # Exactly 2 CYLINDER + 2 CONE (zero vector skipped).
+        self.assertEqual(opcodes.count(cgo_build.CYLINDER), 2)
+        self.assertEqual(opcodes.count(cgo_build.CONE), 2)
+        # Total: 4 + 2*31 + 1 = 67.
+        self.assertEqual(len(stream), 67)
+
+    def test_below_threshold_skip(self):
+        # 1e-7 < 1e-6 threshold -> skipped entirely.
+        atoms = [(0.0, 0.0, 0.0)]
+        vecs = [(1e-7, 0.0, 0.0)]
+        stream = cgo_build.mode_arrows(atoms, vecs)
+        records = _interpret_cgo(stream)
+        opcodes = [r[0] for r in records]
+        self.assertEqual(opcodes.count(cgo_build.CYLINDER), 0)
+        self.assertEqual(opcodes.count(cgo_build.CONE), 0)
+        # Just COLOR + STOP.
+        self.assertEqual(len(stream), 5)
+        self.assertEqual(stream[0], cgo_build.COLOR)
+        self.assertEqual(stream[4], cgo_build.STOP)
+
+    def test_non_unit_direction(self):
+        # A 3 A displacement does not make a 3.6 A arrow: direction is
+        # normalized BEFORE scaling.
+        atoms = [(0.0, 0.0, 0.0)]
+        vecs = [(0.0, 3.0, 0.0)]
+        stream = cgo_build.mode_arrows(atoms, vecs, scale=1.0)
+        _interpret_cgo(stream)
+        # Tip = (0, 1.2, 0) -- normalized y-direction, not 3*1.2.
+        self.assertAlmostEqual(stream[22], 0.0, delta=1e-9)
+        self.assertAlmostEqual(stream[23], 1.2, delta=1e-9)
+        self.assertAlmostEqual(stream[24], 0.0, delta=1e-9)
+
+    def test_all_values_are_floats(self):
+        atoms = [(0.0, 0.0, 0.0)]
+        vecs = [(1.0, 0.0, 0.0)]
+        stream = cgo_build.mode_arrows(atoms, vecs)
+        for i, v in enumerate(stream):
+            self.assertIsInstance(
+                v, float,
+                'stream[%d] = %r is %s, not float'
+                % (i, v, type(v).__name__))
+
+    def test_custom_color_and_radius(self):
+        atoms = [(0.0, 0.0, 0.0)]
+        vecs = [(1.0, 0.0, 0.0)]
+        stream = cgo_build.mode_arrows(
+            atoms, vecs, color=(1.0, 0.0, 0.0), base_radius=0.1)
+        # Color propagates to COLOR header and both CYLINDER + CONE.
+        self.assertEqual(stream[1:4], [1.0, 0.0, 0.0])
+        self.assertAlmostEqual(stream[11], 0.1, delta=1e-9)
+        self.assertAlmostEqual(stream[25], 0.1, delta=1e-9)
+
+
+class TestSpheresCgo(unittest.TestCase):
+    """Sphere builder: one COLOR + [SPHERE, x,y,z,r] per point + STOP."""
+
+    def test_two_points(self):
+        points = [(1.0, 2.0, 3.0), (4.0, 5.0, 6.0)]
+        stream = cgo_build.spheres_cgo(points, 0.5, (1.0, 0.0, 0.0))
+        records = _interpret_cgo(stream)
+        # [COLOR, 1,0,0, SPHERE, 1,2,3, 0.5, SPHERE, 4,5,6, 0.5, STOP] = 15.
+        self.assertEqual(len(stream), 15)
+        self.assertEqual(stream[0:4], [cgo_build.COLOR, 1.0, 0.0, 0.0])
+        self.assertEqual(stream[4], cgo_build.SPHERE)
+        self.assertEqual(stream[5:9], [1.0, 2.0, 3.0, 0.5])
+        self.assertEqual(stream[9], cgo_build.SPHERE)
+        self.assertEqual(stream[10:14], [4.0, 5.0, 6.0, 0.5])
+        self.assertEqual(stream[14], cgo_build.STOP)
+        # Record counts.
+        opcodes = [r[0] for r in records]
+        self.assertEqual(opcodes.count(cgo_build.COLOR), 1)
+        self.assertEqual(opcodes.count(cgo_build.SPHERE), 2)
+        self.assertEqual(opcodes.count(cgo_build.STOP), 1)
+
+    def test_empty_points(self):
+        stream = cgo_build.spheres_cgo([], 0.5, (1.0, 0.0, 0.0))
+        records = _interpret_cgo(stream)
+        # [COLOR, r, g, b, STOP] = 5 floats.
+        self.assertEqual(len(stream), 5)
+        self.assertEqual(stream[0], cgo_build.COLOR)
+        self.assertEqual(stream[4], cgo_build.STOP)
+        opcodes = [r[0] for r in records]
+        self.assertEqual(opcodes.count(cgo_build.SPHERE), 0)
+
+    def test_all_values_are_floats(self):
+        points = [(1, 2, 3)]
+        stream = cgo_build.spheres_cgo(points, 0.5, (1.0, 0.0, 0.0))
+        for i, v in enumerate(stream):
+            self.assertIsInstance(
+                v, float,
+                'stream[%d] = %r is %s, not float'
+                % (i, v, type(v).__name__))
+
+    def test_radius_propagates(self):
+        points = [(0.0, 0.0, 0.0)]
+        stream = cgo_build.spheres_cgo(points, 1.5, (0.0, 1.0, 0.0))
+        self.assertAlmostEqual(stream[8], 1.5, delta=1e-9)
+
+
 if __name__ == '__main__':
     unittest.main()

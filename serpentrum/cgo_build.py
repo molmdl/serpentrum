@@ -129,3 +129,107 @@ def box_cgo(min_corner, max_corner, color=(1.0, 0.4, 0.1), linewidth=2.0):
                     VERTEX, p_b[0], p_b[1], p_b[2]])
     out.extend([END, STOP])
     return out
+
+
+def mode_arrows(atoms, vecs, scale=1.0, color=(0.2, 0.6, 1.0),
+                base_radius=0.06, length_a=1.2):
+    """Build vibrational mode-arrow CGO stream (CYLINDER shaft + CONE head).
+
+    PURE: stdlib math only, returns a plain list of floats.
+
+    atoms: sequence of (x, y, z) atom positions.
+    vecs:  same-length sequence of (x, y, z) displacement vectors (as
+           extracted from spectra ``Mode.vectors`` by the caller).
+    scale: overall scale factor applied to the arrow length.
+    color: (r, g, b) float triplet for both shaft and head.
+    base_radius: radius of the CYLINDER shaft and the CONE base.
+    length_a: base arrow length in Angstrom (before scale).
+
+    For each atom whose displacement magnitude >= 1e-6, emits:
+      CYLINDER (14 floats): opcode + [px,py,pz, sx,sy,sz, radius,
+                             cr,cg,cb, cr,cg,cb]
+        p -> shaft_end, both endpoint colors = arrow color.
+      CONE (17 floats): opcode + [sx,sy,sz, tx,ty,tz, r_base, r_tip,
+                        cr,cg,cb, cr,cg,cb, cap1, cap2]
+        shaft_end -> tip, r_base=base_radius, r_tip=0.0, caps=1.0 (flat).
+
+    Arithmetic (direction normalized BEFORE scaling):
+      v_hat   = v / |v|
+      shaft_end = p + v_hat * scale * length_a * 0.7
+      tip       = p + v_hat * scale * length_a
+    The 0.7 shaft fraction leaves 30% of the arrow length for the cone
+    head.  A 3 A displacement does NOT make a 3.6 A arrow -- the vector
+    is unit-normalized first, then scaled by ``scale * length_a``.
+
+    Vectors shorter than 1e-6 are skipped (no CYLINDER/CONE emitted).
+
+    Returns: [COLOR, r, g, b] + per nonzero vector (CYLINDER + CONE) +
+             [STOP].
+    """
+    cr = float(color[0])
+    cg = float(color[1])
+    cb = float(color[2])
+    sc = float(scale)
+    br = float(base_radius)
+    la = float(length_a)
+    shaft_frac = 0.7  # shaft occupies 70% of the arrow length
+
+    out = [COLOR, cr, cg, cb]
+    for atom, vec in zip(atoms, vecs):
+        vx = float(vec[0])
+        vy = float(vec[1])
+        vz = float(vec[2])
+        mag = math.sqrt(vx * vx + vy * vy + vz * vz)
+        if mag < 1e-6:
+            continue
+        ux = vx / mag
+        uy = vy / mag
+        uz = vz / mag
+        px = float(atom[0])
+        py = float(atom[1])
+        pz = float(atom[2])
+        # Shaft end and tip along the UNIT direction, then scaled.
+        se = sc * la * shaft_frac
+        sx = px + ux * se
+        sy = py + uy * se
+        sz = pz + uz * se
+        tp = sc * la
+        tx = px + ux * tp
+        ty = py + uy * tp
+        tz = pz + uz * tp
+        # CYLINDER shaft: p -> shaft_end (14 floats total).
+        out.extend([CYLINDER, px, py, pz, sx, sy, sz, br,
+                    cr, cg, cb, cr, cg, cb])
+        # CONE head: shaft_end -> tip (17 floats total, two radii +
+        # flat caps 1.0).
+        out.extend([CONE, sx, sy, sz, tx, ty, tz, br, 0.0,
+                    cr, cg, cb, cr, cg, cb, 1.0, 1.0])
+    out.append(STOP)
+    return out
+
+
+def spheres_cgo(points, radius, color):
+    """Build a sphere-per-point CGO stream under a single COLOR header.
+
+    PURE: stdlib only, returns a plain list of floats.
+
+    points: sequence of (x, y, z) sphere centers.
+    radius: sphere radius (same for all points).
+    color:  (r, g, b) float triplet.
+
+    Returns: [COLOR, r, g, b] + per point [SPHERE, x, y, z, radius] +
+             [STOP].
+
+    SPHERE = opcode + 4 floats [x, y, z, radius] (CGO_SPHERE_SZ = 4,
+    CGO.h:96).  The preceding COLOR triplet sets the draw color.
+    """
+    cr = float(color[0])
+    cg = float(color[1])
+    cb = float(color[2])
+    rad = float(radius)
+
+    out = [COLOR, cr, cg, cb]
+    for p in points:
+        out.extend([SPHERE, float(p[0]), float(p[1]), float(p[2]), rad])
+    out.append(STOP)
+    return out
