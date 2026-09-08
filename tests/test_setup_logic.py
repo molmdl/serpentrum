@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import serpentrum.setup_logic as setup_logic  # noqa: E402
 from serpentrum.setup_logic import (  # noqa: E402
     BOX_PRESETS, DEFAULTS, HESSIAN_WARNING, KNOWN_SETS, SCHEMA_VERSION,
-    SetupError, new_setup, validate,
+    SetupError, load_setup, new_setup, randomize_head, save_setup, validate,
 )
 
 EXPECTED_DEFAULTS = {
@@ -242,6 +242,122 @@ class TestValidateNeverRaises(unittest.TestCase):
     def test_non_numeric_budget_does_not_raise(self):
         result = validate(_mutated(atom_budget=None))
         self.assertIsInstance(result, tuple)
+
+
+class TestSaveLoadRoundTrip(unittest.TestCase):
+    """save_setup/load_setup round-trip the setup dict identically as
+    sorted-key indented JSON (SETUP-05 pure half)."""
+
+    def test_round_trip_identical(self):
+        s = new_setup()
+        s['box_preset'] = 'large'
+        s['win_cap_molecules'] = 15   # valid; warns (>10) but saves fine
+        s['xtb_path'] = None
+        loaded = load_setup(save_setup(s))
+        self.assertEqual(loaded, s)
+
+    def test_save_output_is_sorted_key_indented_json(self):
+        s = new_setup()
+        s['box_preset'] = 'large'
+        text = save_setup(s)
+        self.assertTrue(text.startswith('{'), 'JSON object must start with {')
+        self.assertIn('"box_preset"', text)
+        # sorted-key: 'atom_budget' (a) precedes 'box_preset' (b) in text.
+        self.assertLess(text.index('"atom_budget"'), text.index('"box_preset"'))
+        # indent=2 produces a newline + 2-space-indented key.
+        self.assertIn('\n  "atom_budget"', text)
+
+    def test_save_invalid_setup_raises_mentioning_key(self):
+        bad = new_setup()
+        bad['win_cap_molecules'] = 0   # hard error (< 1)
+        with self.assertRaises(SetupError) as ctx:
+            save_setup(bad)
+        self.assertIn('win_cap_molecules', str(ctx.exception))
+
+    def test_save_warns_but_still_serializes(self):
+        # A high cap warns but does NOT block save (warnings are advisory).
+        s = new_setup()
+        s['win_cap_molecules'] = 20   # valid (<=20), warns (>10)
+        text = save_setup(s)          # must NOT raise
+        self.assertEqual(load_setup(text), s)
+
+
+class TestLoadSetupErrors(unittest.TestCase):
+    """load_setup raises SetupError on corrupt JSON, foreign schema, and
+    non-dict payloads (v1 loud-fail; friendly UX = Phase 8 SETUP-08)."""
+
+    def test_invalid_json_mentions_valid_json(self):
+        with self.assertRaises(SetupError) as ctx:
+            load_setup('not json at all')
+        self.assertIn('valid JSON', str(ctx.exception))
+
+    def test_foreign_schema_version_not_supported(self):
+        with self.assertRaises(SetupError) as ctx:
+            load_setup('{"schema_version": 2}')
+        msg = str(ctx.exception)
+        self.assertIn('schema_version', msg)
+        self.assertIn('not supported', msg)
+
+    def test_non_dict_payload_raises(self):
+        with self.assertRaises(SetupError):
+            load_setup('[]')        # JSON list, not an object
+        with self.assertRaises(SetupError):
+            load_setup('42')        # JSON scalar, not an object
+
+    def test_load_does_not_full_validate(self):
+        # v1 checks schema_version ONLY: a v1-schema dict with otherwise
+        # bogus fields loads without raising (caller validate()s after).
+        loaded = load_setup('{"schema_version": 1, "win_cap_molecules": 0}')
+        self.assertEqual(loaded['schema_version'], 1)
+        self.assertEqual(loaded['win_cap_molecules'], 0)
+
+    def test_v1_schema_loads(self):
+        text = save_setup(new_setup())
+        loaded = load_setup(text)
+        self.assertEqual(loaded, new_setup())
+
+
+class TestRandomizeHead(unittest.TestCase):
+    """randomize_head is seed-deterministic via PRIVATE random.Random
+    instances (never the global random module)."""
+
+    CANDIDATES = ['phenol', 'benzene', 'biphenyl']
+
+    def test_same_seed_identical_result(self):
+        self.assertEqual(randomize_head(self.CANDIDATES, 42),
+                         randomize_head(self.CANDIDATES, 42))
+
+    def test_result_always_a_candidate(self):
+        for seed in range(25):
+            self.assertIn(randomize_head(self.CANDIDATES, seed),
+                          self.CANDIDATES)
+
+    def test_seeds_one_and_two_both_valid_members(self):
+        r1 = randomize_head(self.CANDIDATES, 1)
+        r2 = randomize_head(self.CANDIDATES, 2)
+        self.assertIn(r1, self.CANDIDATES)
+        self.assertIn(r2, self.CANDIDATES)
+        # Do NOT assert r1 != r2 — seeds may coincidentally agree.
+
+    def test_empty_candidates_raises(self):
+        self.assertRaises(SetupError, randomize_head, [], 42)
+
+    def test_private_rng_no_shared_state_across_calls(self):
+        # Two calls with the same seed agree even when an intervening
+        # different-seed call runs between them (a private Random per call
+        # would; the global random module would not).
+        first = randomize_head(self.CANDIDATES, 42)
+        randomize_head(self.CANDIDATES, 7)      # intervening call
+        randomize_head(self.CANDIDATES, 100)    # another intervening call
+        again = randomize_head(self.CANDIDATES, 42)
+        self.assertEqual(first, again)
+
+    def test_different_candidate_lists_independent(self):
+        # Determinism is per (candidates, seed); a different candidate
+        # list with the same seed still picks a valid member.
+        others = ['water', 'methane', 'ammonia']
+        pick = randomize_head(others, 42)
+        self.assertIn(pick, others)
 
 
 if __name__ == '__main__':

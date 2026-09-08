@@ -30,7 +30,9 @@ helper with the SAME rules as ``xtbenv.validate_binary_path`` (keep in
 sync with serpentrum/xtbenv.py; a later wave may unify).
 """
 
+import json
 import os
+import random
 
 # Schema version (research R7). v1 ships Set A only. load_setup raises
 # loudly on any other schema_version; friendly UX is Phase 8 (SETUP-08).
@@ -202,3 +204,62 @@ def validate(setup):
         warnings.append(HESSIAN_WARNING)
 
     return errors, warnings
+
+
+def save_setup(setup):
+    """Serialize a setup dict -> sorted-key indented JSON text.
+
+    Validates FIRST: if validate(setup) reports any errors, raises
+    SetupError listing them (warnings do NOT block save — a setup with a
+    high cap/budget is still serializable; the warning is advisory). On a
+    clean setup returns ``json.dumps(setup, sort_keys=True, indent=2)`` —
+    stable text for share-a-setup (SETUP-08, Phase 8 educator flow).
+    """
+    errors, _warnings = validate(setup)
+    if errors:
+        raise SetupError('setup is invalid: ' + '; '.join(errors))
+    return json.dumps(setup, sort_keys=True, indent=2)
+
+
+def load_setup(text):
+    """Parse JSON text -> setup dict. v1 raises loudly (SetupError) on:
+
+      - invalid JSON (any ValueError/JSONDecodeError) ->
+        'setup text is not valid JSON: <msg>'
+      - non-dict payload (e.g. a JSON list or scalar) ->
+        'setup text is not a JSON object (got <type>)'
+      - schema_version != SCHEMA_VERSION ->
+        'setup schema_version <sv> not supported (this build reads <v>)'
+
+    v1 does NOT validate the loaded dict beyond schema_version — full
+    validation is the CALLER's validate() call (a freshly loaded setup is
+    untrusted and should be validate()d before use). Friendly corrupt-file
+    UX is Phase 8 (SETUP-08); this pure half just raises precisely.
+    """
+    try:
+        data = json.loads(text)
+    except ValueError as exc:  # JSONDecodeError is a ValueError subclass.
+        raise SetupError('setup text is not valid JSON: %s' % (exc,))
+    if not isinstance(data, dict):
+        raise SetupError('setup text is not a JSON object (got %s)'
+                         % (type(data).__name__,))
+    sv = data.get('schema_version')
+    if sv != SCHEMA_VERSION:
+        raise SetupError('setup schema_version %s not supported '
+                         '(this build reads version %d)' % (sv, SCHEMA_VERSION))
+    return data
+
+
+def randomize_head(candidates, seed):
+    """Choose a head molecule id from candidates via a PRIVATE seeded RNG.
+
+    Returns ``random.Random(seed).choice(candidates)`` — a fresh
+    ``random.Random(seed)`` instance per call, NEVER the global ``random``
+    module (determinism + seed-to-seed isolation: two calls with the same
+    seed always agree, and an intervening different-seed call never
+    perturbs a given seed's result). Empty candidates -> SetupError.
+    candidates = validated molecule ids (caller's responsibility).
+    """
+    if not candidates:
+        raise SetupError('no head molecule candidates')
+    return random.Random(seed).choice(candidates)
