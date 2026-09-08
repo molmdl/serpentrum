@@ -47,6 +47,24 @@ DIRS = {
     'down': (0.0, -1.0),
 }
 
+# --- Collision + rules constants (plan 02-10). The ONE margin name
+# everywhere is BOUNDARY_MARGIN_A; HEAD_WALL_MARGIN_A is retired. ---
+
+BODY_COLLISION_RADIUS_A = 2.0   # head-centroid vs chain-edge clearance.
+# MUST stay < 3.4 A (committed dimer2 stacking distance) minus margin,
+# else the head would collide with the segment just stacked behind it.
+SEGMENT_SKIP_RECENT = 2         # newest chain edges exempt from self-collision
+PICKUP_RADIUS_A = 3.0           # head-vs-pickup-CENTROID capture distance
+BOUNDARY_MARGIN_A = 1.0         # = BODY_COLLISION_RADIUS_A / 2 — the ONE
+                                # margin constant name everywhere (02-13's
+                                # boundary leg reuses it)
+SWEEP_PICKUP_CLEARANCE_A = 2.5  # atom-level clearance for 02-13's sweep
+                                # pickup leg (same rationale as 02-04
+                                # check_clash's 2.5 A inter-fragment
+                                # threshold; defined here because this plan
+                                # owns the constants block — 02-13 consumes
+                                # it)
+
 
 class GameEngine(object):
     """Deterministic snake engine state — movement core.
@@ -70,29 +88,44 @@ class GameEngine(object):
                 and the engine copies it, never sharing or mutating
                 caller data.
       pending:  list holding AT MOST ONE buffered direction name (the
-                max-1 queue "beyond current"). Inert in this plan: a
-                buffered request produces no event and no heading
-                change in step(); plan 02-13 consumes it at step start.
+                max-1 queue "beyond current"). Inert in 02-06; plan 02-13
+                consumes it at step start.
       paused:   bool — True makes step() an immediate no-op [].
+      box_min:  (x0, y0) float tuple or None — axis-aligned box lower
+                corner (from setup_logic's preset). None disables
+                boundary checking (02-06's free-moving default).
+      box_max:  (x1, y1) float tuple or None — axis-aligned box upper
+                corner. None disables boundary checking.
+      finished: bool — True once the run has ended (crash or win); every
+                later step() is a no-op returning []. Introduced by
+                plan 02-10 (02-06's trimmed scope has no end-of-run
+                state).
+      result:   None, 'crashed', or 'won' — the end-of-run verdict. Set
+                together with finished=True.
     """
 
-    def __init__(self, head=(0.0, 0.0), heading='right', segments=None):
+    def __init__(self, head=(0.0, 0.0), heading='right', segments=None,
+                 box_min=None, box_max=None):
         """Seed the engine state (see reset for the parameter contract).
 
         Kept keyword-friendly: plan 02-10 extends this signature with
         additional keyword arguments, so callers should always pass
         these by name.
         """
-        self.reset(head=head, heading=heading, segments=segments)
+        self.reset(head=head, heading=heading, segments=segments,
+                   box_min=box_min, box_max=box_max)
 
-    def reset(self, head=(0.0, 0.0), heading='right', segments=None):
+    def reset(self, head=(0.0, 0.0), heading='right', segments=None,
+              box_min=None, box_max=None):
         """Rebuild ALL engine state from the given seeds.
 
         Same parameters as __init__ (GAME-07 deterministic restart):
         head (x, y) floats, heading a DIRS name resolved to its unit
         vector, segments the test-seam list (copied — see
-        _copy_segments). Unknown heading names raise ValueError, the
-        same loud contract as request_direction.
+        _copy_segments), box_min/box_max the axis-aligned play box (None
+        disables boundary checking — 02-06's default). Unknown heading
+        names raise ValueError, the same loud contract as
+        request_direction.
         """
         if heading not in DIRS:
             raise ValueError('unknown heading: %r (valid: %s)'
@@ -102,6 +135,10 @@ class GameEngine(object):
         self.segments = self._copy_segments(segments)
         self.pending = []
         self.paused = False
+        self.box_min = tuple(box_min) if box_min is not None else None
+        self.box_max = tuple(box_max) if box_max is not None else None
+        self.finished = False
+        self.result = None
 
     def _copy_segments(self, segments):
         """Copy the caller's segment list into fresh engine-owned dicts.
@@ -163,26 +200,53 @@ class GameEngine(object):
         """Advance the simulation by dt seconds; return the event list.
 
         Paused -> no-op: return [] and mutate nothing.
+        Finished (crashed/won) -> no-op: return [] and mutate nothing.
 
-        Movement branch (this plan's ONLY step branch): head += heading
-        * SPEED_A_PER_S * dt, and emit [('moved', (x, y))] carrying the
-        NEW position. At SPEED_A_PER_S = 3.0 a dt of 0.1 s advances the
-        head exactly 0.3 A along the current heading.
+        Movement branch: head += heading * SPEED_A_PER_S * dt, and emit
+        [('moved', (x, y))] carrying the NEW position. At SPEED_A_PER_S
+        = 3.0 a dt of 0.1 s advances the head exactly 0.3 A along the
+        current heading.
+
+        Boundary crash (plan 02-10, GAME-05): after the move, if a box is
+        set and the head enters the BOUNDARY_MARGIN_A margin of the AABB
+        (inclusive at the margin-adjusted walls), emit
+        ('crashed', 'boundary'), set finished=True / result='crashed',
+        clear the pending queue, and STOP event processing for this
+        tick. A crashed engine no-ops on every later step().
 
         A pending direction is deliberately NOT consumed here and
-        produces NO event — in plan 02-06 the queue only buffers; plan
-        02-13 applies pending turns at the START of step(). (Suite
-        consequence: 02-06's tests never call step() while a request is
+        produces NO event — the queue only buffers; plan 02-13 applies
+        pending turns at the START of step(). (Suite consequence: the
+        02-06 and 02-10 suites never call step() while a request is
         pending, so that later change cannot break them.)
         """
         if self.paused:
+            return []
+        if self.finished:
             return []
         hx, hy = self.head
         ux, uy = self.heading
         nx = hx + ux * SPEED_A_PER_S * dt
         ny = hy + uy * SPEED_A_PER_S * dt
         self.head = (nx, ny)
-        return [('moved', (nx, ny))]
+        events = [('moved', (nx, ny))]
+        # Boundary crash: AABB + BOUNDARY_MARGIN_A, inclusive at the
+        # margin-adjusted walls. A crash stops event processing, ends
+        # the run, and clears the pending queue (turn-state hygiene —
+        # 02-13 builds on this).
+        if self.box_min is not None and self.box_max is not None:
+            x0, y0 = self.box_min
+            x1, y1 = self.box_max
+            if (nx <= x0 + BOUNDARY_MARGIN_A or
+                    nx >= x1 - BOUNDARY_MARGIN_A or
+                    ny <= y0 + BOUNDARY_MARGIN_A or
+                    ny >= y1 - BOUNDARY_MARGIN_A):
+                events.append(('crashed', 'boundary'))
+                self.finished = True
+                self.result = 'crashed'
+                self.pending = []
+                return events
+        return events
 
     def pause(self):
         """Freeze the simulation: step() becomes a no-op returning [].
