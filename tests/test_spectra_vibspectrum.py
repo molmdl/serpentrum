@@ -38,12 +38,15 @@ from serpentrum.spectra import (  # noqa: E402
     parse_g98,
     parse_vibspectrum,
     parse_vibspectrum_text,
+    real_modes,
 )
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES = os.path.join(ROOT, 'tests', 'fixtures', 'xtb')
 VIBSPECTRUM_PATH = os.path.join(FIXTURES, 'vibspectrum')
 G98_PATH = os.path.join(FIXTURES, 'g98.out')
+SYNTHETIC_DIR = os.path.join(FIXTURES, 'synthetic')
+CO2_VIBSPECTRUM_PATH = os.path.join(SYNTHETIC_DIR, 'co2_vibspectrum')
 
 
 def read_text(path):
@@ -135,6 +138,112 @@ class TestVibspectrumHappyPath(unittest.TestCase):
                     self.assertEqual(tokens[1], 'a',
                                      'line %d: real row symmetry != a'
                                      % lineno)
+
+
+class TestRealModesFilter(unittest.TestCase):
+    """real_modes() threshold policy: |freq| ONLY — never sign, never
+    selection-rule column, never a hardcoded 5/6 trivial count.
+
+    The dimer (nonlinear, 26 atoms) has 6 trivial modes; the synthetic CO2
+    (linear, 3 atoms) has 5. A hardcoded 'skip 6' would silently corrupt
+    every linear molecule — this class proves the filter is purely
+    threshold-based and parameterized.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.dimer = parse_vibspectrum(VIBSPECTRUM_PATH)
+        cls.co2 = parse_vibspectrum(CO2_VIBSPECTRUM_PATH)
+
+    # --- dimer (nonlinear, 6 trivial) ----------------------------------------
+
+    def test_dimer_default_threshold_drops_6_trivial(self):
+        real = real_modes(self.dimer)
+        self.assertEqual(len(real), 72)
+        self.assertEqual([m.index for m in real], list(range(7, 79)))
+
+    def test_dimer_negative_real_modes_kept(self):
+        # Modes 7-9 are negative (-31.92 / -23.08 / -18.11) but REAL —
+        # sign never filters. This is the load-bearing sign-policy test.
+        real = real_modes(self.dimer)
+        first_three = real[:3]
+        for mode in first_three:
+            self.assertLess(mode.freq, 0.0)
+        self.assertAlmostEqual(first_three[0].freq, -31.92, places=2)
+        self.assertAlmostEqual(first_three[1].freq, -23.08, places=2)
+        self.assertAlmostEqual(first_three[2].freq, -18.11, places=2)
+
+    # --- synthetic CO2 (linear, 5 trivial) -----------------------------------
+
+    def test_co2_parses_to_8_modes(self):
+        self.assertEqual(len(self.co2.modes), 8)
+        self.assertEqual(self.co2.atoms, [])
+        self.assertEqual(self.co2.n_atoms, 0)
+
+    def test_co2_5_trivial_3_real(self):
+        # 5 trivial (modes 1-5, |0.00| < 10) + 3 real (modes 6-8).
+        trivial = self.co2.modes[:5]
+        for mode in trivial:
+            self.assertLess(abs(mode.freq), 10.0)
+        real = self.co2.modes[5:]
+        self.assertEqual(len(real), 3)
+
+    def test_co2_default_threshold_returns_3_real(self):
+        real = real_modes(self.co2)
+        self.assertEqual(len(real), 3)
+        self.assertEqual([m.index for m in real], [6, 7, 8])
+        freqs = [m.freq for m in real]
+        # Degenerate 600.18 pair retained as SEPARATE Mode objects.
+        self.assertAlmostEqual(freqs[0], 600.18, places=2)
+        self.assertAlmostEqual(freqs[1], 600.18, places=2)
+        self.assertAlmostEqual(freqs[2], 1424.95, places=2)
+
+    def test_co2_zero_intensity_mode_kept(self):
+        # Mode 8 = 1424.95 symmetric stretch: intensity exactly 0.00
+        # (IR-inactive). SPECTRA-05: zero-intensity modes are listed.
+        real = real_modes(self.co2)
+        mode8 = real[-1]
+        self.assertEqual(mode8.index, 8)
+        self.assertAlmostEqual(mode8.intensity, 0.0, places=5)
+
+    def test_co2_2593_row_honestly_omitted(self):
+        # The 2593.38 asymmetric stretch is NOT in the fixture — its log
+        # intensity token is the overflow '******'. Verify no mode has
+        # that frequency (the fixture is 8 rows, not 9).
+        for mode in self.co2.modes:
+            self.assertNotAlmostEqual(mode.freq, 2593.38, places=2,
+                                      msg='2593.38 row should be omitted')
+
+    # --- threshold parametrization (proves no hardcoded count) ---------------
+
+    def test_co2_threshold_700_returns_one(self):
+        # Raising the threshold to 700 drops the 600.18 pair, keeps only
+        # 1424.95. A hardcoded 'skip 5' or 'skip 6' count could not produce
+        # this result — only the |freq| threshold can.
+        real = real_modes(self.co2, threshold=700.0)
+        self.assertEqual(len(real), 1)
+        self.assertAlmostEqual(real[0].freq, 1424.95, places=2)
+
+    def test_co2_threshold_0_5_returns_three(self):
+        # Lowering the threshold to 0.5 still drops the 0.00 trivial rows
+        # (|0.0| < 0.5) and keeps all 3 real modes.
+        real = real_modes(self.co2, threshold=0.5)
+        self.assertEqual(len(real), 3)
+        self.assertEqual([m.index for m in real], [6, 7, 8])
+
+    # --- g98 no-op -----------------------------------------------------------
+
+    def test_g98_no_op_all_72_kept(self):
+        # The g98 core projects trivial modes out, so all 72 modes have
+        # |freq| >= 18.1 and pass the default threshold. real_modes must
+        # return the SAME Mode objects (identity, not copies).
+        g98 = parse_g98(G98_PATH)
+        real = real_modes(g98)
+        self.assertEqual(len(real), 72)
+        self.assertEqual([m.index for m in real],
+                         [m.index for m in g98.modes])
+        for real_mode, orig_mode in zip(real, g98.modes):
+            self.assertIs(real_mode, orig_mode)
 
 
 if __name__ == '__main__':

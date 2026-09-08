@@ -396,3 +396,22 @@ def parse_vibspectrum(path):
     """Parse the vibspectrum file at ``path`` (utf-8) into a Spectrum."""
     with open(path, encoding='utf-8') as fh:
         return parse_vibspectrum_text(fh.read())
+
+
+def real_modes(spectrum, threshold=10.0):
+    """Return the non-trivial modes of ``spectrum``, order preserved.
+
+    Returns ``[m for m in spectrum.modes if abs(m.freq) >= threshold]``.
+
+    Policy (fixture-verified): threshold on |freq| ONLY.
+      - Never on sign: dimer modes 7-9 are negative REAL modes (-31.92 /
+        -23.08 / -18.11) and must survive.
+      - Never on the selection-rule column: 14 real 'NO' rows carry
+        nonzero intensity (min 0.00026) and must survive.
+      - Never a hardcoded trivial count: nonlinear molecules have 6
+        trivial modes, linear ones 5 — a hardcoded 'skip 6' would silently
+        corrupt every linear molecule (the CO2 case: 5 trivial).
+      - No-op on g98 spectra: the g98 core projects trivial modes out, so
+        all 72 modes have |freq| >= 18.1 and pass the default threshold.
+    """
+    return [m for m in spectrum.modes if abs(m.freq) >= threshold]

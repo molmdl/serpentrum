@@ -1,0 +1,21 @@
+$vibrational spectrum
+#  mode     symmetry     wave number   IR intensity    selection rules
+#                         cm**(-1)      (km*mol⁻¹)        IR
+# SYNTHETIC fixture - NOT a measurement. Transcribed from the committed xtb
+# spike log .planning/research/xtb-spike-fixtures/co2.log:
+#   eigvals   (lines 456-457): 0.00 x5, 600.18, 600.18, 1424.95, 2593.38
+#   IR intens (header 545, values 546-547): 0.00 x5, 68.70, 68.70, 0.00, ******
+# Mode 9 (2593.38 cm-1) is honestly OMITTED: its log intensity token is the
+# overflow '******' (no parseable value). A stand-in number would be an
+# invented chemistry claim - forbidden. 5 trivial modes = 3N-5 for linear CO2
+# (co2.log line 240: 'linear (good luck) true').
+# Mode 8 = 1424.95 cm-1 symmetric stretch: intensity exactly 0.00 (IR-inactive).
+     1                      -0.00         0.00000          -
+     2                      -0.00         0.00000          -
+     3                      -0.00         0.00000          -
+     4                      -0.00         0.00000          -
+     5                       0.00         0.00000          -
+     6        a             600.18         68.70000         YES
+     7        a             600.18         68.70000         YES
+     8        a            1424.95         0.00000          NO
+$end

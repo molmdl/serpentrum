@@ -272,10 +272,14 @@ class TestFixtureByteIdentity(unittest.TestCase):
     """Behavior case 6: the single-copy rule — byte-identical to source."""
 
     def test_fixture_dir_holds_exactly_the_17_file_set(self):
-        # Exact set equality also guards the traps: dimer.xyz (mislabeled
-        # CO2 dimer), hessian, xtbrestart must never leak in, and no
-        # __init__.py may ever appear under tests/ (plugin-path safety).
-        self.assertEqual(sorted(os.listdir(FIXTURES)), sorted(COPIED_FIXTURES))
+        # Exact FILE set equality also guards the traps: dimer.xyz
+        # (mislabeled CO2 dimer), hessian, xtbrestart must never leak in,
+        # and no __init__.py may ever appear under tests/ (plugin-path
+        # safety). Subdirectories (e.g. synthetic/ added by 02-09) are
+        # allowed — only FILES are checked against the 17-copy set.
+        files = [name for name in os.listdir(FIXTURES)
+                 if os.path.isfile(os.path.join(FIXTURES, name))]
+        self.assertEqual(sorted(files), sorted(COPIED_FIXTURES))
 
     def test_every_copy_is_byte_identical_to_source(self):
         for name in COPIED_FIXTURES:
