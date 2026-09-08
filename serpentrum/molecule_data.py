@@ -328,3 +328,35 @@ def load_stacking(path):
         _validate_interaction(interaction, where, citations, seen_ids)
 
     return data
+
+
+def shipped_interactions(data):
+    """Return ONLY the status=='APPROVED' interactions, preserving file order.
+
+    DRAFT entries stay loadable and testable (this whole module happily
+    works on DRAFT data) but never ship: DATA-02's human approval track is
+    what flips a DRAFT status to APPROVED in the data file — no invented
+    or auto-approved chemistry. Callers that consume game-facing chemistry
+    must read interactions through this accessor.
+    """
+    return [interaction for interaction in data['interactions']
+            if interaction['status'] == 'APPROVED']
+
+
+def interaction_for(molecule, data):
+    """First interaction (file order — deterministic) applying to a molecule.
+
+    Matches molecule['set'] (a validated manifest molecule's parent set id)
+    against each interaction's applies_to['sets']; returns the FIRST match
+    or None when none applies — the STACK-03 refuse-and-skip input (no
+    applicable interaction => the molecule is skipped, never force-placed).
+
+    NOTE: this does NOT filter by approval status. Callers gate on
+    status=='APPROVED' (via shipped_interactions or a direct check) for
+    shipping decisions; a DRAFT entry returned here is test/preview data.
+    """
+    set_id = molecule['set']
+    for interaction in data['interactions']:
+        if set_id in interaction['applies_to']['sets']:
+            return interaction
+    return None

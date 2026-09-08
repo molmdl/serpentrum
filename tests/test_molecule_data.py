@@ -418,5 +418,93 @@ class TestPathContract(MoleculeDataTestCase):
             molecule_data.load_stacking(dirname)
 
 
+class TestShippedInteractions(MoleculeDataTestCase):
+    """DATA-02 code side: shipped_interactions returns APPROVED only."""
+
+    def test_draft_dataset_ships_nothing(self):
+        # The research dataset as written is DRAFT — nothing ships yet.
+        data = molecule_data.load_stacking(self._stacking_path(self._tmpdir()))
+        self.assertEqual(molecule_data.shipped_interactions(data), [])
+
+    def test_approved_flip_ships_entry(self):
+        # The human track's DRAFT -> APPROVED flip happens IN THE DATA FILE;
+        # the loader accepts the flipped document and the accessor ships it.
+        doc = _copy(VALID_STACKING)
+        doc['interactions'][0]['status'] = 'APPROVED'
+        data = molecule_data.load_stacking(self._stacking_path(self._tmpdir(), doc))
+        shipped = molecule_data.shipped_interactions(data)
+        self.assertEqual(len(shipped), 1)
+        self.assertEqual(shipped[0]['id'], 'pi_stack_pd')
+        self.assertEqual(shipped[0]['distance_a'], 3.4)
+
+    def test_mixed_statuses_keep_file_order(self):
+        doc = _copy(VALID_STACKING)
+        approved_first = _copy(doc['interactions'][0])
+        approved_first['id'] = 'stack_alpha'
+        approved_first['status'] = 'APPROVED'
+        draft_middle = _copy(doc['interactions'][0])
+        draft_middle['id'] = 'stack_bravo'  # stays DRAFT
+        approved_last = _copy(doc['interactions'][0])
+        approved_last['id'] = 'stack_charlie'
+        approved_last['status'] = 'APPROVED'
+        doc['interactions'] = [approved_first, draft_middle, approved_last]
+        data = molecule_data.load_stacking(self._stacking_path(self._tmpdir(), doc))
+        shipped = molecule_data.shipped_interactions(data)
+        self.assertEqual([entry['id'] for entry in shipped],
+                         ['stack_alpha', 'stack_charlie'])
+
+
+class TestInteractionFor(MoleculeDataTestCase):
+    """STACK-03 input: set-based lookup, first match wins, else None."""
+
+    def test_set_a_matches_pi_stack_entry(self):
+        data = molecule_data.load_stacking(self._stacking_path(self._tmpdir()))
+        entry = molecule_data.interaction_for({'set': 'set_a'}, data)
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry['id'], 'pi_stack_pd')
+
+    def test_unmatched_set_returns_none(self):
+        data = molecule_data.load_stacking(self._stacking_path(self._tmpdir()))
+        self.assertIsNone(molecule_data.interaction_for({'set': 'set_b'}, data))
+
+    def test_first_match_wins(self):
+        # Two interactions both applicable to set_a: the EARLIER file-order
+        # entry is returned (deterministic, no "best match" guessing).
+        doc = _copy(VALID_STACKING)
+        second = _copy(doc['interactions'][0])
+        second['id'] = 'pi_stack_second'
+        doc['interactions'].append(second)
+        data = molecule_data.load_stacking(self._stacking_path(self._tmpdir(), doc))
+        entry = molecule_data.interaction_for({'set': 'set_a'}, data)
+        self.assertEqual(entry['id'], 'pi_stack_pd')
+
+
+class TestShippedShapeProof(MoleculeDataTestCase):
+    """Round trip: BOTH research documents load together from one tmpdir."""
+
+    def test_distance_flows_from_the_file(self):
+        """The placement distance the later integration test builds on is
+        READ from stacking.json — never a code constant (STACK-02). The
+        committed dimer2 fixture (fragment 2 = fragment 1 + (0, 0, 3.4))
+        reproduces at exactly the value the file carries; its DRAFT status
+        means the human approval track still owns the shipping decision
+        (DATA-02). No serpentrum/data/ file is created or touched here."""
+        dirname = self._tmpdir()
+        self._write_text(dirname, 'phenol.xyz', 'dummy\n')
+        manifest = molecule_data.load_manifest(
+            self._write(dirname, 'manifest.json', _copy(VALID_MANIFEST)))
+        stacking = molecule_data.load_stacking(
+            self._write(dirname, 'stacking.json', _copy(VALID_STACKING)))
+        molecule = manifest['sets'][0]['molecules'][0]
+        entry = molecule_data.interaction_for(molecule, stacking)
+        self.assertIsNotNone(entry)
+        distance_a = entry['distance_a']  # read FROM the loaded data file
+        self.assertEqual(distance_a, 3.4)
+        self.assertEqual(entry['lateral_offset_a'], 0.0)
+        self.assertEqual(entry['citation'], 'janiak2000')
+        # DRAFT entries are fully usable for tests but ship nothing.
+        self.assertEqual(molecule_data.shipped_interactions(stacking), [])
+
+
 if __name__ == '__main__':
     unittest.main()
