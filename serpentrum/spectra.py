@@ -298,3 +298,101 @@ def parse_g98(path):
     """Parse the g98.out file at ``path`` (utf-8) into a Spectrum."""
     with open(path, encoding='utf-8') as fh:
         return parse_g98_text(fh.read())
+
+
+# ---------------------------------------------------------------------------
+# Plan 02-09: Turbomole vibspectrum fallback parser + trivial-mode filter.
+# Appended below the g98 core (02-01); parse_g98 behavior is unchanged.
+# ---------------------------------------------------------------------------
+
+_VIBSPECTRUM_HEADER = '$vibrational spectrum'
+_VIBSPECTRUM_END = '$end'
+
+
+def parse_vibspectrum_text(text):
+    """Parse Turbomole-format vibspectrum text -> Spectrum.
+
+    The vibspectrum file carries frequency + IR intensity per mode but NO
+    atom geometry and NO displacement vectors: ``atoms == []`` and each
+    Mode's ``vectors == ()``. ``n_atoms = 0`` is intentional — consumers
+    take N from the g98 parse or the .xyz. Trivial modes (translations /
+    rotations) appear explicitly with |freq| < ~10; real_modes() filters
+    them out by threshold.
+
+    Grammar (research S1.2, byte-verified against the committed fixture):
+      line 1  = '$vibrational spectrum'           (header)
+      '#'...  = comment                            (skipped)
+      data    = 4-token trivial row  [mode freq intensity '-']
+              | 5-token real row    [mode symmetry freq intensity selection]
+      last    = '$end'
+
+    Uniform field indexing: ``mode = int(t[0])`` (the file's own 1-based
+    numbering, trivial rows included), ``freq = float(t[-3])``,
+    ``intensity = float(t[-2])``; ``symmetry = t[1]`` when 5 tokens else
+    ``''`` (parsed for grammar validation, not stored — the Mode namedtuple
+    from 02-01 carries no symmetry/selection field, per the plan's
+    ``Mode(index=mode, freq=freq, intensity=intensity, vectors=())``
+    construction). Lines are split with str.splitlines() (neutralizes CRLF
+    and a missing trailing newline); callers open files utf-8 (the comment
+    header carries a literal U+207B U+00B9 in '(km*mol⁻¹)').
+
+    Non-numeric mode/freq/intensity tokens raise
+    ``SpectraParseError('vibspectrum numeric field', ...)`` — never a bare
+    ValueError. A wrong token count raises ``SpectraParseError('vibspectrum
+    row', ...)``. A missing header or missing $end raises a
+    SpectraParseError whose message names the stage and the 1-based line.
+    """
+    lines = text.splitlines()
+
+    # $end check: the final non-blank line must be '$end'. An empty input
+    # or a header-only input both surface here (missing-$end path), which
+    # is the plan's loud-failure contract for those cases.
+    last_nonblank = None
+    for index in range(len(lines) - 1, -1, -1):
+        if lines[index].strip():
+            last_nonblank = index
+            break
+    if last_nonblank is None:
+        _fail('vibspectrum end', 1, '<empty>',
+              "expected '$end' but input is empty")
+    if lines[last_nonblank].strip() != _VIBSPECTRUM_END:
+        _fail('vibspectrum end', last_nonblank + 1, lines[last_nonblank],
+              "expected '$end'")
+
+    # Header check: line 1 must be '$vibrational spectrum'.
+    if not lines or lines[0].strip() != _VIBSPECTRUM_HEADER:
+        _fail('vibspectrum header', 1,
+              lines[0] if lines else '<empty>',
+              "expected '%s'" % _VIBSPECTRUM_HEADER)
+
+    modes = []
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith('#'):
+            continue
+        if stripped == _VIBSPECTRUM_HEADER or stripped == _VIBSPECTRUM_END:
+            continue
+        tokens = line.split()
+        ntok = len(tokens)
+        if ntok not in (4, 5):
+            _fail('vibspectrum row', index + 1, line,
+                  'expected 4 or 5 tokens, got %d' % ntok)
+        # ntok is 4 (trivial) or 5 (real) here — else _fail raised.
+        # Uniform indexing: t[0]=mode, t[-3]=freq, t[-2]=intensity.
+        mode = _to_int(tokens[0], 'vibspectrum numeric field',
+                       index + 1, line)
+        freq = _to_float(tokens[-3], 'vibspectrum numeric field',
+                         index + 1, line)
+        intensity = _to_float(tokens[-2], 'vibspectrum numeric field',
+                              index + 1, line)
+        modes.append(Mode(mode, freq, intensity, ()))
+
+    return Spectrum(0, [], modes)
+
+
+def parse_vibspectrum(path):
+    """Parse the vibspectrum file at ``path`` (utf-8) into a Spectrum."""
+    with open(path, encoding='utf-8') as fh:
+        return parse_vibspectrum_text(fh.read())
