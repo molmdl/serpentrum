@@ -303,5 +303,295 @@ class TestBodyCollision(unittest.TestCase):
             self.assertEqual(events[-1][0], 'moved')
 
 
+def make_pickup(pid, x, y, atoms_n=1):
+    """Build a FRESH pickup record with the given 2D centroid.
+
+    Pickup record shape (STACK-05 seam): 'atoms' is REQUIRED (02-13's
+    swept pickup leg consumes atom positions). atoms_n defaults to 1;
+    the atom list is padded to match (tests only need the count for
+    counter arithmetic unless exercising the 'atoms' carry-through).
+    """
+    atoms = [('C', x, y, 0.0) for _ in range(atoms_n)]
+    return {
+        'id': pid,
+        'centroid': (x, y),
+        'atoms': atoms,
+        'atoms_n': atoms_n,
+    }
+
+
+class TestPickupCapture(unittest.TestCase):
+    """Pickup capture/attach/reject + counters (STACK-05 seam).
+
+    Capture: head within PICKUP_RADIUS_A (inclusive) of a live pickup's
+    centroid -> ('stacked', pickup) exactly once; counters increment.
+    attach_segment: appends the frozen GAME-10 record, counter-NEUTRAL.
+    reject_pickup: rolls counters back, re-arms the pickup, RETURNS the
+    canonical ('refused', pickup_id, reason) 3-tuple.
+    """
+
+    def test_capture_first_step(self):
+        # Head (0,0) heading right; pickup at (2.5, 0.0) atoms_n=1.
+        # Step 1: head -> (0.3, 0.0). Distance to pickup = 2.5 - 0.3 =
+        # 2.2. 2.2^2 = 4.84 <= 9.0 (PICKUP_RADIUS_A^2) -> capture.
+        pickup = make_pickup('p1', 2.5, 0.0, atoms_n=1)
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            pickups=[pickup])
+        events = engine.step(DT)
+        # Event order: ('moved', ...) then ('stacked', <record>).
+        self.assertEqual(len(events), 2)
+        self.assertEqual(events[0][0], 'moved')
+        self.assertEqual(events[1][0], 'stacked')
+        # The stacked record carries 'atoms' (02-13 consumes them).
+        stacked_record = events[1][1]
+        self.assertEqual(stacked_record['id'], 'p1')
+        self.assertIn('atoms', stacked_record)
+        self.assertEqual(len(stacked_record['atoms']), 1)
+        # Counters: 1 molecule, 1 atom, 0 remaining.
+        self.assertEqual(engine.molecules_stacked, 1)
+        self.assertEqual(engine.atoms_total, 1)
+        self.assertEqual(engine.pickups_remaining, 0)
+        # Pickup no longer live.
+        self.assertNotIn('p1', engine.live_pickup_ids)
+
+    def test_attach_segment_frozen_record(self):
+        # attach_segment appends the frozen GAME-10 record and is
+        # counter-NEUTRAL (capture already counted).
+        pickup = make_pickup('p1', 2.5, 0.0, atoms_n=1)
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            pickups=[pickup])
+        engine.step(DT)  # captures p1 -> counters 1/1/0
+        self.assertEqual(engine.molecules_stacked, 1)
+        engine.attach_segment('p1', (2.5, 0.0), [('C', 2.5, 0.0, 0.0)])
+        # The frozen record matches the 02-06 segment seam shape.
+        seg = engine.segments[-1]
+        self.assertEqual(seg['molecule_id'], 'p1')
+        self.assertEqual(seg['centroid'], (2.5, 0.0))
+        self.assertEqual(seg['atoms'], [('C', 2.5, 0.0, 0.0)])
+        self.assertEqual(seg['atoms_n'], 1)
+        # Counters unchanged by attach (counter-NEUTRAL).
+        self.assertEqual(engine.molecules_stacked, 1)
+        self.assertEqual(engine.atoms_total, 1)
+        self.assertEqual(engine.pickups_remaining, 0)
+
+    def test_no_capture_out_of_range(self):
+        # Pickup at (5.0, 0.0); head heading UP (perpendicular) so the
+        # head never approaches the pickup. 20 steps -> no stacked event,
+        # counters unchanged (0/0/1).
+        pickup = make_pickup('p1', 5.0, 0.0, atoms_n=1)
+        engine = GameEngine(head=(0.0, 0.0), heading='up',
+                            pickups=[pickup])
+        for _ in range(20):
+            events = engine.step(DT)
+            # No stacked event ever fires.
+            for e in events:
+                self.assertNotEqual(e[0], 'stacked')
+        self.assertEqual(engine.molecules_stacked, 0)
+        self.assertEqual(engine.atoms_total, 0)
+        self.assertEqual(engine.pickups_remaining, 1)
+        self.assertIn('p1', engine.live_pickup_ids)
+
+    def test_capture_exactly_at_radius_inclusive(self):
+        # Head (0,0) heading right; pickup at (3.3, 0.0). One step of
+        # 0.3 -> head (0.3, 0.0). Distance = 3.3 - 0.3 = 3.0 EXACTLY.
+        # 3.0^2 = 9.0 <= 9.0 (PICKUP_RADIUS_A^2) -> captured (inclusive).
+        pickup = make_pickup('p1', 3.3, 0.0, atoms_n=1)
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            pickups=[pickup])
+        events = engine.step(DT)
+        self.assertEqual(events[-1][0], 'stacked')
+        self.assertEqual(engine.molecules_stacked, 1)
+
+    def test_no_refire_while_claimed(self):
+        # After capturing a pickup, continue stepping -> no second
+        # ('stacked', ...) event (the pickup is no longer live).
+        pickup = make_pickup('p1', 2.5, 0.0, atoms_n=1)
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            pickups=[pickup])
+        engine.step(DT)  # captures p1
+        self.assertEqual(engine.molecules_stacked, 1)
+        # Step many more times past the pickup's position.
+        for _ in range(20):
+            events = engine.step(DT)
+            for e in events:
+                self.assertNotEqual(e[0], 'stacked')
+        # Still only 1 capture.
+        self.assertEqual(engine.molecules_stacked, 1)
+
+    def test_reject_then_recapture(self):
+        # reject_pickup RETURNS the canonical 3-tuple, rolls counters
+        # back, re-arms the pickup. Stepping then captures again.
+        pickup = make_pickup('p1', 2.5, 0.0, atoms_n=1)
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            pickups=[pickup])
+        engine.step(DT)  # captures p1 -> 1/1/0
+        self.assertNotIn('p1', engine.live_pickup_ids)
+        # Reject: returns ('refused', 'p1', 'clash').
+        result = engine.reject_pickup('p1', 'clash')
+        self.assertEqual(result, ('refused', 'p1', 'clash'))
+        # Counters rolled back: 0/0/1.
+        self.assertEqual(engine.molecules_stacked, 0)
+        self.assertEqual(engine.atoms_total, 0)
+        self.assertEqual(engine.pickups_remaining, 1)
+        # Pickup live again.
+        self.assertIn('p1', engine.live_pickup_ids)
+        # Refusal count tracked.
+        self.assertEqual(engine._refusal_counts.get('p1'), 1)
+        # Step again -> captures again (head still near the pickup).
+        events = engine.step(DT)
+        self.assertEqual(events[-1][0], 'stacked')
+        self.assertEqual(engine.molecules_stacked, 1)
+        self.assertEqual(engine.atoms_total, 1)
+        self.assertEqual(engine.pickups_remaining, 0)
+        # Refusal count unchanged by the re-capture (only reject tracks).
+        self.assertEqual(engine._refusal_counts.get('p1'), 1)
+
+    def test_at_most_one_capture_per_tick(self):
+        # Two pickups both within radius on the same tick: only the
+        # FIRST (in list order) is captured.
+        p1 = make_pickup('p1', 0.3, 0.0, atoms_n=1)  # right at step-1 pos
+        p2 = make_pickup('p2', 0.3, 0.0, atoms_n=1)  # same spot
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            pickups=[p1, p2])
+        events = engine.step(DT)  # head -> (0.3, 0.0), both at distance 0
+        stacked = [e for e in events if e[0] == 'stacked']
+        self.assertEqual(len(stacked), 1)
+        self.assertEqual(stacked[0][1]['id'], 'p1')  # list order
+        self.assertEqual(engine.molecules_stacked, 1)
+        self.assertNotIn('p1', engine.live_pickup_ids)
+        self.assertIn('p2', engine.live_pickup_ids)
+
+
+class TestWinAndBudget(unittest.TestCase):
+    """Win at cap ('won') and once-per-run budget warning.
+
+    Win: molecules_stacked >= cap -> ('won',) on the capture tick,
+    finished=True / result='won'. Never fires on a crash tick.
+    Budget: atoms_total > atom_budget -> ('budget_warning', atoms_total)
+    exactly once per run; never a hard stop.
+    """
+
+    def test_win_at_cap_second_capture(self):
+        # cap=2, two pickups in the path: p1 at (2.5, 0.0), p2 at
+        # (5.0, 0.0). Head (0,0) heading right.
+        #   Step 1: head (0.3, 0.0). p1 distance 2.2 <= 3.0 -> capture.
+        #     molecules_stacked=1 < 2 -> no win.
+        #   Steps 2-6: p2 distance > 3.0 (step 6: head 1.8, dist 3.2).
+        #   Step 7: head (2.1, 0.0). p2 distance 2.9 <= 3.0 -> capture.
+        #     molecules_stacked=2 >= 2 -> ('won',).
+        p1 = make_pickup('p1', 2.5, 0.0, atoms_n=1)
+        p2 = make_pickup('p2', 5.0, 0.0, atoms_n=1)
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            pickups=[p1, p2], cap=2)
+        # Step 1: capture p1, no win.
+        events = engine.step(DT)
+        self.assertEqual(events[-1][0], 'stacked')
+        self.assertFalse(engine.finished)
+        # Steps 2-6: no capture (p2 out of range).
+        for _ in range(5):
+            engine.step(DT)
+            self.assertFalse(engine.finished)
+        # Step 7: capture p2 -> win on same tick.
+        events = engine.step(DT)
+        self.assertEqual(events[-1], ('won',))
+        self.assertTrue(engine.finished)
+        self.assertEqual(engine.result, 'won')
+        self.assertEqual(engine.molecules_stacked, 2)
+        # Later step returns [] (finished engine is inert).
+        self.assertEqual(engine.step(DT), [])
+
+    def test_budget_warning_once_per_run(self):
+        # atom_budget=10, two pickups each atoms_n=20. First capture
+        # pushes atoms_total to 20 > 10 -> ('budget_warning', 20).
+        # Second capture pushes to 40 > 10, but the warning already
+        # fired -> no second warning.
+        p1 = make_pickup('p1', 2.5, 0.0, atoms_n=20)
+        p2 = make_pickup('p2', 5.0, 0.0, atoms_n=20)
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            pickups=[p1, p2], atom_budget=10)
+        all_events = []
+        for _ in range(10):
+            all_events.extend(engine.step(DT))
+        budget_warnings = [e for e in all_events
+                           if e[0] == 'budget_warning']
+        # Exactly one budget warning, carrying atoms_total=20.
+        self.assertEqual(len(budget_warnings), 1)
+        self.assertEqual(budget_warnings[0], ('budget_warning', 20))
+        # The game was NOT stopped by the budget warning.
+        self.assertFalse(engine.finished)
+
+    def test_budget_warning_cleared_by_reset(self):
+        # The _budget_warned flag is cleared by reset(), so a new run
+        # can fire the warning again.
+        pickup = make_pickup('p1', 2.5, 0.0, atoms_n=20)
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            pickups=[pickup], atom_budget=10)
+        events = engine.step(DT)
+        self.assertIn(('budget_warning', 20), events)
+        # Reset: flag cleared, counters zeroed.
+        engine.reset(head=(0.0, 0.0), heading='right',
+                     pickups=[pickup], atom_budget=10)
+        self.assertFalse(engine._budget_warned)
+        self.assertEqual(engine.atoms_total, 0)
+        # Step again -> warning fires again.
+        events = engine.step(DT)
+        self.assertIn(('budget_warning', 20), events)
+
+
+class TestEventOrdering(unittest.TestCase):
+    """Event order per research §7: ('moved',) -> crash -> ('stacked',)
+    -> ('budget_warning',) -> ('won',). A crash stops all later
+    processing; pickup/win never fire on a crash tick."""
+
+    def test_move_then_capture_order(self):
+        # A tick that both moves and captures: [('moved', ...),
+        # ('stacked', ...)] in that order.
+        pickup = make_pickup('p1', 2.5, 0.0, atoms_n=1)
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            pickups=[pickup])
+        events = engine.step(DT)
+        self.assertEqual(len(events), 2)
+        self.assertEqual(events[0][0], 'moved')
+        self.assertEqual(events[1][0], 'stacked')
+
+    def test_crashing_tick_emits_nothing_after_crash(self):
+        # A crashing tick emits [('moved', ...), ('crashed', ...)] and
+        # nothing after — even if a pickup is within range.
+        # Head (16.8, 0) heading right, box -> wall crash at 17.1.
+        # Pickup at (17.1, 0.0) would be within PICKUP_RADIUS_A, but the
+        # boundary crash stops all later processing.
+        pickup = make_pickup('p1', 17.1, 0.0, atoms_n=1)
+        engine = GameEngine(head=(16.8, 0.0), heading='right',
+                            box_min=BOX_MIN, box_max=BOX_MAX,
+                            pickups=[pickup])
+        events = engine.step(DT)
+        self.assertEqual(len(events), 2)
+        self.assertEqual(events[0][0], 'moved')
+        self.assertEqual(events[1], ('crashed', 'boundary'))
+        # No stacked/won/budget events after the crash.
+        for e in events:
+            self.assertNotIn(e[0], ('stacked', 'won', 'budget_warning'))
+        # Pickup was never captured (crash stopped processing first).
+        self.assertEqual(engine.molecules_stacked, 0)
+        self.assertIn('p1', engine.live_pickup_ids)
+
+    def test_full_capture_order_stacked_budget_won(self):
+        # A single tick that captures, fires budget, AND wins: order is
+        # ('moved',), ('stacked',), ('budget_warning',), ('won',).
+        # cap=1, atom_budget=0 (any capture exceeds), pickup atoms_n=5.
+        # Step 1: head (0.3, 0.0), pickup at (2.5, 0.0) dist 2.2 -> cap.
+        #   atoms_total=5 > 0 -> budget_warning. molecules_stacked=1 >=
+        #   1 -> win. Order: moved, stacked, budget_warning, won.
+        pickup = make_pickup('p1', 2.5, 0.0, atoms_n=5)
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            pickups=[pickup], cap=1, atom_budget=0)
+        events = engine.step(DT)
+        names = [e[0] for e in events]
+        self.assertEqual(names, ['moved', 'stacked', 'budget_warning',
+                                 'won'])
+        self.assertTrue(engine.finished)
+        self.assertEqual(engine.result, 'won')
+
+
 if __name__ == '__main__':
     unittest.main()

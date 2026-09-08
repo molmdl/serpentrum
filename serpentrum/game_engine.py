@@ -136,10 +136,26 @@ class GameEngine(object):
                 state).
       result:   None, 'crashed', or 'won' — the end-of-run verdict. Set
                 together with finished=True.
+      pickups:  list of pickup records (copied — see _copy_pickups).
+                Each: {'id': str, 'centroid': (x, y),
+                'atoms': [(sym, x, y, z), ...], 'atoms_n': int}.
+                'atoms' is REQUIRED (02-13's swept pickup leg consumes
+                atom positions). None/empty = no pickups.
+      live_pickup_ids: set of ids not yet captured; capture removes,
+                reject_pickup re-adds. Scanned in pickups-list order.
+      cap:      int or None — molecules_stacked >= cap emits ('won',).
+      atom_budget: int or None — atoms_total > atom_budget emits
+                ('budget_warning', atoms_total) exactly once per run.
+      molecules_stacked: int counter (incremented on capture, rolled
+                back by reject_pickup).
+      atoms_total: int counter (sum of captured atoms_n; rolled back
+                by reject_pickup).
+      pickups_remaining: int counter (live pickup count).
     """
 
     def __init__(self, head=(0.0, 0.0), heading='right', segments=None,
-                 box_min=None, box_max=None):
+                 box_min=None, box_max=None,
+                 pickups=None, cap=None, atom_budget=None):
         """Seed the engine state (see reset for the parameter contract).
 
         Kept keyword-friendly: plan 02-10 extends this signature with
@@ -147,19 +163,24 @@ class GameEngine(object):
         these by name.
         """
         self.reset(head=head, heading=heading, segments=segments,
-                   box_min=box_min, box_max=box_max)
+                   box_min=box_min, box_max=box_max,
+                   pickups=pickups, cap=cap, atom_budget=atom_budget)
 
     def reset(self, head=(0.0, 0.0), heading='right', segments=None,
-              box_min=None, box_max=None):
+              box_min=None, box_max=None,
+              pickups=None, cap=None, atom_budget=None):
         """Rebuild ALL engine state from the given seeds.
 
         Same parameters as __init__ (GAME-07 deterministic restart):
         head (x, y) floats, heading a DIRS name resolved to its unit
         vector, segments the test-seam list (copied — see
         _copy_segments), box_min/box_max the axis-aligned play box (None
-        disables boundary checking — 02-06's default). Unknown heading
-        names raise ValueError, the same loud contract as
-        request_direction.
+        disables boundary checking — 02-06's default), pickups the list
+        of pickup records (copied — see _copy_pickups; None/empty = no
+        pickups), cap the win-cap molecule count (None = no win check),
+        atom_budget the warning threshold (None = no budget check).
+        Unknown heading names raise ValueError, the same loud contract
+        as request_direction.
         """
         if heading not in DIRS:
             raise ValueError('unknown heading: %r (valid: %s)'
@@ -173,6 +194,15 @@ class GameEngine(object):
         self.box_max = tuple(box_max) if box_max is not None else None
         self.finished = False
         self.result = None
+        self.pickups = self._copy_pickups(pickups)
+        self.live_pickup_ids = set(p['id'] for p in self.pickups)
+        self.cap = cap
+        self.atom_budget = atom_budget
+        self.molecules_stacked = 0
+        self.atoms_total = 0
+        self.pickups_remaining = len(self.pickups)
+        self._budget_warned = False
+        self._refusal_counts = {}
 
     def _copy_segments(self, segments):
         """Copy the caller's segment list into fresh engine-owned dicts.
@@ -189,6 +219,25 @@ class GameEngine(object):
         for seg in segments:
             copy = dict(seg)
             copy['atoms'] = list(seg.get('atoms', ()))
+            if 'atoms_n' not in copy:
+                copy['atoms_n'] = len(copy['atoms'])
+            copies.append(copy)
+        return copies
+
+    def _copy_pickups(self, pickups):
+        """Copy the caller's pickup list into fresh engine-owned dicts.
+
+        Same isolation contract as _copy_segments: each record becomes a
+        new dict with a fresh 'atoms' list. 'atoms' is REQUIRED on every
+        pickup record (02-13's swept pickup leg consumes atom positions
+        at atom-level clearance). Unknown extra keys are carried through.
+        """
+        if not pickups:
+            return []
+        copies = []
+        for p in pickups:
+            copy = dict(p)
+            copy['atoms'] = list(p.get('atoms', ()))
             if 'atoms_n' not in copy:
                 copy['atoms_n'] = len(copy['atoms'])
             copies.append(copy)
@@ -259,6 +308,18 @@ class GameEngine(object):
         boundary crash. Boundary check runs first; a crash stops all
         later event processing for the tick.
 
+        Pickup capture (plan 02-10, STACK-05 seam): after the body check,
+        scan pickups in list order; the FIRST live pickup whose squared
+        centroid distance to the head is <= PICKUP_RADIUS_A ** 2
+        (inclusive) is captured — claim it, increment counters, emit
+        ('stacked', pickup_record). At most ONE capture per tick. After
+        a capture: if atom_budget is set and atoms_total > atom_budget
+        and not yet warned, emit ('budget_warning', atoms_total) exactly
+        once per run; then if cap is set and molecules_stacked >= cap,
+        emit ('won',), set finished=True / result='won', clear pending.
+        A crash stops all later event processing (pickup/win never fire
+        on a crash tick).
+
         A pending direction is deliberately NOT consumed here and
         produces NO event — the queue only buffers; plan 02-13 applies
         pending turns at the START of step(). (Suite consequence: the
@@ -309,6 +370,39 @@ class GameEngine(object):
                     self.result = 'crashed'
                     self.pending = []
                     return events
+        # Pickup capture (STACK-05 seam): first live pickup within
+        # PICKUP_RADIUS_A (inclusive) is claimed and counted. At most
+        # ONE per tick (deterministic list order). Capture is followed
+        # by the budget warning (once per run) and the win check.
+        if self.live_pickup_ids:
+            pickup_sq = PICKUP_RADIUS_A * PICKUP_RADIUS_A
+            for pickup in self.pickups:
+                if pickup['id'] not in self.live_pickup_ids:
+                    continue
+                px, py = pickup['centroid']
+                dx = nx - px
+                dy = ny - py
+                if dx * dx + dy * dy <= pickup_sq:
+                    self.live_pickup_ids.discard(pickup['id'])
+                    self.molecules_stacked += 1
+                    self.atoms_total += pickup['atoms_n']
+                    self.pickups_remaining -= 1
+                    events.append(('stacked', pickup))
+                    # Budget warning: once per run, never a hard stop.
+                    if (self.atom_budget is not None and
+                            self.atoms_total > self.atom_budget and
+                            not self._budget_warned):
+                        self._budget_warned = True
+                        events.append(('budget_warning', self.atoms_total))
+                    # Win at cap: checked AFTER capture on the same tick.
+                    if (self.cap is not None and
+                            self.molecules_stacked >= self.cap):
+                        events.append(('won',))
+                        self.finished = True
+                        self.result = 'won'
+                        self.pending = []
+                        return events
+                    break  # at most ONE capture per tick
         return events
 
     def pause(self):
@@ -323,3 +417,57 @@ class GameEngine(object):
     def resume(self):
         """Unfreeze the simulation: step() moves the head again."""
         self.paused = False
+
+    def attach_segment(self, molecule_id, centroid, atoms):
+        """Append the frozen segment record (GAME-10 rigid body).
+
+        Counter-NEUTRAL: the capture already counted this molecule in
+        molecules_stacked / atoms_total. The controller calls this
+        AFTER stacking.place_pickup succeeds — the segment is the frozen
+        placed geometry, appended at the end of the chain (index 0 =
+        oldest, last = nearest head).
+
+        The record matches the 02-06 segment seam shape:
+        {'molecule_id', 'centroid', 'atoms', 'atoms_n'}.
+        """
+        self.segments.append({
+            'molecule_id': molecule_id,
+            'centroid': (float(centroid[0]), float(centroid[1])),
+            'atoms': list(atoms),
+            'atoms_n': len(atoms),
+        })
+
+    def reject_pickup(self, pickup_id, reason='clash'):
+        """Roll back a capture and re-arm the pickup (STACK-05 seam).
+
+        The controller calls this when stacking.place_pickup + check_clash
+        reject the placement. Rolls the counters back (molecules_stacked
+        -= 1, atoms_total -= atoms_n, pickups_remaining += 1), re-adds
+        the id to live_pickup_ids, tracks a per-pickup refusal count,
+        and RETURNS the canonical 3-tuple ('refused', pickup_id, reason).
+        step() events cannot be emitted from controller-called methods,
+        so the controller logs the returned tuple.
+
+        Guard: if the pickup is still live (never captured or already
+        rejected), the counters are NOT rolled back (prevents double-
+        decrement) but the refusal count is still tracked and the
+        canonical tuple is still returned.
+        """
+        pickup = None
+        for p in self.pickups:
+            if p['id'] == pickup_id:
+                pickup = p
+                break
+        if pickup is None:
+            return ('refused', pickup_id, reason)
+        self._refusal_counts[pickup_id] = \
+            self._refusal_counts.get(pickup_id, 0) + 1
+        if pickup_id in self.live_pickup_ids:
+            # Already live — never captured or already rejected. Do NOT
+            # roll back (counters were never incremented for this id).
+            return ('refused', pickup_id, reason)
+        self.live_pickup_ids.add(pickup_id)
+        self.molecules_stacked -= 1
+        self.atoms_total -= pickup['atoms_n']
+        self.pickups_remaining += 1
+        return ('refused', pickup_id, reason)
