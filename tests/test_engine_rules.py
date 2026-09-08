@@ -161,5 +161,147 @@ class TestBoundaryCollision(unittest.TestCase):
         self.assertEqual(engine.pending, [])
 
 
+def make_seg_at(x, y, molecule_id='mol'):
+    """Build a FRESH segment record with the given 2D centroid.
+
+    The engine copies these on construction; tests pass a list of them
+    as the segments seam. Atoms carry a single placeholder atom at the
+    centroid (body collision uses centroids only — atoms are for
+    02-13's swept pickup leg).
+    """
+    atoms = [('C', x, y, 0.0)]
+    return {
+        'molecule_id': molecule_id,
+        'centroid': (x, y),
+        'atoms': atoms,
+        'atoms_n': len(atoms),
+    }
+
+
+class TestBodyCollision(unittest.TestCase):
+    """Self-collision: head-centroid vs chain POLYLINE EDGES (GAME-05).
+
+    The chain polyline connects segment centroids c[0..n-1] (index 0 =
+    oldest). Edges (c[i], c[i+1]) are checked for i in range(0, n - 1 -
+    SEGMENT_SKIP_RECENT); the SEGMENT_SKIP_RECENT (=2) newest edges
+    nearest the head (the neck) are exempt. Crash on STRICT <
+    BODY_COLLISION_RADIUS_A ** 2 (= 4.0).
+    """
+
+    def test_body_crash_exact_tick(self):
+        # n=4 segments -> checked edges = edge 0 only: (c0,c1), the
+        # horizontal line y=1.0 for x in [6, 10]. Head travels y=0 at
+        # +0.3/step.
+        #   Step 14: head (4.2, 0.0). Nearest edge point is the clamped
+        #     endpoint (6.0, 1.0). dist^2 = 1.8^2 + 1.0^2 = 3.24 + 1.0
+        #     = 4.24. 4.24 < 4.0? NO -> alive.
+        #   Step 15: head (4.5, 0.0). dist^2 = 1.5^2 + 1.0^2 = 2.25 +
+        #     1.0 = 3.25. 3.25 < 4.0? YES -> ('crashed', 'body').
+        segs = [make_seg_at(6.0, 1.0, 'c0'), make_seg_at(10.0, 1.0, 'c1'),
+                make_seg_at(14.0, 5.0, 'c2'), make_seg_at(18.0, 9.0, 'c3')]
+        engine = GameEngine(head=(0.0, 0.0), heading='right', segments=segs)
+        for k in range(1, 15):  # steps 1..14: all alive
+            events = engine.step(DT)
+            self.assertFalse(engine.finished,
+                             'crashed early at step %d' % k)
+            self.assertEqual(events[-1][0], 'moved')
+        # After step 14: head at (4.2, 0.0).
+        self.assertAlmostEqual(engine.head[0], 4.2, delta=DELTA)
+        # Step 15: crash.
+        events = engine.step(DT)
+        self.assertAlmostEqual(engine.head[0], 4.5, delta=DELTA)
+        self.assertEqual(events[-1], ('crashed', 'body'))
+        self.assertTrue(engine.finished)
+        self.assertEqual(engine.result, 'crashed')
+
+    def test_neck_exemption_skip_proof(self):
+        # Same c0/c1, but c2=(3.0, 0.0), c3=(9.0, 0.0). Edges (c1,c2)
+        # and (c2,c3) are the exempt newest 2. Edge (c2,c3) is the
+        # horizontal line y=0.0 from x=3..9 — the head's OWN PATH
+        # (distance 0.0 at every tick while head.x is in [3, 9]) — yet
+        # NO crash comes from it (skipped). The crash still arrives from
+        # edge 0 at step 15 exactly as above. This proves the skip
+        # window, not luck.
+        segs = [make_seg_at(6.0, 1.0, 'c0'), make_seg_at(10.0, 1.0, 'c1'),
+                make_seg_at(3.0, 0.0, 'c2'), make_seg_at(9.0, 0.0, 'c3')]
+        engine = GameEngine(head=(0.0, 0.0), heading='right', segments=segs)
+        # Steps 10..30 put the head on edge (c2,c3) at distance 0.0 —
+        # but that edge is exempt. No crash from it.
+        for k in range(1, 15):
+            events = engine.step(DT)
+            self.assertFalse(engine.finished,
+                             'crashed early at step %d (neck not exempt?)' % k)
+        # Step 15: crash from edge 0 (c0,c1), NOT from the exempt edge.
+        events = engine.step(DT)
+        self.assertAlmostEqual(engine.head[0], 4.5, delta=DELTA)
+        self.assertEqual(events[-1], ('crashed', 'body'))
+        self.assertTrue(engine.finished)
+
+    def test_strict_comparison_exactly_radius_no_crash(self):
+        # Edge (0,2)-(4,2): horizontal at y=2.0, x in [0, 4]. Pre-step
+        # head (1.7, 0.0) heading right -> post-step (2.0, 0.0). Nearest
+        # edge point (2.0, 2.0). dist^2 = 0 + 2.0^2 = 4.0.
+        # STRICT <: 4.0 < 4.0 is False -> NO crash.
+        # (n=4 so edge 0 is checked; c2/c3 far away and exempt.)
+        segs = [make_seg_at(0.0, 2.0, 'c0'), make_seg_at(4.0, 2.0, 'c1'),
+                make_seg_at(100.0, 100.0, 'c2'),
+                make_seg_at(200.0, 200.0, 'c3')]
+        engine = GameEngine(head=(1.7, 0.0), heading='right', segments=segs)
+        events = engine.step(DT)
+        self.assertAlmostEqual(engine.head[0], 2.0, delta=DELTA)
+        self.assertFalse(engine.finished)
+        self.assertEqual(events[-1][0], 'moved')
+
+    def test_strict_comparison_just_under_radius_crashes(self):
+        # Same edge. Pre-step head (1.7, 0.01) heading right -> post-step
+        # (2.0, 0.01). Nearest edge point (2.0, 2.0). dist^2 = 0 +
+        # (2.0 - 0.01)^2 = 1.99^2 = 3.9601. 3.9601 < 4.0 -> crash.
+        segs = [make_seg_at(0.0, 2.0, 'c0'), make_seg_at(4.0, 2.0, 'c1'),
+                make_seg_at(100.0, 100.0, 'c2'),
+                make_seg_at(200.0, 200.0, 'c3')]
+        engine = GameEngine(head=(1.7, 0.01), heading='right', segments=segs)
+        events = engine.step(DT)
+        self.assertAlmostEqual(engine.head[0], 2.0, delta=DELTA)
+        self.assertAlmostEqual(engine.head[1], 0.01, delta=DELTA)
+        self.assertEqual(events[-1], ('crashed', 'body'))
+        self.assertTrue(engine.finished)
+        self.assertEqual(engine.result, 'crashed')
+
+    def test_crash_precedence_boundary_over_body(self):
+        # A tick where the head crosses BOTH a wall and an edge. Boundary
+        # check runs first -> exactly one ('crashed', ...) event and it
+        # is 'boundary'; the body crash (which would also fire) never
+        # runs.
+        #   Box ((-18,-18),(18,18)) -> margin walls at +-17.0.
+        #   Edge 0: c0=(17.1, 2.0), c1=(17.1, -2.0) — vertical at x=17.1.
+        #   Head (16.8, 0.0) heading right -> post-step (17.1, 0.0).
+        #   Boundary: 17.1 >= 17.0 -> crash. Body: head ON the edge
+        #   (distance 0.0) but body check never runs.
+        segs = [make_seg_at(17.1, 2.0, 'c0'), make_seg_at(17.1, -2.0, 'c1'),
+                make_seg_at(100.0, 100.0, 'c2'),
+                make_seg_at(200.0, 200.0, 'c3')]
+        engine = GameEngine(head=(16.8, 0.0), heading='right', segments=segs,
+                            box_min=BOX_MIN, box_max=BOX_MAX)
+        events = engine.step(DT)
+        # Exactly one crash event.
+        crash_events = [e for e in events if e[0] == 'crashed']
+        self.assertEqual(len(crash_events), 1)
+        self.assertEqual(crash_events[0], ('crashed', 'boundary'))
+        self.assertTrue(engine.finished)
+        self.assertEqual(engine.result, 'crashed')
+
+    def test_too_few_segments_no_body_check(self):
+        # n <= 1 + SEGMENT_SKIP_RECENT (= 3) -> range is empty -> no body
+        # check possible. Head walks through its own path with no crash.
+        # 3 segments: checked edges = range(0, 3-1-2) = range(0, 0) = [].
+        segs = [make_seg_at(1.0, 0.0, 'c0'), make_seg_at(2.0, 0.0, 'c1'),
+                make_seg_at(3.0, 0.0, 'c2')]
+        engine = GameEngine(head=(0.0, 0.0), heading='right', segments=segs)
+        for _ in range(20):
+            events = engine.step(DT)
+            self.assertFalse(engine.finished)
+            self.assertEqual(events[-1][0], 'moved')
+
+
 if __name__ == '__main__':
     unittest.main()

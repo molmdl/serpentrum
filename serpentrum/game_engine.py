@@ -66,6 +66,40 @@ SWEEP_PICKUP_CLEARANCE_A = 2.5  # atom-level clearance for 02-13's sweep
                                 # it)
 
 
+def _point_segment_distance_sq(px, py, ax, ay, bx, by):
+    """Squared distance from point (px, py) to segment (a -> b) in 2D.
+
+    Standard clamped projection: project (p - a) onto (b - a), clamp the
+    parameter t to [0, 1] (so the closest point stays on the segment),
+    and return the squared distance to that closest point. Compare the
+    result against BODY_COLLISION_RADIUS_A ** 2 (strict <).
+
+    Module-level (not a method) so plan 02-13's swept pre-check body leg
+    can reuse it on the same polyline edges without re-implementing the
+    math. Pure stdlib float arithmetic — no numpy.
+    """
+    dx = bx - ax
+    dy = by - ay
+    len_sq = dx * dx + dy * dy
+    if len_sq == 0.0:
+        # Degenerate segment (a == b): distance to the single point.
+        ex = px - ax
+        ey = py - ay
+        return ex * ex + ey * ey
+    # Project (p - a) onto (b - a), clamp t to [0, 1].
+    t = ((px - ax) * dx + (py - ay) * dy) / len_sq
+    if t < 0.0:
+        t = 0.0
+    elif t > 1.0:
+        t = 1.0
+    # Closest point on the segment.
+    cx = ax + t * dx
+    cy = ay + t * dy
+    ex = px - cx
+    ey = py - cy
+    return ex * ex + ey * ey
+
+
 class GameEngine(object):
     """Deterministic snake engine state — movement core.
 
@@ -214,6 +248,17 @@ class GameEngine(object):
         clear the pending queue, and STOP event processing for this
         tick. A crashed engine no-ops on every later step().
 
+        Self-collision (plan 02-10, GAME-05 — AUTHORITATIVE polyline-edge
+        model): after the boundary check, build the chain polyline from
+        segment centroids c[0..n-1] (index 0 = oldest, n-1 = newest
+        nearest the head). Check edges (c[i], c[i+1]) for i in
+        range(0, n - 1 - SEGMENT_SKIP_RECENT) — the SEGMENT_SKIP_RECENT
+        newest edges (the neck) are exempt. If the head's squared
+        distance to any checked edge is STRICT < BODY_COLLISION_RADIUS_A
+        ** 2, emit ('crashed', 'body') and end the run the same way as a
+        boundary crash. Boundary check runs first; a crash stops all
+        later event processing for the tick.
+
         A pending direction is deliberately NOT consumed here and
         produces NO event — the queue only buffers; plan 02-13 applies
         pending turns at the START of step(). (Suite consequence: the
@@ -246,6 +291,24 @@ class GameEngine(object):
                 self.result = 'crashed'
                 self.pending = []
                 return events
+        # Self-collision: head-centroid vs chain POLYLINE EDGES built
+        # from segment centroids. The SEGMENT_SKIP_RECENT edges nearest
+        # the head (the neck) are exempt. STRICT < BODY_COLLISION_RADIUS_A**2.
+        n = len(self.segments)
+        limit = n - 1 - SEGMENT_SKIP_RECENT
+        if limit > 0:
+            radius_sq = BODY_COLLISION_RADIUS_A * BODY_COLLISION_RADIUS_A
+            centroids = [seg['centroid'] for seg in self.segments]
+            for i in range(limit):
+                ax, ay = centroids[i]
+                bx, by = centroids[i + 1]
+                if _point_segment_distance_sq(nx, ny, ax, ay, bx, by) \
+                        < radius_sq:
+                    events.append(('crashed', 'body'))
+                    self.finished = True
+                    self.result = 'crashed'
+                    self.pending = []
+                    return events
         return events
 
     def pause(self):
