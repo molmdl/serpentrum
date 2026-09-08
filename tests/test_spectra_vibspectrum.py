@@ -246,5 +246,96 @@ class TestRealModesFilter(unittest.TestCase):
             self.assertIs(real_mode, orig_mode)
 
 
+class TestVibspectrumLoudFailures(unittest.TestCase):
+    """Malformed vibspectrum input raises SpectraParseError (never a bare
+    ValueError) carrying the parser stage + 1-based line number + ~80-char
+    excerpt.
+
+    Each malformed input is built IN MEMORY from the real fixture text
+    (read once in setUpClass) or a small synthetic string — fixture files
+    on disk are never corrupted.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.good_text = read_text(VIBSPECTRUM_PATH)
+        cls.good_lines = cls.good_text.splitlines()
+
+    def test_missing_end_raises(self):
+        # Drop the last line ($end) -> the final non-blank line is now a
+        # data row, not $end.
+        text = '\n'.join(self.good_lines[:-1])
+        with self.assertRaises(SpectraParseError) as ctx:
+            parse_vibspectrum_text(text)
+        self.assertIn('$end', str(ctx.exception))
+
+    def test_missing_header_raises(self):
+        # Replace line 1 with a wrong marker.
+        lines = list(self.good_lines)
+        lines[0] = '$energies'
+        text = '\n'.join(lines)
+        with self.assertRaises(SpectraParseError) as ctx:
+            parse_vibspectrum_text(text)
+        self.assertIn('header', str(ctx.exception))
+
+    def test_garbage_row_raises_with_line_number(self):
+        # Insert a non-parseable row before $end. The fixture has 82 lines;
+        # $end is line 82. Inserting garbage before it puts garbage at
+        # 1-based line 82.
+        lines = list(self.good_lines)
+        lines.insert(-1, 'this is not a mode row')
+        text = '\n'.join(lines)
+        with self.assertRaises(SpectraParseError) as ctx:
+            parse_vibspectrum_text(text)
+        msg = str(ctx.exception)
+        self.assertIn('vibspectrum row', msg)
+        self.assertIn('82', msg)
+
+    def test_non_numeric_field_raises_not_valueerror(self):
+        # Corrupt a real row's intensity token (mode 10, line 13) with '*'.
+        # Must raise SpectraParseError mentioning 'numeric', NOT a bare
+        # ValueError escaping the conversion wrapper.
+        lines = list(self.good_lines)
+        target_index = None
+        for i, line in enumerate(lines):
+            if line.split() and line.split()[0] == '10':
+                target_index = i
+                break
+        self.assertIsNotNone(target_index, 'mode 10 row not found')
+        tokens = lines[target_index].split()
+        # 5-token real row: [mode, symmetry, freq, intensity, selection]
+        # intensity = tokens[-2] = tokens[3]; replace with '*'
+        self.assertEqual(len(tokens), 5, 'mode 10 should be a 5-token row')
+        tokens[-2] = '*'
+        lines[target_index] = '     ' + '   '.join(tokens)
+        text = '\n'.join(lines)
+        with self.assertRaises(SpectraParseError) as ctx:
+            parse_vibspectrum_text(text)
+        msg = str(ctx.exception)
+        self.assertIn('numeric', msg)
+        # The error must be SpectraParseError, not a bare ValueError.
+        self.assertIs(type(ctx.exception), SpectraParseError)
+
+    def test_empty_text_raises(self):
+        with self.assertRaises(SpectraParseError):
+            parse_vibspectrum_text('')
+
+    def test_only_header_raises_missing_end(self):
+        # Header present but no $end -> missing-$end path.
+        with self.assertRaises(SpectraParseError) as ctx:
+            parse_vibspectrum_text('$vibrational spectrum\n')
+        self.assertIn('$end', str(ctx.exception))
+
+    def test_extra_comment_line_does_not_break_parsing(self):
+        # Insert a comment line after the header (line 2). Comment lines
+        # within the file body must be skipped — this is what makes the
+        # synthetic CO2 fixture's inline labeling legal.
+        lines = list(self.good_lines)
+        lines.insert(1, '# anything')
+        text = '\n'.join(lines)
+        spectrum = parse_vibspectrum_text(text)
+        self.assertEqual(len(spectrum.modes), 78)
+
+
 if __name__ == '__main__':
     unittest.main()
