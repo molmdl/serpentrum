@@ -17,7 +17,7 @@ A PyMOL plugin game: steer a molecular head around a bounded box, stack real sma
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 1: Plugin Skeleton & Purity Harness** - Installable plugin, single-instance modeless 3-tab dialog, purity/test harness built in from commit one *(research A)*
-- [ ] **Phase 2: Pure Core — Game & Chemistry Logic** - All game/chemistry rules as stdlib-only WSL-tested modules; spectra parser fixture-first; demo-data approval track starts *(research B)*
+- [x] **Phase 2: Pure Core — Game & Chemistry Logic** - All game/chemistry rules as stdlib-only WSL-tested modules; spectra parser fixture-first; demo-data approval track starts *(research B)*
 - [ ] **Phase 3: Molecules in the Viewer & Setup Tab** - Configure a game in the Setup tab; box + head molecule materialize in the viewer; uploads gated *(research C)*
 - [ ] **Phase 4: Game Loop & Input** - Arrow-key steered movement on a 2D locked-camera plane with countdown, HUD, pause/restart *(research D — input spike)*
 - [ ] **Phase 5: Stacking & Game Rules Complete** - Pickups stack at cited geometry; rigid-pivot turns; collisions end runs; win/crash both reach spectra *(research E)*
@@ -63,20 +63,20 @@ Notes: Avoids the expensive-to-retrofit traps — module identity double-singlet
 **Plans**: 14 plans (4 waves)
 
 Plans:
-- [ ] 02-01-PLAN.md — TDD g98.out spectra parser core + fixture copies into tests/fixtures/xtb/ (Wave 1)
-- [ ] 02-02-PLAN.md — xtbenv: 3-leg success contract + xtb/xtb.exe detection (Wave 1, parallel)
-- [ ] 02-03-PLAN.md — xyzio: .xyz writer/reader + fixture round-trips (Wave 1, parallel)
-- [ ] 02-04-PLAN.md — TDD stacking placement math + clash gate (Wave 1, parallel)
-- [ ] 02-05-PLAN.md — molecule_data: manifest + stacking-dataset schemas, validated loader (Wave 1, parallel)
-- [ ] 02-06-PLAN.md — TDD game_engine core: continuous-2D state, movement, direction queue (Wave 1, parallel)
-- [ ] 02-07-PLAN.md — setup_logic: defaults, validation, save/load schema, randomize (Wave 1, parallel)
-- [ ] 02-08-PLAN.md — cgo_build: local CGO constants, box + mode-arrow builders (Wave 1, parallel)
-- [ ] 02-09-PLAN.md — vibspectrum fallback parser + trivial-mode filter + CO₂ linear case (Wave 2)
-- [ ] 02-10-PLAN.md — engine collisions + rules: boundary, self-collision, score/cap/budget (Wave 2, parallel)
-- [ ] 02-11-PLAN.md — demo-data draft materialization + blocking decision checkpoint: pinned π-stack distance (Wave 2, parallel)
-- [ ] 02-12-PLAN.md — spectra completion: Gaussian broadening + corrupt-fixture loud failures + index correspondence (Wave 3)
-- [ ] 02-13-PLAN.md — engine rigid-pivot turn sweep with refusal pre-check (Wave 3, parallel)
-- [ ] 02-14-PLAN.md — pure-core integration chain + full-suite gates green (Wave 4)
+- [x] 02-01-PLAN.md — TDD g98.out spectra parser core + fixture copies into tests/fixtures/xtb/ (Wave 1)
+- [x] 02-02-PLAN.md — xtbenv: 3-leg success contract + xtb/xtb.exe detection (Wave 1, parallel)
+- [x] 02-03-PLAN.md — xyzio: .xyz writer/reader + fixture round-trips (Wave 1, parallel)
+- [x] 02-04-PLAN.md — TDD stacking placement math + clash gate (Wave 1, parallel)
+- [x] 02-05-PLAN.md — molecule_data: manifest + stacking-dataset schemas, validated loader (Wave 1, parallel)
+- [x] 02-06-PLAN.md — TDD game_engine core: continuous-2D state, movement, direction queue (Wave 1, parallel)
+- [x] 02-07-PLAN.md — setup_logic: defaults, validation, save/load schema, randomize (Wave 1, parallel)
+- [x] 02-08-PLAN.md — cgo_build: local CGO constants, box + mode-arrow builders (Wave 1, parallel)
+- [x] 02-09-PLAN.md — vibspectrum fallback parser + trivial-mode filter + CO₂ linear case (Wave 2)
+- [x] 02-10-PLAN.md — engine collisions + rules: boundary, self-collision, score/cap/budget (Wave 2, parallel)
+- [x] 02-11-PLAN.md — demo-data draft materialization + blocking decision checkpoint: pinned π-stack distance (Wave 2, parallel)
+- [x] 02-12-PLAN.md — spectra completion: Gaussian broadening + corrupt-fixture loud failures + index correspondence (Wave 3)
+- [x] 02-13-PLAN.md — engine rigid-pivot turn sweep with refusal pre-check (Wave 3, parallel)
+- [x] 02-14-PLAN.md — pure-core integration chain + full-suite gates green (Wave 4)
 
 Notes: Fixtures-first rule (Pitfalls 1/12); success contract as a pure function (Pitfall 3). **Parallel human track starts here:** π-stack distances pinned from CC0 COD CIFs (3.555/3.570/3.580 Å measured; Janiak abstract verifies 20° displacement + 3.8 Å bound) → explicit human approval (DATA-02) in plan 02-11's checkpoint — longest non-code lead time; gates Phase 8. See 02-RESEARCH-pure-core.md (fixture-exact parser spec, continuous-2D engine resolution) and 02-RESEARCH-demo-data.md (pinning record).
 
@@ -211,7 +211,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Plugin Skeleton & Purity Harness | 6/6 | Complete (verified 5/5 must-haves) | 2026-09-06 |
-| 2. Pure Core — Game & Chemistry Logic | 0/14 | Planning complete | - |
+| 2. Pure Core — Game & Chemistry Logic | 14/14 | Complete (verified 4/4 must-haves) | 2026-09-10 |
 | 3. Molecules in the Viewer & Setup Tab | 0/TBD | Not started | - |
 | 4. Game Loop & Input | 0/TBD | Not started | - |
 | 5. Stacking & Game Rules Complete | 0/TBD | Not started | - |

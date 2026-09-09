@@ -38,7 +38,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Molecular Stacking
 
 - [ ] **STACK-01**: Each pickup is placed deterministically at the dataset-stored geometry (translate/rotate onto the stack position) — placed geometry equals the cited distance
-- [ ] **STACK-02**: Stacking data is a data file (not code): interaction mode + distance + citation per molecule pair; v1 dataset = π-stack, parallel-displaced (Set A)
+- [x] **STACK-02**: Stacking data is a data file (not code): interaction mode + distance + citation per molecule pair; v1 dataset = π-stack, parallel-displaced (Set A)
 - [ ] **STACK-03**: A pickup without a verified dataset entry is skipped (not placed), with the info box stating why — no invented chemistry
 - [ ] **STACK-04**: Info box shows per-pickup structured content (interaction name, distance, one-line explanation, citation short-code), plus idle chemistry tips, early controls hints, and an end-of-run interaction breakdown
 - [ ] **STACK-05**: A clash gate rejects stacking placements that would collide (protecting xtb from inferring spurious covalent bonds)
@@ -141,7 +141,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GAME-09 | Phase 5 | Pending |
 | GAME-10 | Phase 5 | Pending |
 | STACK-01 | Phase 5 | Pending |
-| STACK-02 | Phase 2 | Pending |
+| STACK-02 | Phase 2 | Complete |
 | STACK-03 | Phase 5 | Pending |
 | STACK-04 | Phase 5 | Pending |
 | STACK-05 | Phase 5 | Pending |
