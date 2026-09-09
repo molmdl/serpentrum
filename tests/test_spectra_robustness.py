@@ -34,6 +34,7 @@ below; tests/ deliberately has NO __init__.py (plugin-path safety), and
 tests/fixtures/xtb/ is a plain data directory (never a package).
 """
 import os
+import re
 import sys
 import unittest
 
@@ -267,6 +268,104 @@ class TestPhenolEigvalCrossCheck(unittest.TestCase):
             after = line.split('eigval :', 1)[1]
             eigvals.extend(float(tok) for tok in after.split())
         return eigvals
+
+
+_LINE_NUMBER_RE = re.compile(r'line\D*(\d+)')
+
+
+def _extract_line_number(message):
+    """Pull the first 1-based line number from a SpectraParseError message
+    (format: '<stage>: line <N>: <detail> [<excerpt>]'). Returns None if
+    no line number is present."""
+    match = _LINE_NUMBER_RE.search(message)
+    return int(match.group(1)) if match else None
+
+
+class TestCorruptFixtureLoudFailures(unittest.TestCase):
+    """Every corrupt path raises SpectraParseError (never a bare ValueError)
+    carrying stage + 1-based line number + ~80-char excerpt.
+
+    Corrupt variants are built IN MEMORY from committed fixture text —
+    fixture files on disk are never modified. The 02-01/02-09 parsers
+    already wrap ALL numeric conversions via _to_float/_to_int (verified:
+    float('******') surfaces as SpectraParseError, not ValueError); this
+    plan owns the file post-merge and closes any gap if found — no gap
+    was found, so no hardening was needed.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.g98_text = read_text(G98_PATH)
+        cls.vib_text = read_text(VIBSPECTRUM_PATH)
+        cls.bad_text = read_text(BAD_LOG_PATH)
+
+    def test_bad_log_raises_naming_frequency_section(self):
+        # bad.log: 105 lines, fatal error at line 97, NO frequency section
+        # anywhere -> the g98 parser's no-frequency-section loud failure.
+        with self.assertRaises(SpectraParseError) as ctx:
+            parse_g98_text(self.bad_text)
+        self.assertIn('frequency section', str(ctx.exception))
+
+    def test_truncated_g98_mid_atom_rows_raises_with_line_number(self):
+        # lines[:480] falls MID-ATOM-ROWS of block 13: block 13's
+        # ' Frequencies --' is at line 466, property lines 467-471, ' Atom
+        # AN' header at 472, its 26 atom rows span 473-498. Line 480 is
+        # atom row 8 of 26 -> the parser hits EOF mid-block.
+        lines = self.g98_text.splitlines()
+        text = '\n'.join(lines[:480])
+        with self.assertRaises(SpectraParseError) as ctx:
+            parse_g98_text(text)
+        lineno = _extract_line_number(str(ctx.exception))
+        self.assertIsNotNone(lineno,
+                             'no line number in: %s' % ctx.exception)
+        self.assertLessEqual(lineno, 480)
+
+    def test_truncated_g98_mid_header_raises_with_line_number(self):
+        # lines[:470] falls mid-property-lines of block 13 (between the
+        # Frequencies line 466 and the atom rows 473-498, inside the
+        # property lines 467-471): the parser expects a property row that
+        # was truncated away.
+        lines = self.g98_text.splitlines()
+        text = '\n'.join(lines[:470])
+        with self.assertRaises(SpectraParseError) as ctx:
+            parse_g98_text(text)
+        lineno = _extract_line_number(str(ctx.exception))
+        self.assertIsNotNone(lineno,
+                             'no line number in: %s' % ctx.exception)
+
+    def test_g98_asterisk_overflow_raises_not_valueerror(self):
+        # Replace mode 1's IR intensity token '2.4191' (line 49) with the
+        # g98 overflow marker '******'. float('******') raises ValueError;
+        # the parser must wrap it into SpectraParseError with a line number.
+        text = self.g98_text.replace('2.4191', '******', 1)
+        with self.assertRaises(SpectraParseError) as ctx:
+            parse_g98_text(text)
+        # Must be SpectraParseError, NOT a bare ValueError escaping the
+        # conversion wrapper.
+        self.assertIs(type(ctx.exception), SpectraParseError)
+        lineno = _extract_line_number(str(ctx.exception))
+        self.assertIsNotNone(lineno,
+                             'no line number in: %s' % ctx.exception)
+
+    def test_vibspectrum_asterisk_overflow_raises_not_valueerror(self):
+        # Replace mode 7's intensity token '2.41910' (line 10) with the
+        # overflow marker '******'. Same contract as the g98 case.
+        text = self.vib_text.replace('2.41910', '******', 1)
+        with self.assertRaises(SpectraParseError) as ctx:
+            parse_vibspectrum_text(text)
+        self.assertIs(type(ctx.exception), SpectraParseError)
+        lineno = _extract_line_number(str(ctx.exception))
+        self.assertIsNotNone(lineno,
+                             'no line number in: %s' % ctx.exception)
+
+    def test_unmodified_fixtures_still_parse(self):
+        # Identity guard: the UNMODIFIED g98 and vibspectrum text still
+        # parse fine (guards against a sloppy mutation in the tests above
+        # corrupting the shared setUpClass fixture text).
+        g = parse_g98_text(self.g98_text)
+        self.assertEqual(len(g.modes), 72)
+        vs = parse_vibspectrum_text(self.vib_text)
+        self.assertEqual(len(vs.modes), 78)
 
 
 if __name__ == '__main__':
