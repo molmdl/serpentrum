@@ -506,16 +506,85 @@ class GameEngine(object):
                             return 'pickup'
         return None
 
+    def _advance_sweep(self):
+        """Advance the open sweep by one tick; return the tick's events.
+
+        Increments ``sweeping['tick']``, rotates the WHOLE chain
+        (centroids + atom x/y) ABSOLUTELY from the sweep's start pose by
+        th = angle_signed * tick / total_ticks (so floating-point error
+        does NOT accumulate across ticks — the final pose is exact to
+        cos/sin quality, well under the 1e-9 assertion delta). z and
+        symbol are preserved. Emits ``('turning', tick / total)``. NO
+        forward motion and no ``('moved',)`` event during sweeps.
+
+        On the final tick (tick == total_ticks): sets heading =
+        target_heading and clears sweeping. Pending is NOT touched here
+        — a chained turn is attempted at the NEXT step's start, by the
+        same pending-application rule (the revision-pinned timing).
+        """
+        sweep = self.sweeping
+        sweep['tick'] += 1
+        tick = sweep['tick']
+        total = sweep['total_ticks']
+        angle = sweep['angle_signed']
+        th = angle * tick / float(total)
+        cos_t = math.cos(math.radians(th))
+        sin_t = math.sin(math.radians(th))
+        hx, hy = self.head
+        start_centroids = sweep['start_centroids']
+        start_atoms = sweep['start_atoms']
+        new_segments = []
+        for i in range(len(self.segments)):
+            seg = self.segments[i]
+            scx, scy = start_centroids[i]
+            rcx, rcy = _rotate_xy(scx, scy, hx, hy, cos_t, sin_t)
+            new_atoms = []
+            for atom in start_atoms[i]:
+                sym = atom[0]
+                ax = atom[1]
+                ay = atom[2]
+                az = atom[3]
+                rax, ray = _rotate_xy(ax, ay, hx, hy, cos_t, sin_t)
+                new_atoms.append((sym, rax, ray, az))
+            new_seg = dict(seg)
+            new_seg['centroid'] = (rcx, rcy)
+            new_seg['atoms'] = new_atoms
+            new_segments.append(new_seg)
+        self.segments = new_segments
+        events = [('turning', tick / float(total))]
+        if tick >= total:
+            self.heading = sweep['target_heading']
+            self.sweeping = None
+        return events
+
     def step(self, dt):
         """Advance the simulation by dt seconds; return the event list.
 
         Paused -> no-op: return [] and mutate nothing.
         Finished (crashed/won) -> no-op: return [] and mutate nothing.
 
-        Movement branch: head += heading * SPEED_A_PER_S * dt, and emit
-        [('moved', (x, y))] carrying the NEW position. At SPEED_A_PER_S
-        = 3.0 a dt of 0.1 s advances the head exactly 0.3 A along the
-        current heading.
+        Sweep-in-progress (plan 02-13): advance the open sweep one tick
+        via _advance_sweep — rotate the whole chain rigidly about the
+        head and emit ('turning', tick/total). NO forward motion and no
+        ('moved',) event during sweeps. On the final tick heading becomes
+        the target and sweeping clears; pending is NOT touched (a chained
+        turn is attempted at the NEXT step's start).
+
+        Pending application at step START (plan 02-13, not sweeping): pop
+        the front request. Perpendicular to the current heading -> attempt
+        start_sweep(d); on success THIS tick is sweep tick 1 (rotate 15
+        deg, emit ('turning', 1/6), no 'moved'); on refusal emit
+        ('turn_refused', reason), CONSUME the request, and fall through to
+        forward motion in the same tick. Same-direction -> dropped
+        silently, fall through. (180-degree requests never reach pending —
+        request_direction filters them.) The turn attempt runs BEFORE the
+        forward branch, so a successful turn tick never also moves the
+        head.
+
+        Movement branch (02-06): head += heading * SPEED_A_PER_S * dt,
+        and emit ('moved', (x, y)) carrying the NEW position. At
+        SPEED_A_PER_S = 3.0 a dt of 0.1 s advances the head exactly 0.3 A
+        along the current heading.
 
         Boundary crash (plan 02-10, GAME-05): after the move, if a box is
         set and the head enters the BOUNDARY_MARGIN_A margin of the AABB
@@ -546,23 +615,39 @@ class GameEngine(object):
         emit ('won',), set finished=True / result='won', clear pending.
         A crash stops all later event processing (pickup/win never fire
         on a crash tick).
-
-        A pending direction is deliberately NOT consumed here and
-        produces NO event — the queue only buffers; plan 02-13 applies
-        pending turns at the START of step(). (Suite consequence: the
-        02-06 and 02-10 suites never call step() while a request is
-        pending, so that later change cannot break them.)
         """
         if self.paused:
             return []
         if self.finished:
             return []
+        # Sweep-in-progress: advance one tick; NO forward motion.
+        if self.sweeping is not None:
+            return self._advance_sweep()
+        events = []
+        # Pending application at step START (not sweeping): pop the front
+        # request. Perpendicular -> start_sweep (this tick becomes sweep
+        # tick 1 on success; 'turn_refused' + fall through on refusal).
+        # Same-direction / 180 -> dropped, fall through to forward motion.
+        if self.pending:
+            d = self.pending.pop(0)
+            unit = DIRS[d]
+            dot = unit[0] * self.heading[0] + unit[1] * self.heading[1]
+            if -0.5 <= dot <= 0.5:
+                opened, sweep_events = self.start_sweep(d)
+                events.extend(sweep_events)
+                if opened:
+                    # THIS tick is sweep tick 1 (rotate 15 deg, no move).
+                    events.extend(self._advance_sweep())
+                    return events
+                # Refused: request consumed; fall through to forward.
+            # Same-direction (or a 180 that should never be here): drop,
+            # fall through to forward motion.
         hx, hy = self.head
         ux, uy = self.heading
         nx = hx + ux * SPEED_A_PER_S * dt
         ny = hy + uy * SPEED_A_PER_S * dt
         self.head = (nx, ny)
-        events = [('moved', (nx, ny))]
+        events.append(('moved', (nx, ny)))
         # Boundary crash: AABB + BOUNDARY_MARGIN_A, inclusive at the
         # margin-adjusted walls. A crash stops event processing, ends
         # the run, and clears the pending queue (turn-state hygiene —

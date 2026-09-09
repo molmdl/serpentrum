@@ -329,5 +329,282 @@ class TestRequestDirectionSweepLevel(unittest.TestCase):
         self.assertEqual(engine.pending, ['right'])  # newest wins
 
 
+class TestSweepProgress(unittest.TestCase):
+    """step() sweep progression: the whole chain rotates rigidly about
+    the head over TURN_TICKS=6 ticks (15 deg/tick), ABSOLUTELY from the
+    start pose each tick (no cross-tick float drift -> final pose exact
+    to 1e-9). Forward motion pauses; z and symbol preserved."""
+
+    def test_rotation_exactness_full_sweep(self):
+        # head (0,0) heading (1,0); segs (3,0),(6,0),(9,0); seg 0 atom
+        # ('C', 4.0, 1.0, 2.0). request 'up' (CCW +90); step(0.1) x6.
+        # After 6 ticks: heading (0,1); centroids (3,0)->(0,3),
+        # (6,0)->(0,6), (9,0)->(0,9); atom (4,1) about origin +90 ->
+        # (-1, 4) with z exactly 2.0.
+        seg0 = make_seg_at(3.0, 0.0, 's0', atoms=[('C', 4.0, 1.0, 2.0)])
+        seg1 = make_seg_at(6.0, 0.0, 's1')
+        seg2 = make_seg_at(9.0, 0.0, 's2')
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            segments=[seg0, seg1, seg2])
+        self.assertTrue(engine.request_direction('up'))
+        all_events = []
+        for _ in range(TURN_N):
+            all_events.extend(engine.step(0.1))
+        # 6 turning events in order, NO 'moved' events.
+        self.assertEqual([e[0] for e in all_events], ['turning'] * TURN_N)
+        expected_fracs = [k / float(TURN_N) for k in range(1, TURN_N + 1)]
+        for got, exp in zip([e[1] for e in all_events], expected_fracs):
+            self.assertAlmostEqual(got, exp, delta=DELTA)
+        # heading == (0, 1).
+        self.assertAlmostEqual(engine.heading[0], 0.0, delta=DELTA)
+        self.assertAlmostEqual(engine.heading[1], 1.0, delta=DELTA)
+        # Centroids rotated exactly +90 about the head (0,0).
+        self.assertAlmostEqual(engine.segments[0]['centroid'][0], 0.0, delta=DELTA)
+        self.assertAlmostEqual(engine.segments[0]['centroid'][1], 3.0, delta=DELTA)
+        self.assertAlmostEqual(engine.segments[1]['centroid'][0], 0.0, delta=DELTA)
+        self.assertAlmostEqual(engine.segments[1]['centroid'][1], 6.0, delta=DELTA)
+        self.assertAlmostEqual(engine.segments[2]['centroid'][0], 0.0, delta=DELTA)
+        self.assertAlmostEqual(engine.segments[2]['centroid'][1], 9.0, delta=DELTA)
+        # Atom: (4, 1) about (0,0) +90 -> x' = 4*cos90 - 1*sin90 = -1;
+        # y' = 4*sin90 + 1*cos90 = 4. z preserved exactly (2.0).
+        atom = engine.segments[0]['atoms'][0]
+        self.assertEqual(atom[0], 'C')               # symbol preserved
+        self.assertAlmostEqual(atom[1], -1.0, delta=DELTA)
+        self.assertAlmostEqual(atom[2], 4.0, delta=DELTA)
+        self.assertEqual(atom[3], 2.0)               # z exactly preserved
+        # Head unmoved (pivot); sweep cleared.
+        self.assertEqual(engine.head, (0.0, 0.0))
+        self.assertIsNone(engine.sweeping)
+
+    def test_mid_sweep_pose_tick_3(self):
+        # Same start; after 3 steps th = 90*3/6 = 45 deg. seg (3,0)
+        # about (0,0) -> (3*cos45, 3*sin45) = (2.1213203436, 2.1213203436).
+        # tick 3 emits ('turning', 3/6 = 0.5).
+        seg0 = make_seg_at(3.0, 0.0, 's0', atoms=[('C', 4.0, 1.0, 2.0)])
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            segments=[seg0, make_seg_at(6.0, 0.0, 's1'),
+                                      make_seg_at(9.0, 0.0, 's2')])
+        engine.request_direction('up')
+        last_frac = None
+        for _ in range(3):
+            evs = engine.step(0.1)
+            last_frac = evs[-1][1]
+        cx, cy = engine.segments[0]['centroid']
+        self.assertAlmostEqual(cx, 3.0 * math.cos(math.radians(45.0)),
+                               places=6)
+        self.assertAlmostEqual(cy, 3.0 * math.sin(math.radians(45.0)),
+                               places=6)
+        self.assertAlmostEqual(last_frac, 0.5, delta=DELTA)
+        self.assertIsNotNone(engine.sweeping)
+        self.assertEqual(engine.sweeping['tick'], 3)
+
+    def test_forward_motion_paused_during_sweep(self):
+        # head (0,0) heading (1,0); seg 8 A away at (8,0). request 'up';
+        # 6 sweep ticks. Head stays (0,0) (pivot); no 'moved' events;
+        # the 8-A segment traverses the arc to (0, 8).
+        seg_far = make_seg_at(8.0, 0.0, 'far')
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            segments=[seg_far])
+        engine.request_direction('up')
+        all_events = []
+        for _ in range(TURN_N):
+            all_events.extend(engine.step(0.1))
+        self.assertEqual(engine.head, (0.0, 0.0))  # pivot unmoved
+        self.assertNotIn('moved', [e[0] for e in all_events])
+        # The 8-A segment traversed the arc to (0, 8).
+        self.assertAlmostEqual(engine.segments[0]['centroid'][0], 0.0, delta=DELTA)
+        self.assertAlmostEqual(engine.segments[0]['centroid'][1], 8.0, delta=DELTA)
+
+    def test_cw_turn_down(self):
+        # heading (1,0), request 'down' (CW -90). After 6 ticks seg (3,0)
+        # is at (0, -3); heading (0, -1). cross = 1*(-1) - 0*0 = -1 < 0.
+        seg = make_seg_at(3.0, 0.0, 's0')
+        engine = GameEngine(head=(0.0, 0.0), heading='right', segments=[seg])
+        self.assertTrue(engine.request_direction('down'))
+        for _ in range(TURN_N):
+            engine.step(0.1)
+        cx, cy = engine.segments[0]['centroid']
+        self.assertAlmostEqual(cx, 0.0, delta=DELTA)
+        self.assertAlmostEqual(cy, -3.0, delta=DELTA)
+        self.assertAlmostEqual(engine.heading[0], 0.0, delta=DELTA)
+        self.assertAlmostEqual(engine.heading[1], -1.0, delta=DELTA)
+
+
+class TestSweepLevel180AndChaining(unittest.TestCase):
+    """180-degree enforcement at sweep level (judged against the sweep
+    target while sweeping); chained turns apply at the NEXT step's start
+    after completion; newest-wins buffering during a sweep."""
+
+    def test_180_vs_target_ignored_no_chained_sweep(self):
+        # heading (1,0); request 'up' (sweep opens, target (0,1)); during
+        # the sweep request 'down' (180 vs target) -> ignored; pending
+        # stays empty; after completion no chained sweep, heading (0,1).
+        seg = make_seg_at(3.0, 0.0, 's0')
+        engine = GameEngine(head=(0.0, 0.0), heading='right', segments=[seg])
+        engine.request_direction('up')
+        engine.step(0.1)  # tick 1 (sweep opens)
+        self.assertFalse(engine.request_direction('down'))  # 180 vs target
+        self.assertEqual(engine.pending, [])
+        for _ in range(TURN_N - 1):  # ticks 2..6 finish sweep 1
+            engine.step(0.1)
+        self.assertAlmostEqual(engine.heading[1], 1.0, delta=DELTA)
+        self.assertEqual(engine.pending, [])
+        self.assertIsNone(engine.sweeping)
+        # Next step is forward motion on the new heading (no turn opens).
+        evs = engine.step(0.1)
+        self.assertEqual([e[0] for e in evs], ['moved'])
+
+    def test_chained_left_after_up_net_180(self):
+        # heading (1,0); request 'up' then during the sweep request 'left'
+        # -> buffered. After sweep 1 completes (tick 6, heading (0,1),
+        # pending still ['left']), the NEXT step opens sweep 2 at its
+        # START (first event ('turning', 1/6), no 'moved' on that tick);
+        # after 6 more ticks heading (-1, 0); original seg (3,0) now at
+        # (-3, 0) (net 180 deg).
+        seg = make_seg_at(3.0, 0.0, 's0')
+        engine = GameEngine(head=(0.0, 0.0), heading='right', segments=[seg])
+        engine.request_direction('up')
+        engine.step(0.1)  # tick 1 of sweep 1
+        self.assertTrue(engine.request_direction('left'))  # perp to (0,1)
+        self.assertEqual(engine.pending, ['left'])
+        for _ in range(TURN_N - 1):  # finish sweep 1 (ticks 2..6)
+            engine.step(0.1)
+        self.assertAlmostEqual(engine.heading[1], 1.0, delta=DELTA)
+        self.assertEqual(engine.pending, ['left'])  # completion didn't touch it
+        self.assertIsNone(engine.sweeping)
+        # NEXT step opens sweep 2 at its START.
+        evs = engine.step(0.1)
+        self.assertEqual(evs[0][0], 'turning')
+        self.assertAlmostEqual(evs[0][1], 1.0 / 6.0, delta=DELTA)
+        self.assertNotIn('moved', [e[0] for e in evs])
+        # 'left' from (0,1): cross = 0*0 - 1*(-1) = 1 > 0 -> CCW +90 ->
+        # target (-1, 0). Pending consumed.
+        self.assertEqual(engine.sweeping['target_heading'], (-1.0, 0.0))
+        self.assertEqual(engine.pending, [])
+        for _ in range(TURN_N - 1):  # finish sweep 2
+            engine.step(0.1)
+        self.assertAlmostEqual(engine.heading[0], -1.0, delta=DELTA)
+        self.assertAlmostEqual(engine.heading[1], 0.0, delta=DELTA)
+        # (3,0) -> (0,3) [sweep 1] -> (-3, 0) [sweep 2]: net 180 deg.
+        cx, cy = engine.segments[0]['centroid']
+        self.assertAlmostEqual(cx, -3.0, delta=DELTA)
+        self.assertAlmostEqual(cy, 0.0, delta=DELTA)
+
+    def test_newest_wins_during_sweep_chained_cw(self):
+        # Buffering 'left' and then 'right' during a sweep leaves only
+        # 'right' pending (max 1) -> after completion the next step
+        # starts the chained CW sweep targeting (1,0) from (0,1).
+        seg = make_seg_at(3.0, 0.0, 's0')
+        engine = GameEngine(head=(0.0, 0.0), heading='right', segments=[seg])
+        engine.request_direction('up')
+        engine.step(0.1)  # tick 1 of sweep 1 (target (0,1))
+        self.assertTrue(engine.request_direction('left'))
+        self.assertTrue(engine.request_direction('right'))
+        self.assertEqual(engine.pending, ['right'])  # newest wins
+        for _ in range(TURN_N - 1):
+            engine.step(0.1)  # finish sweep 1
+        self.assertAlmostEqual(engine.heading[1], 1.0, delta=DELTA)
+        # NEXT step opens chained CW sweep. 'right' from (0,1): cross =
+        # 0*0 - 1*1 = -1 < 0 -> CW -90 -> target (1, 0).
+        evs = engine.step(0.1)
+        self.assertEqual(evs[0][0], 'turning')
+        self.assertNotIn('moved', [e[0] for e in evs])
+        self.assertEqual(engine.sweeping['target_heading'], (1.0, 0.0))
+        self.assertEqual(engine.sweeping['angle_signed'], -TURN_DEG)  # CW
+
+    def test_refused_chained_sweep_falls_through(self):
+        # Geometry where the chained turn would exit the box. head (0,0);
+        # seg (3,0); box ((-2.5,-10),(10,10)) -> margin walls x in
+        # [-1.5, 9], y in [-9, 9]. Sweep 1 'up' is SAFE: seg traces the
+        # first-quadrant arc (3cos th, 3sin th), x in [0, 3] (within
+        # [-1.5, 9]), y in [0, 3] (within [-9, 9]). After sweep 1 the seg
+        # is at (0, 3), heading (0, 1). The chained 'left' (CCW +90 from
+        # (0,1)) swings the seg into the second quadrant: at sweep-2
+        # sample k=3 the seg angle is 90+45=135 deg, x = 3*cos135 =
+        # -2.121 < wall_x0 = -1.5 -> refuse 'boundary'. The refusal
+        # consumes the request and the SAME tick falls through to forward
+        # motion; the next step emits only 'moved' (not retried).
+        seg = make_seg_at(3.0, 0.0, 's0')
+        engine = GameEngine(head=(0.0, 0.0), heading='right', segments=[seg],
+                            box_min=(-2.5, -10.0), box_max=(10.0, 10.0))
+        engine.request_direction('up')
+        engine.step(0.1)  # tick 1 of sweep 1
+        engine.request_direction('left')  # buffered (perp to target (0,1))
+        self.assertEqual(engine.pending, ['left'])
+        for _ in range(TURN_N - 1):  # finish sweep 1 (ticks 2..6)
+            engine.step(0.1)
+        self.assertAlmostEqual(engine.heading[1], 1.0, delta=DELTA)
+        self.assertEqual(engine.pending, ['left'])
+        self.assertIsNone(engine.sweeping)
+        # NEXT step: chained 'left' attempted -> refused -> consumed ->
+        # SAME tick falls through to forward motion.
+        evs = engine.step(0.1)
+        self.assertEqual(evs[0], ('turn_refused', 'boundary'))
+        self.assertEqual(evs[1][0], 'moved')
+        self.assertEqual(engine.pending, [])  # consumed exactly once
+        self.assertIsNone(engine.sweeping)
+        # The step AFTER emits only 'moved' (request not retried).
+        evs2 = engine.step(0.1)
+        self.assertEqual([e[0] for e in evs2], ['moved'])
+
+    def test_pending_applied_exactly_once_after_chained_open(self):
+        # A successful chained sweep consumes pending exactly once; no
+        # later step re-attempts a turn.
+        seg = make_seg_at(3.0, 0.0, 's0')
+        engine = GameEngine(head=(0.0, 0.0), heading='right', segments=[seg])
+        engine.request_direction('up')
+        engine.step(0.1)  # tick 1 of sweep 1
+        engine.request_direction('left')  # buffered for after sweep 1
+        for _ in range(TURN_N - 1):
+            engine.step(0.1)  # sweep 1 completes
+        engine.step(0.1)  # sweep 2 opens, consuming 'left'
+        self.assertEqual(engine.pending, [])  # consumed exactly once
+        self.assertIsNotNone(engine.sweeping)
+        for _ in range(TURN_N - 1):
+            engine.step(0.1)  # sweep 2 completes
+        self.assertIsNone(engine.sweeping)
+        self.assertEqual(engine.pending, [])
+        # No re-attempt: forward motion only.
+        for _ in range(3):
+            evs = engine.step(0.1)
+            self.assertEqual([e[0] for e in evs], ['moved'])
+
+
+class TestEpochSafety(unittest.TestCase):
+    """reset() wipes all turn state (sweeping, pending) — no stale turn
+    survives a restart; the following step() does normal forward movement."""
+
+    def test_reset_mid_sweep_clears_turn_state(self):
+        seg = make_seg_at(3.0, 0.0, 's0')
+        engine = GameEngine(head=(0.0, 0.0), heading='right', segments=[seg])
+        engine.request_direction('up')
+        engine.step(0.1)  # sweep in progress (tick 1)
+        self.assertIsNotNone(engine.sweeping)
+        engine.reset(head=(0.0, 0.0), heading='right')
+        self.assertIsNone(engine.sweeping)
+        self.assertEqual(engine.pending, [])
+        # Following step does normal forward movement (no 'turning').
+        evs = engine.step(0.1)
+        self.assertEqual([e[0] for e in evs], ['moved'])
+        for _ in range(3):
+            evs = engine.step(0.1)
+            self.assertNotIn('turning', [e[0] for e in evs])
+
+    def test_reset_clears_stale_pending_request(self):
+        # Request a direction, reset(), then step several times -> no
+        # turn ever opens from the stale request.
+        seg = make_seg_at(3.0, 0.0, 's0')
+        engine = GameEngine(head=(0.0, 0.0), heading='right', segments=[seg])
+        engine.request_direction('up')
+        self.assertEqual(engine.pending, ['up'])
+        engine.reset(head=(0.0, 0.0), heading='right')
+        self.assertEqual(engine.pending, [])
+        self.assertIsNone(engine.sweeping)
+        for _ in range(5):
+            evs = engine.step(0.1)
+            self.assertNotIn('turning', [e[0] for e in evs])
+        self.assertIsNone(engine.sweeping)
+
+
 if __name__ == '__main__':
     unittest.main()
