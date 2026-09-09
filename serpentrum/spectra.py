@@ -23,6 +23,7 @@ fallback parser and the trivial-mode filter arrive with plan 02-09; the
 line-shape convolution and the parse dispatcher with plan 02-12. Do not
 add them here.
 """
+import math
 from collections import namedtuple
 
 Mode = namedtuple('Mode', 'index freq intensity vectors')
@@ -415,3 +416,60 @@ def real_modes(spectrum, threshold=10.0):
         all 72 modes have |freq| >= 18.1 and pass the default threshold.
     """
     return [m for m in spectrum.modes if abs(m.freq) >= threshold]
+
+
+# ---------------------------------------------------------------------------
+# Plan 02-12: Gaussian broadening, unified parse dispatcher, loud-failure
+# hardening. Appended below the g98 core (02-01) and the vibspectrum
+# fallback (02-09); existing parser behavior is unchanged.
+# ---------------------------------------------------------------------------
+
+# sigma = fwhm / (2*sqrt(2*ln(2)))  (~ fwhm/2.35482; 16 -> 6.794574,
+# 32 -> 13.58915). Precomputed once at import; broaden() multiplies fwhm
+# by this factor, never hardcodes the decimal.
+_SIGMA_PER_FWHM = 1.0 / (2.0 * math.sqrt(2.0 * math.log(2.0)))
+
+
+def broaden(modes, fwhm=16.0, x_min=0.0, x_max=None, n_points=800):
+    """Sum of Gaussians, one per mode: y(x) = sum(I_i * exp(-0.5*((x-f_i)/sigma)^2)).
+
+    sigma = fwhm / (2*sqrt(2*ln(2)))  (~ fwhm/2.35482; 16 -> 6.794574,
+    32 -> 13.58915).
+    Grid: xs[i] = x_min + (x_max - x_min) * i / (n_points - 1), i in
+    0..n_points-1 (both ends inclusive). x_max default:
+    max(3600.0, max(freq) + 5*sigma) — the 3600 floor keeps the plotted
+    axis at the xtb display range; with NO modes the default grid is
+    [x_min, 3600.0].
+    EMPTY MODES -> (grid, [0.0]*n_points): the PINNED zero-curve semantics
+    (a silent spectrum plots as a flat zero line, never an exception).
+    Negatives are NOT special-cased (their in-grid tail is negligible:
+    exp(-11) at -31.9 with fwhm 16); zero-intensity modes contribute
+    exactly 0 by arithmetic.
+    Raises ValueError on fwhm <= 0 or n_points < 2.
+    """
+    if fwhm <= 0.0:
+        raise ValueError(
+            'broaden: fwhm must be positive, got %r' % (fwhm,))
+    if n_points < 2:
+        raise ValueError(
+            'broaden: n_points must be >= 2, got %r' % (n_points,))
+    sigma = fwhm * _SIGMA_PER_FWHM
+    if x_max is None:
+        if modes:
+            x_max = max(3600.0,
+                        max(m.freq for m in modes) + 5.0 * sigma)
+        else:
+            x_max = 3600.0
+    span = x_max - x_min
+    xs = [x_min + span * i / (n_points - 1) for i in range(n_points)]
+    if not modes:
+        return xs, [0.0] * n_points
+    inv_sigma_sq = 1.0 / (sigma * sigma)
+    ys = []
+    for x in xs:
+        total = 0.0
+        for m in modes:
+            dx = x - m.freq
+            total += m.intensity * math.exp(-0.5 * dx * dx * inv_sigma_sq)
+        ys.append(total)
+    return xs, ys
