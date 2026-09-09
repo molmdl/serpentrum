@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "interactions": [
+    {
+      "id": "pi_stack_pd",
+      "mode": "pi_stack",
+      "name": "pi-pi stacking (parallel-displaced)",
+      "distance_a": 3.383,
+      "lateral_offset_a": 1.231,
+      "uncertainty_a": null,
+      "citation": "janiak2000",
+      "explanation": "Aromatic rings stack face-to-face but slightly offset (~20 deg off the ring normal), not eclipsed. distance_a is the perpendicular separation component and lateral_offset_a the lateral component consumed directly by stacking.place_pickup; together they encode a centroid-centroid distance of sqrt(3.383^2 + 1.231^2) = 3.60 A at atan2(1.231, 3.383) = 20.0 deg off-normal. Basis: measured parallel-displaced stacks 3.555/3.570/3.580 A (COD 4003564, 2100607, 2100608) all round to 3.6 A; Janiak 2000 abstract: usual stacking is parallel-displaced, ring-normal angle ~20 deg, centroid-centroid up to 3.8 A. Idealized pairwise geometry - neat Set A crystals are herringbone (see DATA_SOURCES.md).",
+      "applies_to": {"sets": ["set_a"]},
+      "status": "APPROVED"
+    }
+  ],
+  "citations": {
+    "janiak2000": {"short": "Janiak 2000", "doi": "10.1039/b003010o", "approved": true},
+    "cod4003564": {"short": "COD 4003564 (phenanthrene-TCNB cocrystal)", "doi": "10.1021/acs.chemmater.0c01184", "approved": true},
+    "cod2100607": {"short": "COD 2100607 (pyrene, 298 K)", "doi": "10.1107/S0108768106026814", "approved": true}
+  }
+}
