@@ -1,26 +1,42 @@
-"""serpentrum.game_engine — snake engine MOVEMENT core (PURE).
+"""serpentrum.game_engine — snake engine (movement + rules + sweeps, PURE).
 
-Plan 02-06 (wave 1 of the Phase-2 engine split). This module owns ONLY
-movement: continuous-2D state, constant-speed forward stepping, the
-direction queue, pause/resume/reset, and the segments state seam. The
-ROADMAP splits the engine across three plans with disjoint scope:
+The ROADMAP splits the engine across three plans with disjoint scope:
 
-  02-06 (this plan): movement core — step() advances the head at
-      SPEED_A_PER_S along the current heading and emits ('moved', pos);
-      the direction queue only BUFFERS (a pending direction is inert
-      until turns are applied); pause/resume/reset (GAME-07).
+  02-06: movement core — step() advances the head at SPEED_A_PER_S along
+      the current heading and emits ('moved', pos); the direction queue
+      only BUFFERS (a pending direction is inert until turns are
+      applied); pause/resume/reset (GAME-07).
   02-10: collisions and rules — boundary crash, polyline-edge body
       collision, pickup capture/chain growth, counters, win/budget.
-  02-13: rigid-pivot turn sweeps — applying buffered directions at the
-      START of step() with the 3-leg refusal pre-check.
+  02-13 (this extension): rigid-pivot turn sweeps — applying buffered
+      directions at the START of step() with the 3-leg refusal
+      pre-check (GAME-10). A turn rotates the WHOLE chain rigidly about
+      the head over TURN_TICKS ticks; atoms rotate WITH their segment
+      (x, y rotate; z and symbol preserved) so pairwise stacking
+      geometry stays frozen ("stacking geometry immutable at all times").
+      Rigid rotation about the head is the only turn model compatible
+      with that invariant (grid steps would tear the chain; per-segment
+      steering would break the frozen stacking geometry).
 
 Coordinate model (research R4 resolution — CONTINUOUS 2D floats, NOT a
 grid): the head and segment centroids live in the box's xy-plane in
-Angstroms; z is display-only and carried inside segment atom records but
-never rotated here. The "grid" wording in ARCHITECTURE.md is stale
-shorthand — GAME-05's head-centroid-vs-segments collision, GAME-10's
-rigid sweeps, and STACK-01's exact placed distances are all incompatible
-with quantization.
+Angstroms; z is display-only and carried inside segment atom records,
+rotated about the vertical axis through the head only as part of a
+sweep (the 2D game plane is xy; z is preserved exactly). The "grid"
+wording in ARCHITECTURE.md is stale shorthand — GAME-05's head-centroid-
+vs-segments collision, GAME-10's rigid sweeps, and STACK-01's exact
+placed distances are all incompatible with quantization.
+
+Body-leg nuance (swept pre-check): rotation about the head preserves
+point-to-point distances to the pivot, so head-vs-SEGMENT-POINT checks
+are pose-invariant — but head-vs-POLYLINE-EDGE (chord) distances are NOT
+(a chord between two rotated centroids can pass nearer the head than
+either endpoint distance suggests), and the leg doubles as a defensive
+guard if the running state was already overlapping. The swept body leg
+therefore uses the SAME model as 02-10's forward check (rotated polyline
+edges, same edge set, same _point_segment_distance_sq, same
+BODY_COLLISION_RADIUS_A, STRICT <) — one body-collision model across
+the whole engine.
 
 Determinism: pure float arithmetic on fixed constants. NO RNG and NO
 wall-clock anywhere (pause timing is the GUI's job — Pitfall 9.3), so
@@ -30,11 +46,21 @@ module (no pymol / pmg_tk / PyQt5 / numpy — enforced by
 tools/check_purity.py); zero sys.modules stubs.
 """
 
+import math
+
 # Constant speed in Angstroms per second (GAME-08: constant speed, no
 # acceleration). The VALUE is a tunable placeholder pinned at 3.0 for
 # Phase-2 testing (0.3 A per 0.1 s tick); the final feel is decided by
 # Phase-4 playtesting (setup_logic mirrors it as its 'speed' default).
 SPEED_A_PER_S = 3.0
+
+# --- Rigid-pivot sweep constants (plan 02-13, GAME-10). This plan owns
+# them — 02-06's trimmed movement scope defines only SPEED_A_PER_S +
+# DIRS; 02-10's constants are collision/capture only. Sweep animation
+# polish (easing, partial-tick rendering) is Phase 5; the pure math
+# stays coarse at TURN_TICKS samples. ---
+TURN_DEGREES = 90.0   # pivot turns are quarter-turns on the 2D plane
+TURN_TICKS = 6        # ticks to complete one rigid sweep (15 deg/tick)
 
 # Direction names -> unit vectors in the box's xy-plane (math
 # convention: +x right, +y up; heading angles right=0, up=+90,
@@ -100,30 +126,68 @@ def _point_segment_distance_sq(px, py, ax, ay, bx, by):
     return ex * ex + ey * ey
 
 
+def _rotate_xy(x, y, cx, cy, cos_t, sin_t):
+    """Rotate point (x, y) about center (cx, cy) by the angle whose cos
+    and sin are given (CCW positive). Returns (rx, ry).
+
+    dx = x - cx; dy = y - cy;
+        rx = cx + dx*cos_t - dy*sin_t
+        ry = cy + dx*sin_t + dy*cos_t
+
+    Pure float arithmetic. z and symbol are NEVER touched here — callers
+    that rotate atoms carry atom[3] (z) and atom[0] (sym) through
+    unchanged, so a sweep about the vertical axis through the head
+    preserves the display-only z exactly and keeps the atom identity.
+    Verify: (3, 0) about (0, 0) by +90 deg (cos=0, sin=1) -> (0, 3).
+
+    Module-level (not a method) so both the swept pre-check and the
+    sweep-tick progression use the identical rotation primitive.
+    """
+    dx = x - cx
+    dy = y - cy
+    rx = cx + dx * cos_t - dy * sin_t
+    ry = cy + dx * sin_t + dy * cos_t
+    return (rx, ry)
+
+
 class GameEngine(object):
-    """Deterministic snake engine state — movement core.
+    """Deterministic snake engine state — movement + rules + sweeps.
 
     State (all plain data, engine-owned):
 
       head:     (x, y) float tuple — continuous 2D position in
                 Angstroms in the box's xy-plane (z is display-only and
-                lives in segment atom records, never rotated here).
+                lives in segment atom records; rotated about the head
+                only as part of a sweep, with z preserved exactly).
       heading:  unit vector (x, y) — one of the four DIRS axes, never a
                 name; the direction of forward travel.
-      segments: list of segment records — STATE ONLY in this plan (no
-                collision semantics; that is plan 02-10's scope). Order
-                convention: index 0 is the OLDEST segment (tail-most),
-                the LAST entry is the most recently stacked (nearest
-                the head); new segments APPEND at the end. Each record:
+      segments: list of segment records. Order convention: index 0 is
+                the OLDEST segment (tail-most), the LAST entry is the
+                most recently stacked (nearest the head); new segments
+                APPEND at the end. Each record:
                 {'molecule_id': str, 'centroid': (x, y),
                  'atoms': [(sym, x, y, z), ...], 'atoms_n': int}
                 The constructor/reset parameter is an explicit TEST
                 SEAM — production chain growth lands in plan 02-10 —
                 and the engine copies it, never sharing or mutating
-                caller data.
+                caller data. During a sweep the centroids + atom x/y
+                are rotated rigidly about the head; z and sym preserved.
+      sweeping: None, or the in-progress sweep-state dict (plan 02-13):
+                {'start_heading', 'target_heading', 'angle_signed',
+                 'total_ticks', 'tick',
+                 'start_centroids', 'start_atoms'} — the last two are
+                the chain pose captured at sweep open, used to rotate
+                ABSOLUTELY each tick (no cross-tick float drift). step()
+                advances 'tick' to total_ticks; on the final tick
+                heading = target_heading and sweeping is cleared. reset()
+                wipes it (epoch safety).
       pending:  list holding AT MOST ONE buffered direction name (the
-                max-1 queue "beyond current"). Inert in 02-06; plan 02-13
-                consumes it at step start.
+                max-1 queue "beyond current"). Applied at the START of
+                step() while not sweeping (plan 02-13): perpendicular ->
+                start_sweep (this tick is sweep tick 1 on success;
+                'turn_refused' + fall through on refusal); same-direction
+                -> dropped. While sweeping, request_direction buffers
+                against the sweep TARGET (newest-wins, max 1).
       paused:   bool — True makes step() an immediate no-op [].
       box_min:  (x0, y0) float tuple or None — axis-aligned box lower
                 corner (from setup_logic's preset). None disables
@@ -189,6 +253,7 @@ class GameEngine(object):
         self.heading = DIRS[heading]
         self.segments = self._copy_segments(segments)
         self.pending = []
+        self.sweeping = None  # epoch safety: no stale turn survives a reset
         self.paused = False
         self.box_min = tuple(box_min) if box_min is not None else None
         self.box_max = tuple(box_max) if box_max is not None else None
@@ -244,21 +309,33 @@ class GameEngine(object):
         return copies
 
     def request_direction(self, direction):
-        """Queue a turn request against the CURRENT heading.
+        """Queue a turn request.
 
-        Contract (plan 02-06; reference is the current heading — plan
-        02-13 switches the reference to the sweep target while
-        sweeping, which is out of scope here):
+        While NOT sweeping (plan 02-06's original rule, reference = the
+        CURRENT heading):
 
           - unknown name             -> ValueError (loud)
           - 180-degree reversal      -> ignored, return False
-                                        (dot < -0.5; locked: no reversal)
+                                       (dot < -0.5; locked: no reversal)
           - same direction           -> ignored, return False
-                                        (dot > 0.5; nothing to turn to)
+                                       (dot > 0.5; nothing to turn to)
           - buffer already holds one -> ignored, return False
-                                        (at most ONE request buffered
-                                        beyond the current heading)
+                                       (at most ONE; FIRST-KEPT)
           - otherwise                -> buffered, return True
+
+        While sweeping (plan 02-13, SWEEP-LEVEL 180 enforcement,
+        reference = the sweep's TARGET heading — the heading that will
+        be in effect when the request would apply):
+
+          - 180-vs-target / same-as-target -> ignored, return False
+                                               (dot < -0.5 or dot > 0.5)
+          - otherwise                      -> buffered, return True
+                                               (max 1, NEWEST-WINS — an
+                                               INTENTIONAL in-sweep
+                                               override of the static
+                                               first-kept rule; the two
+                                               policies are deliberately
+                                               NOT unified)
 
         The 0.5 thresholds are on the unit-vector dot product: axis
         directions give dot values of exactly 1.0 (same), 0.0
@@ -269,6 +346,14 @@ class GameEngine(object):
             raise ValueError('unknown direction: %r (valid: %s)'
                              % (direction, ', '.join(sorted(DIRS))))
         unit = DIRS[direction]
+        if self.sweeping is not None:
+            target = self.sweeping['target_heading']
+            dot = unit[0] * target[0] + unit[1] * target[1]
+            if dot < -0.5 or dot > 0.5:
+                return False
+            # Perpendicular to the sweep target: buffer, newest wins.
+            self.pending = [direction]
+            return True
         dot = unit[0] * self.heading[0] + unit[1] * self.heading[1]
         if dot < -0.5:
             return False
@@ -279,16 +364,227 @@ class GameEngine(object):
         self.pending.append(direction)
         return True
 
+    def start_sweep(self, direction):
+        """Attempt to open a rigid-pivot turn sweep toward `direction`.
+
+        Public; also the internal path step() uses. Returns a 2-tuple
+        ``(opened, events)``:
+
+          - Success: ``(True, [])`` and ``self.sweeping`` is set to the
+            sweep-state dict with ``tick=0`` (step() advances it to
+            tick 1). The 3-leg pre-check cleared every sampled pose.
+          - Refusal: ``(False, [('turn_refused', reason)])`` with ZERO
+            state mutation (heading, segments, sweeping, pending all
+            unchanged). `reason` is 'boundary', 'body', or 'pickup'.
+          - 180-degree / same-as-current-heading: ``(False, [])`` — a
+            no-op, NOT a refusal (mirrors request_direction; never
+            reached via step() because request_direction filters these).
+
+        The pre-check (_sweep_check_safe) samples K = TURN_TICKS + 1
+        poses of the WHOLE chain rotated rigidly about the head and
+        refuses on the first boundary / body / pickup hit. Rigid
+        rotation about the head is the only turn model compatible with
+        the frozen stacking geometry (GAME-10).
+        """
+        if direction not in DIRS:
+            raise ValueError('unknown direction: %r (valid: %s)'
+                             % (direction, ', '.join(sorted(DIRS))))
+        if self.sweeping is not None:
+            # Defensive: a sweep is already open. No second concurrent
+            # sweep (step() never calls start_sweep while sweeping).
+            return (False, [])
+        target = DIRS[direction]
+        sx, sy = self.heading
+        dot = target[0] * sx + target[1] * sy
+        if dot < -0.5 or dot > 0.5:
+            # 180-degree reversal or same direction vs the CURRENT
+            # heading: a no-op, not a refusal (mirrors request_direction
+            # static rule; never reached via step()).
+            return (False, [])
+        # Signed sweep angle: cross(heading, target) > 0 -> CCW (+90);
+        # < 0 -> CW (-90). After the dot filter, target is perpendicular
+        # so cross is exactly +/-1 for axis pairs (never 0).
+        cross = sx * target[1] - sy * target[0]
+        angle_signed = TURN_DEGREES if cross > 0.0 else -TURN_DEGREES
+        reason = self._sweep_check_safe(angle_signed)
+        if reason is not None:
+            return (False, [('turn_refused', reason)])
+        # Open the sweep. start_centroids / start_atoms capture the chain
+        # pose NOW so each tick rotates ABSOLUTELY from this pose (no
+        # cross-tick float drift -> final pose exact to cos/sin quality).
+        self.sweeping = {
+            'start_heading': self.heading,
+            'target_heading': target,
+            'angle_signed': angle_signed,
+            'total_ticks': TURN_TICKS,
+            'tick': 0,
+            'start_centroids': [seg['centroid'] for seg in self.segments],
+            'start_atoms': [list(seg['atoms']) for seg in self.segments],
+        }
+        return (True, [])
+
+    def _sweep_check_safe(self, angle_signed):
+        """Run the 3-leg swept-region pre-check; return reason or None.
+
+        Samples K = TURN_TICKS + 1 poses (k = 0..TURN_TICKS) of the WHOLE
+        chain rotated rigidly about the head by
+        th_k = angle_signed * k / TURN_TICKS. At each pose, in order:
+
+          boundary leg (only if box set): any rotated segment CENTROID
+            STRICTLY beyond the BOUNDARY_MARGIN_A-adjusted box
+            [x0+M, x1-M] x [y0+M, y1-M] -> 'boundary'. (Outside means
+            strictly beyond — a centroid exactly at a margin wall is
+            inside; this is the swept pre-check model, distinct from
+            02-10's inclusive forward-velocity crash at the head.)
+          body leg: head vs the rotated chain polyline edges, same edge
+            set as 02-10's forward check (i in range(0, n-1-
+            SEGMENT_SKIP_RECENT)); STRICT < BODY_COLLISION_RADIUS_A**2
+            -> 'body'. (See the module docstring for the chord nuance.)
+          pickup leg (atom-level): any rotated CHAIN ATOM (head excluded
+            — it is the invariant pivot) within STRICT <
+            SWEEP_PICKUP_CLEARANCE_A**2 (2.5 A) of any LIVE pickup ATOM
+            -> 'pickup'. Pickups stay put; only the chain moves.
+
+        Returns the first reason found, or None if every sampled pose is
+        clear. Pure float math; builds rotated poses in LOCAL variables
+        and NEVER writes them into engine state.
+        """
+        hx, hy = self.head
+        n = len(self.segments)
+        radius_sq_body = BODY_COLLISION_RADIUS_A * BODY_COLLISION_RADIUS_A
+        clearance_sq = SWEEP_PICKUP_CLEARANCE_A * SWEEP_PICKUP_CLEARANCE_A
+        box_set = self.box_min is not None and self.box_max is not None
+        if box_set:
+            bx0, by0 = self.box_min
+            bx1, by1 = self.box_max
+            wall_x0 = bx0 + BOUNDARY_MARGIN_A
+            wall_x1 = bx1 - BOUNDARY_MARGIN_A
+            wall_y0 = by0 + BOUNDARY_MARGIN_A
+            wall_y1 = by1 - BOUNDARY_MARGIN_A
+        # Live pickup atoms (pickups don't move during the sweep).
+        live_pickup_atoms = []
+        for p in self.pickups:
+            if p['id'] in self.live_pickup_ids:
+                for atom in p['atoms']:
+                    live_pickup_atoms.append((atom[1], atom[2]))
+        limit = n - 1 - SEGMENT_SKIP_RECENT
+        for k in range(TURN_TICKS + 1):
+            th = angle_signed * k / float(TURN_TICKS)
+            cos_t = math.cos(math.radians(th))
+            sin_t = math.sin(math.radians(th))
+            rot_centroids = []
+            rot_chain_atoms = []
+            for seg in self.segments:
+                cx, cy = seg['centroid']
+                rcx, rcy = _rotate_xy(cx, cy, hx, hy, cos_t, sin_t)
+                rot_centroids.append((rcx, rcy))
+                for atom in seg['atoms']:
+                    rax, ray = _rotate_xy(atom[1], atom[2],
+                                          hx, hy, cos_t, sin_t)
+                    rot_chain_atoms.append((rax, ray))
+            # Boundary leg (centroid-level, sampled).
+            if box_set:
+                for rcx, rcy in rot_centroids:
+                    if (rcx < wall_x0 or rcx > wall_x1 or
+                            rcy < wall_y0 or rcy > wall_y1):
+                        return 'boundary'
+            # Body leg (head vs rotated polyline edges, 02-10's model).
+            if limit > 0:
+                for i in range(limit):
+                    ax, ay = rot_centroids[i]
+                    bx, by = rot_centroids[i + 1]
+                    if _point_segment_distance_sq(hx, hy, ax, ay, bx, by) \
+                            < radius_sq_body:
+                        return 'body'
+            # Pickup leg (rotated chain atoms vs live pickup atoms).
+            if live_pickup_atoms and rot_chain_atoms:
+                for rax, ray in rot_chain_atoms:
+                    for px, py in live_pickup_atoms:
+                        ddx = rax - px
+                        ddy = ray - py
+                        if ddx * ddx + ddy * ddy < clearance_sq:
+                            return 'pickup'
+        return None
+
+    def _advance_sweep(self):
+        """Advance the open sweep by one tick; return the tick's events.
+
+        Increments ``sweeping['tick']``, rotates the WHOLE chain
+        (centroids + atom x/y) ABSOLUTELY from the sweep's start pose by
+        th = angle_signed * tick / total_ticks (so floating-point error
+        does NOT accumulate across ticks — the final pose is exact to
+        cos/sin quality, well under the 1e-9 assertion delta). z and
+        symbol are preserved. Emits ``('turning', tick / total)``. NO
+        forward motion and no ``('moved',)`` event during sweeps.
+
+        On the final tick (tick == total_ticks): sets heading =
+        target_heading and clears sweeping. Pending is NOT touched here
+        — a chained turn is attempted at the NEXT step's start, by the
+        same pending-application rule (the revision-pinned timing).
+        """
+        sweep = self.sweeping
+        sweep['tick'] += 1
+        tick = sweep['tick']
+        total = sweep['total_ticks']
+        angle = sweep['angle_signed']
+        th = angle * tick / float(total)
+        cos_t = math.cos(math.radians(th))
+        sin_t = math.sin(math.radians(th))
+        hx, hy = self.head
+        start_centroids = sweep['start_centroids']
+        start_atoms = sweep['start_atoms']
+        new_segments = []
+        for i in range(len(self.segments)):
+            seg = self.segments[i]
+            scx, scy = start_centroids[i]
+            rcx, rcy = _rotate_xy(scx, scy, hx, hy, cos_t, sin_t)
+            new_atoms = []
+            for atom in start_atoms[i]:
+                sym = atom[0]
+                ax = atom[1]
+                ay = atom[2]
+                az = atom[3]
+                rax, ray = _rotate_xy(ax, ay, hx, hy, cos_t, sin_t)
+                new_atoms.append((sym, rax, ray, az))
+            new_seg = dict(seg)
+            new_seg['centroid'] = (rcx, rcy)
+            new_seg['atoms'] = new_atoms
+            new_segments.append(new_seg)
+        self.segments = new_segments
+        events = [('turning', tick / float(total))]
+        if tick >= total:
+            self.heading = sweep['target_heading']
+            self.sweeping = None
+        return events
+
     def step(self, dt):
         """Advance the simulation by dt seconds; return the event list.
 
         Paused -> no-op: return [] and mutate nothing.
         Finished (crashed/won) -> no-op: return [] and mutate nothing.
 
-        Movement branch: head += heading * SPEED_A_PER_S * dt, and emit
-        [('moved', (x, y))] carrying the NEW position. At SPEED_A_PER_S
-        = 3.0 a dt of 0.1 s advances the head exactly 0.3 A along the
-        current heading.
+        Sweep-in-progress (plan 02-13): advance the open sweep one tick
+        via _advance_sweep — rotate the whole chain rigidly about the
+        head and emit ('turning', tick/total). NO forward motion and no
+        ('moved',) event during sweeps. On the final tick heading becomes
+        the target and sweeping clears; pending is NOT touched (a chained
+        turn is attempted at the NEXT step's start).
+
+        Pending application at step START (plan 02-13, not sweeping): pop
+        the front request. Perpendicular to the current heading -> attempt
+        start_sweep(d); on success THIS tick is sweep tick 1 (rotate 15
+        deg, emit ('turning', 1/6), no 'moved'); on refusal emit
+        ('turn_refused', reason), CONSUME the request, and fall through to
+        forward motion in the same tick. Same-direction -> dropped
+        silently, fall through. (180-degree requests never reach pending —
+        request_direction filters them.) The turn attempt runs BEFORE the
+        forward branch, so a successful turn tick never also moves the
+        head.
+
+        Movement branch (02-06): head += heading * SPEED_A_PER_S * dt,
+        and emit ('moved', (x, y)) carrying the NEW position. At
+        SPEED_A_PER_S = 3.0 a dt of 0.1 s advances the head exactly 0.3 A
+        along the current heading.
 
         Boundary crash (plan 02-10, GAME-05): after the move, if a box is
         set and the head enters the BOUNDARY_MARGIN_A margin of the AABB
@@ -319,23 +615,39 @@ class GameEngine(object):
         emit ('won',), set finished=True / result='won', clear pending.
         A crash stops all later event processing (pickup/win never fire
         on a crash tick).
-
-        A pending direction is deliberately NOT consumed here and
-        produces NO event — the queue only buffers; plan 02-13 applies
-        pending turns at the START of step(). (Suite consequence: the
-        02-06 and 02-10 suites never call step() while a request is
-        pending, so that later change cannot break them.)
         """
         if self.paused:
             return []
         if self.finished:
             return []
+        # Sweep-in-progress: advance one tick; NO forward motion.
+        if self.sweeping is not None:
+            return self._advance_sweep()
+        events = []
+        # Pending application at step START (not sweeping): pop the front
+        # request. Perpendicular -> start_sweep (this tick becomes sweep
+        # tick 1 on success; 'turn_refused' + fall through on refusal).
+        # Same-direction / 180 -> dropped, fall through to forward motion.
+        if self.pending:
+            d = self.pending.pop(0)
+            unit = DIRS[d]
+            dot = unit[0] * self.heading[0] + unit[1] * self.heading[1]
+            if -0.5 <= dot <= 0.5:
+                opened, sweep_events = self.start_sweep(d)
+                events.extend(sweep_events)
+                if opened:
+                    # THIS tick is sweep tick 1 (rotate 15 deg, no move).
+                    events.extend(self._advance_sweep())
+                    return events
+                # Refused: request consumed; fall through to forward.
+            # Same-direction (or a 180 that should never be here): drop,
+            # fall through to forward motion.
         hx, hy = self.head
         ux, uy = self.heading
         nx = hx + ux * SPEED_A_PER_S * dt
         ny = hy + uy * SPEED_A_PER_S * dt
         self.head = (nx, ny)
-        events = [('moved', (nx, ny))]
+        events.append(('moved', (nx, ny)))
         # Boundary crash: AABB + BOUNDARY_MARGIN_A, inclusive at the
         # margin-adjusted walls. A crash stops event processing, ends
         # the run, and clears the pending queue (turn-state hygiene —
