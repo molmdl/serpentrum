@@ -91,7 +91,17 @@ Notes: Fixtures-first rule (Pitfalls 1/12); success contract as a pure function 
   3. User can leave xtb path/env on auto-detect (handling both `xtb` and `xtb.exe`) or set a manual path that overrides detection. [SETUP-05]
   4. The win cap defaults to the safe budget (~10 molecules / ~100 atoms) and shows the hessian-cost (~N³) warning when raised beyond it. [SETUP-06]
   5. "Cleanup model" removes only game-generated `srp_*` objects (user molecules untouched) and still works in a fresh process after a session save/reload. [INFRA-04]
-**Plans**: TBD (expected 3; bridge/loader + validation gate, box/camera/cleanup, and setup-tab UI are separable — parallelizable with explicit file boundaries)
+**Plans**: 8 plans (5 waves)
+
+Plans:
+- [ ] 03-01-PLAN.md — Purity checker: BRIDGE cmd-seam class + gui_setup GUI allowlist entry (Wave 1)
+- [ ] 03-02-PLAN.md — TDD molfile: SDF V2000/mol2 readers, cyclomatic ring count, ring finder, ≤3-ring gate (Wave 1, parallel)
+- [ ] 03-03-PLAN.md — Unify xtb path validation via xtbenv.validate_binary_path (Wave 1, parallel)
+- [ ] 03-04-PLAN.md — TDD setloader: demo/upload molecule records, __upload__ skip keying, multi-record split (Wave 2)
+- [ ] 03-05-PLAN.md — Demo Set A data: human SDF checkpoint + manifest build + real-file regression tests (Wave 2, parallel; HUMAN GATE)
+- [ ] 03-06-PLAN.md — pymol_bridge cmd-seam + headless viewer smoke (.pse survival, wildcard cleanup) (Wave 3)
+- [ ] 03-07-PLAN.md — SetupTab form + gui.py page-0 registration + anchored setup dict (Wave 4)
+- [ ] 03-08-PLAN.md — Full gate pass + checkpoint:human-verify in real Windows PyMOL (Wave 5)
 
 Notes: Avoids molecule-hygiene traps (Pitfall 11) and cleanup semantics (8). Human-verify: uploaded set loads; box renders.
 
@@ -212,7 +222,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. Plugin Skeleton & Purity Harness | 6/6 | Complete (verified 5/5 must-haves) | 2026-09-06 |
 | 2. Pure Core — Game & Chemistry Logic | 14/14 | Complete (verified 4/4 must-haves) | 2026-09-10 |
-| 3. Molecules in the Viewer & Setup Tab | 0/TBD | Not started | - |
+| 3. Molecules in the Viewer & Setup Tab | 0/8 | Not started | - |
 | 4. Game Loop & Input | 0/TBD | Not started | - |
 | 5. Stacking & Game Rules Complete | 0/TBD | Not started | - |
 | 6. xtb Pipeline | 0/TBD | Not started | - |
