@@ -473,3 +473,33 @@ def broaden(modes, fwhm=16.0, x_min=0.0, x_max=None, n_points=800):
             total += m.intensity * math.exp(-0.5 * dx * dx * inv_sigma_sq)
         ys.append(total)
     return xs, ys
+
+
+def parse_text(text):
+    """Format-sniffing entry point -> Spectrum.
+
+    First non-blank line is '$vibrational spectrum' -> parse_vibspectrum_text;
+    'Standard orientation:' appears in text -> parse_g98_text; otherwise
+    SpectraParseError('unrecognized format', ...). Never guesses silently.
+
+    Documented contract: the Phase-6 runner tries g98.out first and falls
+    back to vibspectrum; parse() accepts whichever file it is handed.
+    """
+    nonblank = [ln for ln in text.splitlines() if ln.strip()]
+    first = nonblank[0] if nonblank else ''
+    if first.strip() == _VIBSPECTRUM_HEADER:
+        return parse_vibspectrum_text(text)
+    if 'Standard orientation:' in text:
+        return parse_g98_text(text)
+    raise SpectraParseError(
+        "unrecognized format: input is neither vibspectrum (no '%s' "
+        "first line) nor g98 (no 'Standard orientation:' marker) [%s]"
+        % (_VIBSPECTRUM_HEADER, _excerpt(first or '<empty>')))
+
+
+def parse(path):
+    """utf-8 open + delegate to parse_text. Accepts either a g98 frequency
+    output or a Turbomole vibspectrum file; the format is sniffed from
+    content, never from the file name."""
+    with open(path, encoding='utf-8') as fh:
+        return parse_text(fh.read())
