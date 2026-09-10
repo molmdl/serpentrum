@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "sets": [
+    {
+      "id": "set_a",
+      "name": "Aromatic pi-stack",
+      "molecules": [
+        {
+          "id": "benzene",
+          "name": "Benzene",
+          "file": "benzene.sdf",
+          "source_db": "PubChem",
+          "source_id": "CID 241",
+          "atom_count": 12,
+          "charge": 0,
+          "ring_count": 1,
+          "ring_atoms": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "set": "set_a"
+        },
+        {
+          "id": "naphthalene",
+          "name": "Naphthalene",
+          "file": "naphthalene.sdf",
+          "source_db": "PubChem",
+          "source_id": "CID 931",
+          "atom_count": 18,
+          "charge": 0,
+          "ring_count": 2,
+          "ring_atoms": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "set": "set_a"
+        },
+        {
+          "id": "anthracene",
+          "name": "Anthracene",
+          "file": "anthracene.sdf",
+          "source_db": "PubChem",
+          "source_id": "CID 8418",
+          "atom_count": 24,
+          "charge": 0,
+          "ring_count": 3,
+          "ring_atoms": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13
+          ],
+          "set": "set_a"
+        },
+        {
+          "id": "phenanthrene",
+          "name": "Phenanthrene",
+          "file": "phenanthrene.sdf",
+          "source_db": "PubChem",
+          "source_id": "CID 995",
+          "atom_count": 24,
+          "charge": 0,
+          "ring_count": 3,
+          "ring_atoms": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13
+          ],
+          "set": "set_a"
+        },
+        {
+          "id": "biphenyl",
+          "name": "Biphenyl",
+          "file": "biphenyl.sdf",
+          "source_db": "PubChem",
+          "source_id": "CID 7095",
+          "atom_count": 22,
+          "charge": 0,
+          "ring_count": 2,
+          "ring_atoms": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "set": "set_a"
+        }
+      ]
+    }
+  ]
+}
