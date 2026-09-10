@@ -28,7 +28,7 @@ import check_purity  # noqa: E402
 
 
 class PurityFixtureTest(unittest.TestCase):
-    """Cases 1-9: checker behaviour against known-bad / known-clean trees."""
+    """Cases 1-9, 11-17: checker behaviour against known-bad / known-clean trees."""
 
     def make_tree(self, files):
         """Write {posix_relpath: content} under a fresh tempdir and return
@@ -197,11 +197,137 @@ class PurityFixtureTest(unittest.TestCase):
                 '\n'
                 '\n'
                 'def open_dialog():\n'
-                '    from .gui import PluginDialog\n'
-                '    return PluginDialog\n'
+            '    from .gui import PluginDialog\n'
+            '    return PluginDialog\n'
             ),
         })
         self.assertEqual(check_purity.check_tree(root), [])
+
+    # -- case 11: BRIDGE, pymol at module level (clean) ----------------
+    def test_bridge_module_level_pymol_clean(self):
+        root = self.make_tree({
+            'serpentrum/__init__.py': '"""Entry."""\n',
+            'serpentrum/pymol_bridge.py': (
+                '"""Cmd-seam bridge module (BRIDGE class)."""\n'
+                'from pymol import cmd\n'
+                '\n'
+                '\n'
+                'def cleanup_srp():\n'
+                '    cmd.delete(\'srp_*\')\n'
+            ),
+        })
+        self.assertEqual(check_purity.check_tree(root), [])
+
+    # -- case 12: BRIDGE, pymol/pmg_tk inside function bodies (clean) --
+    def test_bridge_body_pymol_clean(self):
+        root = self.make_tree({
+            'serpentrum/__init__.py': '"""Entry."""\n',
+            'serpentrum/pymol_bridge.py': (
+                '"""Cmd-seam bridge module (BRIDGE class)."""\n'
+                '\n'
+                '\n'
+                'def load_molecule(path, name):\n'
+                '    from pymol import cmd\n'
+                '    cmd.load(path, object=name, zoom=0)\n'
+                '\n'
+                '\n'
+                'def anchor_module():\n'
+                '    import pmg_tk.startup\n'
+                '    return pmg_tk.startup\n'
+            ),
+        })
+        self.assertEqual(check_purity.check_tree(root), [])
+
+    # -- case 13: BRIDGE, PyQt5 banned at any level --------------------
+    def test_bridge_pyqt5_banned(self):
+        root = self.make_tree({
+            'serpentrum/__init__.py': '"""Entry."""\n',
+            'serpentrum/pymol_bridge.py': (
+                '"""Cmd-seam bridge module (BRIDGE class)."""\n'
+                'from PyQt5 import QtWidgets\n'
+            ),
+        })
+        violations = check_purity.check_tree(root)
+        self.assertEqual(len(violations), 1, violations)
+        rel, lineno, msg = violations[0]
+        self.assertEqual(rel, 'serpentrum/pymol_bridge.py')
+        self.assertIn('PyQt5', msg)
+
+    # -- case 14: BRIDGE, numpy banned inside a function body ---------
+    def test_bridge_numpy_banned(self):
+        root = self.make_tree({
+            'serpentrum/__init__.py': '"""Entry."""\n',
+            'serpentrum/pymol_bridge.py': (
+                '"""Cmd-seam bridge module (BRIDGE class)."""\n'
+                '\n'
+                '\n'
+                'def helper():\n'
+                '    import numpy\n'
+                '    return numpy.zeros(3)\n'
+            ),
+        })
+        violations = check_purity.check_tree(root)
+        self.assertEqual(len(violations), 1, violations)
+        rel, lineno, msg = violations[0]
+        self.assertEqual(rel, 'serpentrum/pymol_bridge.py')
+        self.assertIn('numpy', msg)
+
+    # -- case 15: BRIDGE, .exec_() call still banned -------------------
+    def test_bridge_exec_call_flagged(self):
+        root = self.make_tree({
+            'serpentrum/__init__.py': '"""Entry."""\n',
+            'serpentrum/pymol_bridge.py': (
+                '"""Cmd-seam bridge module (BRIDGE class)."""\n'
+                '\n'
+                '\n'
+                'def show(dialog):\n'
+                '    dialog.exec_()\n'
+            ),
+        })
+        violations = check_purity.check_tree(root)
+        self.assertEqual(len(violations), 1, violations)
+        rel, lineno, msg = violations[0]
+        self.assertEqual(rel, 'serpentrum/pymol_bridge.py')
+        self.assertIn('exec_', msg)
+
+    # -- case 16: gui_setup (GUI class), pymol.Qt clean at any level ---
+    def test_gui_setup_pymol_qt_clean(self):
+        root = self.make_tree({
+            'serpentrum/__init__.py': '"""Entry."""\n',
+            'serpentrum/gui_setup.py': (
+                '"""Setup-tab GUI module (GUI class)."""\n'
+                'from pymol.Qt import QtWidgets, QtCore\n'
+            ),
+        })
+        self.assertEqual(check_purity.check_tree(root), [])
+
+    # -- case 17: gui_setup (GUI class), bare pymol flagged any level --
+    def test_gui_setup_bare_pymol_flagged(self):
+        module_level = (
+            '"""Setup-tab GUI module (GUI class)."""\n'
+            'from pymol import cmd\n'
+        )
+        violations = check_purity.check_tree(self.make_tree({
+            'serpentrum/gui_setup.py': module_level,
+        }))
+        self.assertEqual(len(violations), 1, violations)
+        self.assertEqual(violations[0][0], 'serpentrum/gui_setup.py')
+        self.assertIn('pymol', violations[0][2])
+
+        in_body = (
+            '"""Setup-tab GUI module (GUI class)."""\n'
+            '\n'
+            '\n'
+            'def refresh():\n'
+            '    import pmg_tk.startup\n'
+            '    return pmg_tk.startup\n'
+        )
+        violations = check_purity.check_tree(self.make_tree({
+            'serpentrum/gui_setup.py': in_body,
+        }))
+        self.assertEqual(len(violations), 1, violations)
+        self.assertEqual(violations[0][1], 5)  # the `import pmg_tk` line
+        self.assertIn('pmg_tk', violations[0][2])
 
 
 class RealRepoCleanTest(unittest.TestCase):
