@@ -4,10 +4,10 @@ The stacking geometry the game places molecules with is a DATA FILE, never
 a code constant. This module loads and STRUCTURALLY validates:
 
 - the molecule manifest (sets + molecules, incl. ring_atoms indices for
-  stacking)      -> serpentrum/data/demos/manifest.json  (shipped by a later plan)
+  stacking)      -> serpentrum/data/manifest.json  (shipped by a later plan)
 - the stacking-interaction dataset (mode + distance + lateral offset +
   citation + DRAFT/APPROVED status)
-                 -> serpentrum/data/demos/stacking.json (shipped by a later plan)
+                 -> serpentrum/data/stacking_pi_stack.json (shipped by a later plan)
 
 Both loaders take the PATH of the JSON file; the base directory against
 which molecule ``file`` references are checked is derived from that path
