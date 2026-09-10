@@ -22,7 +22,11 @@ def _anchor():
         class _SerpentrumState(object):
             dialog = None       # the single PluginDialog instance
             controller = None   # the single live game controller (later phases)
-        pmg_tk.startup._serpentrum = _SerpentrumState()
+            setup = None        # the live setup dict (Phase 3, plan 03-07)
+        state = _SerpentrumState()
+        from . import setup_logic  # lazy relative import (ENTRY-legal)
+        state.setup = setup_logic.new_setup()
+        pmg_tk.startup._serpentrum = state
     return pmg_tk.startup._serpentrum
 
 
@@ -39,7 +43,7 @@ def run_plugin_gui():
     if state.dialog is None:
         from .gui import PluginDialog            # lazy: Qt loads on first open
         existing = PluginDialog.find_existing()  # adopt orphaned widget (01-02 defines it)
-        state.dialog = existing if existing is not None else PluginDialog()
+        state.dialog = existing if existing is not None else PluginDialog(anchor_state=state)
     state.dialog.show()      # MODELESS — .show() never .exec_() (INFRA-05)
     state.dialog.raise_()
     state.dialog.activateWindow()

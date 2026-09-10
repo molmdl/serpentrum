@@ -1,25 +1,26 @@
-"""serpentrum plugin dialog shell (Phase 1: 3 placeholder tabs).
+"""serpentrum plugin dialog shell (3-tab dialog; Setup live from Phase 3).
 
-Module level imports ONLY pymol.Qt — the purity checker's GUI allowlist
-is exactly this module. Direct PyQt5 imports are banned project-wide;
-Qt reaches this code exclusively through pymol.Qt.
+Module level imports ONLY pymol.Qt -- the purity checker's GUI allowlist
+is exactly this module plus gui_setup (added in Phase 3). Direct PyQt5
+imports are banned project-wide; Qt reaches this code exclusively through
+pymol.Qt.
 
-The three placeholder tabs (Setup / Game / Spectra) are registered via
-QTabWidget.addTab; real tab content lands in Phases 3/4/7 (ROADMAP) and
-the real bottom button row lands in Phase 8.
+Page 0 (Setup) is the live SetupTab from gui_setup (Phase 3, plan
+03-07). Pages 1-2 (Game, Spectra) remain placeholders until Phases 4/7.
+The real bottom button row lands in Phase 8 (SETUP-07).
 """
 from pymol.Qt import QtWidgets
 
-# (key, label, placeholder text) — real content lands Phases 3/4/7 (ROADMAP)
+from .gui_setup import SetupTab
+
+# Placeholder tabs for Game/Spectra (real content lands Phases 4/7).
+# Setup is now the live SetupTab (page 0) -- not in this list.
 _TAB_DEFS = [
-    ('setup', 'Setup',
-     'Setup tab — game configuration (demo set or upload, box size, '
-     'head molecule, xtb path, win cap) arrives in Phase 3.'),
     ('game', 'Game',
-     'Game tab — steered movement, timer, pickups and stacking '
+     'Game tab - steered movement, timer, pickups and stacking '
      'arrive in Phases 4-5.'),
     ('spectra', 'Spectra',
-     'Spectra tab — xtb run, broadened IR spectrum and frequency '
+     'Spectra tab - xtb run, broadened IR spectrum and frequency '
      'table arrive in Phases 6-7.'),
 ]
 
@@ -27,23 +28,27 @@ _TAB_DEFS = [
 class PluginDialog(QtWidgets.QDialog):
     """Modeless 3-tab dialog shell.
 
-    Shown via .show() only — the modal exec call is banned on the main
-    dialog (INFRA-05; the Phase 1 checker fails any hit, since no child
-    dialogs exist yet).
+    Shown via .show() only -- the main dialog stays modeless (INFRA-05).
 
-    Registration contract: each tab page is added with exactly one
-    addTab(page, label) call inside __init__, in _TAB_DEFS order.
+    Registration contract: page 0 (Setup) is the live SetupTab from
+    gui_setup; pages 1-2 (Game, Spectra) are placeholder QWidgets from
+    _TAB_DEFS. Each page is added with exactly one addTab(page, label)
+    call inside __init__.
 
     Switching contract (later phases): self.tabs (QTabWidget) is the
-    documented handle — setCurrentWidget(page) / setCurrentIndex(i);
+    documented handle -- setCurrentWidget(page) / setCurrentIndex(i);
     page order stays fixed Setup -> Game -> Spectra.
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, anchor_state=None):
         super(PluginDialog, self).__init__(parent)
         self.setWindowTitle('serpentrum')
         self.setMinimumWidth(450)
         self.tabs = QtWidgets.QTabWidget(self)
+        # Page 0: Setup (live SetupTab from gui_setup).
+        setup_page = SetupTab(anchor_state, self.tabs)
+        self.tabs.addTab(setup_page, 'Setup')
+        # Pages 1-2: Game/Spectra placeholders.
         for _key, label, text in _TAB_DEFS:
             page = QtWidgets.QWidget(self.tabs)
             page_lay = QtWidgets.QVBoxLayout(page)
@@ -54,7 +59,7 @@ class PluginDialog(QtWidgets.QDialog):
             page_lay.addStretch(1)
             self.tabs.addTab(page, label)
         buttons = QtWidgets.QHBoxLayout()   # Phase 8: 6 right-aligned buttons
-        buttons.addStretch(1)               # reserved row — no buttons in Phase 1
+        buttons.addStretch(1)               # reserved row - no buttons in Phase 1
         outer = QtWidgets.QVBoxLayout(self)
         outer.addWidget(self.tabs)
         outer.addLayout(buttons)
