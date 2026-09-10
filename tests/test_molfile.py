@@ -171,5 +171,168 @@ class TestLoudFailures(unittest.TestCase):
         self.assertIn('Xx', str(caught.exception))
 
 
+class TestWriteSdfRoundTrip(unittest.TestCase):
+    """Behavior case 6: write_sdf_text round-trips parsed records.
+
+    For each SDF fixture record: read -> write_sdf_text -> read again
+    yields identical elements (order), bond count, charge sum, and coords
+    within 1e-6; the written text ends with '$$$'.
+    """
+
+    SDF_FIXTURES = ('methane.sdf', 'benzene_naphthalene.sdf',
+                    'acetate.sdf', 'benzene_noh.sdf')
+
+    def test_round_trip_preserves_elements_bonds_charge_coords(self):
+        for name in self.SDF_FIXTURES:
+            records = molfile.read_sdf(_fixture(name))
+            for rec in records:
+                text = molfile.write_sdf_text(rec)
+                self.assertTrue(
+                    text.rstrip().endswith('$$$$'),
+                    'written text for %s record %d does not end with $$$$'
+                    % (name, rec['record_index']))
+                round_trip = molfile.read_sdf_text(text)
+                self.assertEqual(len(round_trip), 1)
+                rt = round_trip[0]
+                self.assertEqual(rt['elements'], rec['elements'],
+                    'elements mismatch for %s record %d'
+                    % (name, rec['record_index']))
+                self.assertEqual(len(rt['bonds']), len(rec['bonds']),
+                    'bond count mismatch for %s record %d'
+                    % (name, rec['record_index']))
+                self.assertEqual(rt['charge'], rec['charge'],
+                    'charge mismatch for %s record %d'
+                    % (name, rec['record_index']))
+                self.assertEqual(len(rt['coords']), len(rec['coords']))
+                for orig, rt_coord in zip(rec['coords'], rt['coords']):
+                    for o_val, r_val in zip(orig, rt_coord):
+                        self.assertAlmostEqual(o_val, r_val, places=6)
+
+
+class TestReadMol2(unittest.TestCase):
+    """Behavior case 7: mol2 reader with charge=0 + warning."""
+
+    def test_benzene_mol2(self):
+        records = molfile.read_mol2(_fixture('benzene.mol2'))
+        self.assertEqual(len(records), 1)
+        rec = records[0]
+        self.assertEqual(len(rec['elements']), 12)
+        self.assertEqual(len(rec['bonds']), 12)
+        self.assertEqual(rec['charge'], 0)
+        # The mol2-charge warning text must be present.
+        self.assertTrue(
+            any('mol2' in w.lower() and 'charge' in w.lower()
+                for w in rec['warnings']),
+            'mol2 charge warning not found in %r' % rec['warnings'])
+
+
+class TestFindRingAtoms(unittest.TestCase):
+    """Behavior case 8: ring-atom finder returns the benzene 6-cycle.
+
+    find_ring_atoms(benzene) -> sorted list of exactly 6 indices that all
+    have degree >= 2 within the returned set and form a cycle.
+    find_ring_atoms(methane) -> [].
+    """
+
+    def test_benzene_returns_six_ring_carbons(self):
+        records = molfile.read_sdf(_fixture('benzene_naphthalene.sdf'))
+        benzene = records[0]
+        ring_atoms = molfile.find_ring_atoms(benzene)
+        self.assertEqual(len(ring_atoms), 6)
+        self.assertEqual(ring_atoms, sorted(ring_atoms))
+        # Each ring atom must have degree >= 2 within the returned set.
+        ring_set = set(ring_atoms)
+        bond_set = set()
+        for a, b in benzene['bonds']:
+            bond_set.add((a, b))
+            bond_set.add((b, a))
+        for atom in ring_atoms:
+            neighbors = [other for other in ring_set
+                         if other != atom and (atom, other) in bond_set]
+            self.assertGreaterEqual(
+                len(neighbors), 2,
+                'ring atom %d has only %d ring neighbors'
+                % (atom, len(neighbors)))
+
+    def test_methane_returns_empty(self):
+        records = molfile.read_sdf(_fixture('methane.sdf'))
+        methane = records[0]
+        self.assertEqual(molfile.find_ring_atoms(methane), [])
+
+
+class TestGateMatrix(unittest.TestCase):
+    """Behavior case 9: gate rejects >3-ring and organic-no-H, accepts
+    inorganic-no-H with advisory, charge never rejects.
+
+    gate_molecule(record) -> (ok, reason).
+    gate_set(records) -> (accepted, rejected) with per-molecule reasons.
+    """
+
+    def _benzene_record(self):
+        return molfile.read_sdf(_fixture('benzene_naphthalene.sdf'))[0]
+
+    def _noh_record(self):
+        return molfile.read_sdf(_fixture('benzene_noh.sdf'))[0]
+
+    def _synthetic(self, title, elements, ring_count, has_explicit_h,
+                   bonds=None):
+        """Build a minimal record dict for gate testing."""
+        return {
+            'title': title,
+            'elements': list(elements),
+            'coords': [(0.0, 0.0, 0.0)] * len(elements),
+            'bonds': list(bonds) if bonds else [],
+            'charges': {},
+            'record_index': 0,
+            'atom_count': len(elements),
+            'charge': 0,
+            'ring_count': ring_count,
+            'has_explicit_h': has_explicit_h,
+            'warnings': [],
+        }
+
+    def test_benzene_accepted(self):
+        ok, reason = molfile.gate_molecule(self._benzene_record())
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+    def test_ring_count_4_rejected(self):
+        rec = self._synthetic('ring4', ['C', 'H'], 4, True)
+        ok, reason = molfile.gate_molecule(rec)
+        self.assertFalse(ok)
+        self.assertIn('rings', reason)
+        self.assertIn('3', reason)
+
+    def test_organic_no_h_rejected(self):
+        rec = self._noh_record()
+        ok, reason = molfile.gate_molecule(rec)
+        self.assertFalse(ok)
+        self.assertIn('hydrogen', reason.lower())
+
+    def test_inorganic_no_h_accepted_with_warning(self):
+        rec = self._synthetic('NaCl', ['Na', 'Cl'], 0, False,
+                              bonds=[(0, 1)])
+        warnings_before = len(rec['warnings'])
+        ok, reason = molfile.gate_molecule(rec)
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+        self.assertEqual(len(rec['warnings']), warnings_before + 1)
+        self.assertIn('hydrogen', rec['warnings'][-1].lower())
+
+    def test_gate_set_ordering(self):
+        benzene = self._benzene_record()
+        noh = self._noh_record()
+        ring4 = self._synthetic('ring4', ['C', 'H'], 4, True)
+        accepted, rejected = molfile.gate_set([benzene, noh, ring4])
+        self.assertEqual(len(accepted), 1)
+        self.assertEqual(accepted[0]['title'], benzene['title'])
+        self.assertEqual(len(rejected), 2)
+        # Rejected in input order: noh (hydrogen), ring4 (rings).
+        self.assertEqual(rejected[0][0]['title'], noh['title'])
+        self.assertIn('hydrogen', rejected[0][1].lower())
+        self.assertEqual(rejected[1][0]['title'], ring4['title'])
+        self.assertIn('rings', rejected[1][1])
+
+
 if __name__ == '__main__':
     unittest.main()
