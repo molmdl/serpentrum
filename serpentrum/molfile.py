@@ -357,3 +357,262 @@ def _parse_m_chg_tokens(tokens, lineno, charges, natoms, line):
                               'M CHG: atom index %d out of range [1, %d]'
                               % (atom_idx, natoms))
         charges[atom_idx - 1] = charge_val
+
+
+def write_sdf_text(record):
+    """Serialize one record dict to V2000 text ending with ``$$$$``.
+
+    Fixed-width V2000: counts line ``%3d%3d ... 999 V2000``, atom rows
+    ``%10.4f%10.4f%10.4f %-3s 0 ...``, bond rows ``%3d%3d%3d  0`` (type 1
+    = single), M CHG lines from ``record['charges']`` (<= 8 pairs/line).
+    Round-trips through read_sdf_text: read -> write -> read reproduces
+    the same elements/bonds/charge/coords (enables the Phase-3 upload
+    split in 03-04).
+    """
+    elements = record['elements']
+    coords = record['coords']
+    bonds = record['bonds']
+    charges = record['charges']
+    natoms = len(elements)
+    nbonds = len(bonds)
+
+    lines = []
+    # Line 1: title.
+    lines.append(record.get('title', ''))
+    # Line 2: program/timestamp line.
+    lines.append('  serpentrum')
+    # Line 3: comment (blank).
+    lines.append('')
+    # Line 4: counts line.
+    lines.append('%3d%3d  0  0  0  0  0  0  0  0999 V2000'
+                 % (natoms, nbonds))
+    # Atom block.
+    for i in range(natoms):
+        x, y, z = coords[i]
+        lines.append(
+            '%10.4f%10.4f%10.4f %-3s 0  0  0  0  0  0  0  0  0  0  0  0'
+            % (x, y, z, elements[i]))
+    # Bond block (bond type 1 = single for all; type not stored on record).
+    for a, b in bonds:
+        lines.append('%3d%3d%3d  0' % (a + 1, b + 1, 1))
+    # M CHG property lines (<= 8 pairs per line).
+    if charges:
+        items = sorted(charges.items())
+        for chunk_start in range(0, len(items), 8):
+            chunk = items[chunk_start:chunk_start + 8]
+            parts = ['M  CHG%3d' % len(chunk)]
+            for idx, chg in chunk:
+                parts.append('%4d%4d' % (idx + 1, chg))
+            lines.append(''.join(parts))
+    # M END + record separator.
+    lines.append('M  END')
+    lines.append('$$$$')
+    return '\n'.join(lines) + '\n'
+
+
+def read_mol2_text(text):
+    """Parse mol2 <text> -> list of record dicts.
+
+    mol2 carries PARTIAL charges only (PITFALLS 11,
+    [SRC: chempy/mol2.py:74]) -> formal charge is assumed 0 and a
+    warning is appended to ``record['warnings']``. Element symbols are
+    extracted from the sybyl atom type (e.g. ``C.ar`` -> ``C``).
+
+    Same MolFileError contract (1-based line + snippet) as read_sdf_text.
+    """
+    lines = text.splitlines()
+
+    # Locate the @<TRIPOS>MOLECULE section header.
+    mol_start = None
+    for i, line in enumerate(lines):
+        if line.strip() == '@<TRIPOS>MOLECULE':
+            mol_start = i
+            break
+    if mol_start is None:
+        return []  # no molecule section -> empty list
+
+    # Molecule name is the line after the header.
+    title = ''
+    if mol_start + 1 < len(lines):
+        title = lines[mol_start + 1].strip()
+
+    # Locate @<TRIPOS>ATOM and @<TRIPOS>BOND sections.
+    atom_start = None
+    bond_start = None
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped == '@<TRIPOS>ATOM':
+            atom_start = i
+        elif stripped == '@<TRIPOS>BOND':
+            bond_start = i
+
+    # Parse atom rows.
+    elements = []
+    coords = []
+    if atom_start is not None:
+        pos = atom_start + 1
+        while pos < len(lines):
+            stripped = lines[pos].strip()
+            if stripped.startswith('@<TRIPOS>'):
+                break
+            if stripped:
+                tokens = stripped.split()
+                if len(tokens) >= 6:
+                    try:
+                        x = float(tokens[2])
+                        y = float(tokens[3])
+                        z = float(tokens[4])
+                    except ValueError:
+                        raise _line_error(pos + 1, lines[pos],
+                                          'mol2 atom line: cannot parse '
+                                          'coordinates')
+                    sybyl_type = tokens[5]
+                    element = sybyl_type.split('.')[0]
+                    if element not in ELEMENT_SYMBOLS:
+                        raise _line_error(pos + 1, lines[pos],
+                                          'unknown element symbol %r'
+                                          % element)
+                    elements.append(element)
+                    coords.append((x, y, z))
+            pos += 1
+
+    # Parse bond rows.
+    bonds = []
+    if bond_start is not None:
+        pos = bond_start + 1
+        while pos < len(lines):
+            stripped = lines[pos].strip()
+            if stripped.startswith('@<TRIPOS>'):
+                break
+            if stripped:
+                tokens = stripped.split()
+                if len(tokens) >= 3:
+                    try:
+                        a1 = int(tokens[1])
+                        a2 = int(tokens[2])
+                    except ValueError:
+                        raise _line_error(pos + 1, lines[pos],
+                                          'mol2 bond line: cannot parse '
+                                          'atom indices')
+                    bonds.append((a1 - 1, a2 - 1))
+            pos += 1
+
+    ring_count = count_rings(bonds, len(elements))
+    has_explicit_h = 'H' in elements
+
+    return [{
+        'title': title,
+        'elements': elements,
+        'coords': coords,
+        'bonds': bonds,
+        'charges': {},
+        'record_index': 0,
+        'atom_count': len(elements),
+        'charge': 0,
+        'ring_count': ring_count,
+        'has_explicit_h': has_explicit_h,
+        'warnings': [MOL2_CHARGE_WARNING],
+    }]
+
+
+def read_mol2(path):
+    """Read a mol2 file (utf-8) -> list of record dicts (see read_mol2_text)."""
+    with open(path, 'r', encoding='utf-8') as handle:
+        return read_mol2_text(handle.read())
+
+
+def find_ring_atoms(record):
+    """Return sorted indices of atoms in any ring (the 2-core of the graph).
+
+    Iteratively removes pendant atoms (degree < 2) until the remaining
+    subgraph has all degrees >= 2. The surviving atoms are ring atoms.
+    Returns ``[]`` when the graph is acyclic (no rings survive).
+
+    For benzene this yields the 6 ring carbons; for methane ``[]``.
+    """
+    bonds = record['bonds']
+    atom_count = record['atom_count']
+    if atom_count == 0:
+        return []
+
+    adjacency = [set() for _ in range(atom_count)]
+    for a, b in bonds:
+        if 0 <= a < atom_count and 0 <= b < atom_count:
+            adjacency[a].add(b)
+            adjacency[b].add(a)
+
+    removed = set()
+    changed = True
+    while changed:
+        changed = False
+        for i in range(atom_count):
+            if i in removed:
+                continue
+            degree = len(adjacency[i] - removed)
+            if degree < 2:
+                removed.add(i)
+                changed = True
+
+    return [i for i in range(atom_count) if i not in removed]
+
+
+# Elements considered "organic" for the explicit-H gate.
+_ORGANIC_ELEMENTS = frozenset(('C', 'N', 'O'))
+
+
+def gate_molecule(record):
+    """Check a molecule record against the load-time gate (SC1 / DATA-03).
+
+    Checks IN ORDER:
+      (a) ring_count > 3  ->  reject (reason names the count and the limit)
+      (b) organic (C/N/O) with zero explicit H  ->  reject (pre-protonated
+          file required; auto-H is banned per PITFALLS 11)
+      (c) inorganic with zero explicit H  ->  accept + append hydrogen
+          advisory to ``record['warnings']``
+
+    Charge is INFORMATION, never a rejection.
+
+    Returns ``(ok, reason)``: ok is True/False; reason is None when
+    accepted, a clear human-readable string when rejected.
+    """
+    name = record.get('title', 'molecule')
+
+    # (a) Ring-count gate.
+    if record['ring_count'] > 3:
+        return (False,
+                '%s: has %d rings (limit is 3)'
+                % (name, record['ring_count']))
+
+    # (b) Organic + zero explicit H.
+    elements = record['elements']
+    is_organic = any(e in _ORGANIC_ELEMENTS for e in elements)
+    if is_organic and not record['has_explicit_h']:
+        return (False,
+                '%s: no explicit hydrogens found - provide a '
+                'pre-protonated file (auto-H is not used per policy)'
+                % name)
+
+    # (c) Inorganic + zero explicit H: warn but accept.
+    if not is_organic and not record['has_explicit_h']:
+        record['warnings'].append(
+            '%s: no hydrogens - verify this is correct for an inorganic '
+            'molecule' % name)
+
+    return (True, None)
+
+
+def gate_set(records):
+    """Apply gate_molecule to a list; return ``(accepted, rejected)``.
+
+    ``accepted`` is a list of records that passed the gate.
+    ``rejected`` is a list of ``(record, reason)`` tuples in input order.
+    """
+    accepted = []
+    rejected = []
+    for record in records:
+        ok, reason = gate_molecule(record)
+        if ok:
+            accepted.append(record)
+        else:
+            rejected.append((record, reason))
+    return accepted, rejected
