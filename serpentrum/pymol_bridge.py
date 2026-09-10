@@ -108,14 +108,16 @@ def place_head(srp_name=HEAD_NAME):
     """Center the head molecule at the box origin (0, 0, 0).
 
     Computes the loaded molecule's centroid via ``cmd.get_extent`` (returns
-    (min_x, min_y, min_z, max_x, max_y, max_z, ...); centroid = midpoint)
-    and translates by its negative. All BOX_PRESETS are symmetric about
-    (0,0,0) (setup_logic.py:63-67), so box center = origin.
+    ``[[min_x, min_y, min_z], [max_x, max_y, max_z]]`` in PyMOL 2.5;
+    centroid = midpoint of each axis) and translates by its negative. All
+    BOX_PRESETS are symmetric about (0,0,0) (setup_logic.py:63-67), so box
+    center = origin.
     """
     ext = cmd.get_extent(srp_name)
-    cx = (ext[0] + ext[3]) / 2.0
-    cy = (ext[1] + ext[4]) / 2.0
-    cz = (ext[2] + ext[5]) / 2.0
+    (min_x, min_y, min_z), (max_x, max_y, max_z) = ext
+    cx = (min_x + max_x) / 2.0
+    cy = (min_y + max_y) / 2.0
+    cz = (min_z + max_z) / 2.0
     cmd.translate([-cx, -cy, -cz], srp_name)
 
 
@@ -124,13 +126,13 @@ def cleanup_srp():
 
     Pure function of object names: NO controller / game-state / anchor
     arguments, NO state reads. Counts ``srp_*`` objects via
-    ``cmd.get_names('all_objects')`` BEFORE the delete, deletes with the
-    ``srp_*`` name pattern (idempotent — backup.py:42,49), returns the
+    ``cmd.get_names('public_objects')`` BEFORE the delete, deletes with
+    the ``srp_*`` name pattern (idempotent — backup.py:42,49), returns the
     count. Identical code path from a live dialog AND a fresh process
     after .pse reload (PITFALLS.md 8.3: viewer objects survive, plugin
     state does not).
     """
-    before = [n for n in cmd.get_names('all_objects')
+    before = [n for n in cmd.get_names('public_objects')
               if n.startswith(SRP_PREFIX)]
     cmd.delete(SRP_PREFIX + '*')
     return len(before)

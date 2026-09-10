@@ -52,7 +52,8 @@ WALK_DIRS = ('serpentrum', 'tools', 'tests', 'smoke')
 SAFETY_DIRS = ('tests', 'smoke', 'tools')
 
 # Required headless smokes (a missing one fails the gate).
-REQUIRED_SMOKES = ('smoke/01_skeleton_smoke.py',)
+REQUIRED_SMOKES = ('smoke/01_skeleton_smoke.py',
+                    'smoke/03_viewer_bridge_smoke.py')
 
 SMOKE_BAT = 'C:\\src\\run-conda-pymol.bat'
 SMOKE_TIMEOUT = 90  # seconds, per research Q3
