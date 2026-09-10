@@ -31,6 +31,7 @@ from serpentrum.setup_logic import (  # noqa: E402
     BOX_PRESETS, DEFAULTS, HESSIAN_WARNING, KNOWN_SETS, SCHEMA_VERSION,
     SetupError, load_setup, new_setup, randomize_head, save_setup, validate,
 )
+import serpentrum.xtbenv as xtbenv  # noqa: E402
 
 EXPECTED_DEFAULTS = {
     'schema_version': 1,
@@ -358,6 +359,62 @@ class TestRandomizeHead(unittest.TestCase):
         others = ['water', 'methane', 'ammonia']
         pick = randomize_head(others, 42)
         self.assertIn(pick, others)
+
+
+class XtbPathUnificationTest(unittest.TestCase):
+    """Pin the Phase-3 unification (03-03): setup_logic._xtb_path_problems
+    delegates to xtbenv.validate_binary_path, so the two must agree on
+    EVERY input class (None/non-str/empty, missing, directory, quoted,
+    valid). The pre-existing TestValidateXtbPath matrix stays green
+    UNMODIFIED — that is the byte-identity proof for validate(); this
+    class pins the direct delegation separately and locks the historical
+    message literals against accidental rewording.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='srp_unify_')
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def _real_file(self):
+        path = os.path.join(self.tmp, 'xtb.exe')
+        with open(path, 'wb') as handle:
+            handle.write(b'MZ')
+        return path
+
+    def test_validators_agree_across_full_input_matrix(self):
+        # The full input matrix: None, empty str, non-str, a missing
+        # path, a directory, a quoted path (never created on disk), and
+        # a real existing file. For each, the delegator and the
+        # canonical validator must return EXACTLY the same list
+        # (order + content).
+        directory = tempfile.mkdtemp(prefix='srp_unify_dir_', dir=self.tmp)
+        matrix = [
+            None,
+            '',
+            5,
+            os.path.join(tempfile.gettempdir(), 'srp_no_such_xtb.exe'),
+            directory,
+            "C:\\x'tb.exe",
+            self._real_file(),
+        ]
+        for path in matrix:
+            self.assertEqual(
+                setup_logic._xtb_path_problems(path),
+                xtbenv.validate_binary_path(path),
+                'delegator disagrees with canonical validator for %r'
+                % (path,))
+
+    def test_missing_path_message_literals_pinned(self):
+        # Lock the historical message contract against accidental
+        # rewording: a missing path yields exactly the literal below.
+        missing = os.path.join(tempfile.gettempdir(), 'srp_no_such_xtb.exe')
+        self.assertEqual(
+            setup_logic._xtb_path_problems(missing),
+            ["'%s' does not exist" % (missing,)])
+        # And the delegator matches the canonical validator here too.
+        self.assertEqual(
+            setup_logic._xtb_path_problems(missing),
+            xtbenv.validate_binary_path(missing))
 
 
 if __name__ == '__main__':
