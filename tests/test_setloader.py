@@ -383,5 +383,129 @@ class TestDemoPath(SetLoaderTestCase):
         self.assertFalse(records[0]['has_stack_entry'])
 
 
+class TestUploadPath(SetLoaderTestCase):
+    """Behavior cases 7-12: upload gating, '__upload__' keying, multi-record split.
+
+    load_upload(path, stacking_path) routes by extension, gates per record,
+    and splits multi-record SDFs into single-record files in one
+    srp_upload_ tempdir. Upload records carry set='__upload__' which
+    matches NO interaction -> has_stack_entry=False (STACK-03).
+    """
+
+    # --- Case 7: upload single-record SDF ---
+
+    def test_upload_single_record_sdf(self):
+        path = os.path.join(FIXTURES, 'methane.sdf')
+        stacking_path = self._stacking_path()
+        records, errors = setloader.load_upload(path, stacking_path)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(records), 1)
+        r = records[0]
+        self.assertEqual(r['id'], 'upload_0')
+        self.assertEqual(r['set'], '__upload__')
+        self.assertEqual(r['source'], 'upload')
+        self.assertFalse(r['has_stack_entry'])
+        self.assertEqual(r['file'], path)
+        self.assertEqual(r['record_index'], 0)
+        self.assertEqual(r['atom_count'], 5)
+        self.assertEqual(r['charge'], 0)
+        self.assertEqual(r['ring_count'], 0)
+        self.assertTrue(r['has_explicit_h'])
+
+    def test_upload_single_record_sdf_no_stacking(self):
+        # stacking_path=None -> has_stack_entry=False without a stacking file.
+        path = os.path.join(FIXTURES, 'methane.sdf')
+        records, errors = setloader.load_upload(path)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(records), 1)
+        self.assertFalse(records[0]['has_stack_entry'])
+
+    # --- Case 8: upload multi-record SDF split ---
+
+    def test_upload_multi_record_sdf_splits_into_tempdir(self):
+        path = os.path.join(FIXTURES, 'benzene_naphthalene.sdf')
+        stacking_path = self._stacking_path()
+        records, errors = setloader.load_upload(path, stacking_path)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(records), 2)
+
+        # Distinct file paths under one srp_upload_ tempdir.
+        files = [r['file'] for r in records]
+        self.assertNotEqual(files[0], files[1])
+        self.assertTrue(os.path.isfile(files[0]))
+        self.assertTrue(os.path.isfile(files[1]))
+        self.assertEqual(os.path.dirname(files[0]),
+                         os.path.dirname(files[1]))
+        self.assertIn('srp_upload_', os.path.dirname(files[0]))
+        # Clean up the split tempdir (load_upload leaves it to OS cleanup).
+        self.addCleanup(shutil.rmtree, os.path.dirname(files[0]), True)
+
+        # ids are record_index-stable.
+        self.assertEqual(records[0]['id'], 'upload_0')
+        self.assertEqual(records[1]['id'], 'upload_1')
+
+        # Each written file re-parses to EXACTLY 1 record with matching
+        # elements/charge.
+        for r in records:
+            reparsed = molfile.read_sdf(r['file'])
+            self.assertEqual(len(reparsed), 1)
+            self.assertEqual(reparsed[0]['elements'], r['elements'])
+            self.assertEqual(reparsed[0]['charge'], r['charge'])
+
+        # Upload keying.
+        for r in records:
+            self.assertEqual(r['set'], '__upload__')
+            self.assertEqual(r['source'], 'upload')
+            self.assertFalse(r['has_stack_entry'])
+
+    # --- Case 9: upload rejection ---
+
+    def test_upload_rejection_clear_reason(self):
+        path = os.path.join(FIXTURES, 'benzene_noh.sdf')
+        stacking_path = self._stacking_path()
+        records, errors = setloader.load_upload(path, stacking_path)
+        self.assertEqual(records, [])
+        self.assertEqual(len(errors), 1)
+        # name = title ('benzene_noh'); reason contains 'hydrogens'.
+        self.assertIn('benzene_noh', errors[0])
+        self.assertIn('hydrogens', errors[0])
+
+    # --- Case 10: upload mol2 ---
+
+    def test_upload_mol2_warning_propagated(self):
+        path = os.path.join(FIXTURES, 'benzene.mol2')
+        stacking_path = self._stacking_path()
+        records, errors = setloader.load_upload(path, stacking_path)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(records), 1)
+        r = records[0]
+        self.assertEqual(r['id'], 'upload_0')
+        self.assertEqual(r['charge'], 0)
+        self.assertTrue(any('mol2' in w for w in r['warnings']))
+        self.assertEqual(r['file'], path)
+        self.assertEqual(r['set'], '__upload__')
+        self.assertEqual(r['source'], 'upload')
+        self.assertFalse(r['has_stack_entry'])
+
+    # --- Case 11: unsupported extension ---
+
+    def test_upload_unsupported_extension(self):
+        dirname = self._tmpdir()
+        path = self._write_text(dirname, 'set.txt', '')
+        records, errors = setloader.load_upload(path)
+        self.assertEqual(records, [])
+        self.assertEqual(len(errors), 1)
+        self.assertIn('unsupported molecule file type', errors[0])
+
+    # --- Case 12: missing file ---
+
+    def test_upload_missing_file_no_exception(self):
+        path = os.path.join(self._tmpdir(), 'nonexistent.sdf')
+        records, errors = setloader.load_upload(path)
+        self.assertEqual(records, [])
+        self.assertEqual(len(errors), 1)
+        self.assertIn('nonexistent.sdf', errors[0])
+
+
 if __name__ == '__main__':
     unittest.main()
