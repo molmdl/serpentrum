@@ -44,6 +44,6 @@ def run_plugin_gui():
         from .gui import PluginDialog            # lazy: Qt loads on first open
         existing = PluginDialog.find_existing()  # adopt orphaned widget (01-02 defines it)
         state.dialog = existing if existing is not None else PluginDialog(anchor_state=state)
-    state.dialog.show()      # MODELESS — .show() never .exec_() (INFRA-05)
+    state.dialog.show()      # MODELESS - .show() only, never a blocking modal (INFRA-05)
     state.dialog.raise_()
     state.dialog.activateWindow()
