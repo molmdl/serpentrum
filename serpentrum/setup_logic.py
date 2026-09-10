@@ -20,19 +20,20 @@ instance per call — NEVER the global ``random`` module (determinism +
 reproducibility on the same 3.6 build; the global module would advance
 shared state across calls and break seed-to-seed isolation).
 
-python3.6 syntax only (%-formatting, no dataclasses/walrus); stdlib-only
-(json/math/random/os) PURE module — no pymol / pmg_tk / PyQt5 / numpy
-anywhere (enforced by tools/check_purity.py, which auto-classifies this
-module PURE); zero sys.modules stubs. Does NOT import other Phase-2
-modules: ``xtbenv`` is a PARALLEL wave-1 plan and may not exist in this
-worktree, so the xtb-path rules are kept in a local ``_xtb_path_problems``
-helper with the SAME rules as ``xtbenv.validate_binary_path`` (keep in
-sync with serpentrum/xtbenv.py; a later wave may unify).
+python3.6 syntax only (%-formatting, no dataclasses/walrus); PURE module
+(json/random stdlib + one intra-package import) — no pymol / pmg_tk /
+PyQt5 / numpy anywhere (enforced by tools/check_purity.py, which
+auto-classifies this module PURE; relative intra-package imports are
+purity-exempt); zero sys.modules stubs. The xtb-path rules live in
+``serpentrum.xtbenv.validate_binary_path``; ``_xtb_path_problems``
+delegates to it (unified Phase 3 per 02-02-SUMMARY.md:109) — single
+source of the rules, no drift.
 """
 
 import json
-import os
 import random
+
+from .xtbenv import validate_binary_path
 
 # Schema version (research R7). v1 ships Set A only. load_setup raises
 # loudly on any other schema_version; friendly UX is Phase 8 (SETUP-08).
@@ -98,11 +99,13 @@ def _is_number(value):
 
 
 def _xtb_path_problems(path):
-    """Validate a user-configured xtb binary path (local mirror of
-    ``xtbenv.validate_binary_path``).
+    """Validate a user-configured xtb binary path.
 
-    Returns a list of problem strings (empty list = valid). Problems
-    accumulate where meaningfully checkable:
+    Delegates to ``serpentrum.xtbenv.validate_binary_path`` — the single
+    source of the xtb-path rules (unified Phase 3 per
+    02-02-SUMMARY.md:109; previously a local mirror kept in sync by
+    hand). The message contract is unchanged: returns a list of problem
+    strings (empty list = valid) with the same literals as before:
 
       (a) empty / None / non-string -> 'xtb path is empty'
       (b) missing on disk           -> "'<path>' does not exist"
@@ -110,21 +113,10 @@ def _xtb_path_problems(path):
       (d) contains ' or "           -> "path contains quote character(s):
                                        '<path>'"
 
-    Kept local (not imported from serpentrum.xtbenv) because xtbenv is a
-    PARALLEL wave-1 plan and may not exist in this worktree; keep in sync
-    with serpentrum/xtbenv.py — a later wave may unify the two.
+    Kept as a thin wrapper (not inlined into validate()) so the name
+    documents the concern and tests can pin the delegation directly.
     """
-    problems = []
-    if not isinstance(path, str) or not path:
-        problems.append('xtb path is empty')
-        return problems
-    if not os.path.exists(path):
-        problems.append("'%s' does not exist" % (path,))
-    elif not os.path.isfile(path):
-        problems.append("'%s' is not a file" % (path,))
-    if '"' in path or "'" in path:
-        problems.append("path contains quote character(s): '%s'" % (path,))
-    return problems
+    return validate_binary_path(path)
 
 
 def validate(setup):
