@@ -18,15 +18,18 @@ path                         class   rule summary
 ``serpentrum/__init__.py``   ENTRY   pymol/pmg_tk allowed ONLY lazily inside
                                      function/method bodies; module level is a
                                      violation. PyQt5/numpy never anywhere.
-``serpentrum/gui.py``        GUI     ONLY ``pymol.Qt`` / ``pymol.Qt.*`` import
-                                     forms (any level); any other pymol*/pmg_tk
+``serpentrum/gui.py``,       GUI     ONLY ``pymol.Qt`` / ``pymol.Qt.*`` import
+``serpentrum/gui_setup.py``          forms (any level); any other pymol*/pmg_tk
                                      anywhere is a violation. PyQt5/numpy never.
+``serpentrum/pymol_bridge``  BRIDGE  pymol/pmg_tk allowed at any level; PyQt5/
+``.py``                              numpy never; ``.exec_()`` never.
 anything else under          PURE    pymol/pmg_tk/PyQt5/numpy never anywhere
 ``serpentrum/``                      (module level OR function bodies).
 ===========================  ======  =============================================
 
 PURE is the default-strict class: a future pure module is automatically
-covered; a new GUI module must be added to GUI_MODULES deliberately.
+covered; a new GUI or BRIDGE module must be added to GUI_MODULES or
+BRIDGE_MODULES deliberately.
 
 Additional rules:
 
@@ -52,7 +55,14 @@ import sys
 
 # Explicit GUI allowlist — extend consciously in later phases: a new GUI
 # module must be added here deliberately. Everything else defaults PURE.
-GUI_MODULES = {'serpentrum/gui.py'}
+GUI_MODULES = {'serpentrum/gui.py', 'serpentrum/gui_setup.py'}
+
+# Explicit cmd-bridge allowlist — the ONLY modules (besides ENTRY-lazy)
+# that may import pymol.cmd. Allows pymol/pmg_tk at module level AND in
+# bodies; bans PyQt5/numpy everywhere (Qt stays in GUI modules; numpy
+# never needed in the bridge — pure modules do the math). .exec_() stays
+# banned (the bridge builds no dialogs).
+BRIDGE_MODULES = {'serpentrum/pymol_bridge.py'}
 
 ENTRY_MODULE = 'serpentrum/__init__.py'
 
@@ -64,11 +74,13 @@ QT_ALLOWED_PREFIX = 'pymol.Qt'
 
 
 def classify(rel_path):
-    """Return 'ENTRY', 'GUI' or 'PURE' for a posix rel path."""
+    """Return 'ENTRY', 'GUI', 'BRIDGE' or 'PURE' for a posix rel path."""
     if rel_path == ENTRY_MODULE:
         return 'ENTRY'
     if rel_path in GUI_MODULES:
         return 'GUI'
+    if rel_path in BRIDGE_MODULES:
+        return 'BRIDGE'
     return 'PURE'
 
 
@@ -132,6 +144,13 @@ def _check_import_node(out, rel_path, cls, node, at_module_level):
         for root in sorted(roots & {'PyQt5', 'numpy'}):
             _flag(out, rel_path, node.lineno,
                   'GUI module imports %r (banned anywhere)' % root)
+    elif cls == 'BRIDGE':
+        # Allow pymol/pmg_tk at ANY level (module + bodies) — this is the
+        # cmd-seam. PyQt5/numpy banned anywhere (Qt stays in GUI modules;
+        # numpy never needed in the bridge — pure modules do the math).
+        for root in sorted(roots & {'PyQt5', 'numpy'}):
+            _flag(out, rel_path, node.lineno,
+                  'bridge module imports %r (banned anywhere)' % root)
     else:  # PURE — default-strict: never anywhere, any level.
         for root in sorted(roots & set(BANNED_ROOTS)):
             _flag(out, rel_path, node.lineno,
