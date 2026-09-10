@@ -207,3 +207,117 @@ def load_demo_set(data_dir=None, set_id='set_a', stacking_path=None):
             ring_atoms=molecule['ring_atoms']))
 
     return (records, errors)
+
+
+def load_upload(path, stacking_path=None):
+    """Load + gate an uploaded SDF/mol2 file -> (records, errors).
+
+    ``path`` is the uploaded file path. ``stacking_path`` is the path to
+    the stacking dataset JSON; None -> skip the stacking lookup
+    (has_stack_entry=False for all records).
+
+    Routes by extension (case-insensitive):
+    - ``.sdf`` -> ``molfile.read_sdf``
+    - ``.mol2`` -> ``molfile.read_mol2``
+    - else -> error ``'unsupported molecule file type: <ext> (use .sdf
+      or .mol2)'``
+
+    Gates per record via ``molfile.gate_set``. Accepted records carry:
+    - id ``'upload_<record_index>'``
+    - name = title (or id when title is blank)
+    - set = ``'__upload__'`` (matches NO interaction -> has_stack_entry
+      False, the STACK-03 skip-policy keying)
+    - source = ``'upload'``
+
+    Multi-record SDF with >= 1 accepted record: each accepted record is
+    written via ``molfile.write_sdf_text`` into
+    ``tempfile.mkdtemp(prefix='srp_upload_')`` as
+    ``'upload_<record_index>.sdf'``; ``record['file']`` = that path.
+    Single-record SDF and mol2 uploads: ``record['file']`` = the
+    original path unchanged.
+
+    Rejected records surface as errors (the gate reason already carries
+    the ``'<name>: <detail>'`` format). File/parse failures
+    (MolFileError / IOError) become error entries, never exceptions.
+
+    Returns ``(records, errors)``.
+    """
+    # Load the stacking dataset (if provided).
+    stacking_data = None
+    if stacking_path is not None:
+        try:
+            stacking_data = molecule_data.load_stacking(stacking_path)
+        except (molecule_data.DataError, IOError) as exc:
+            return ([], ['setloader: cannot load stacking dataset: %s' % exc])
+
+    # Route by extension (case-insensitive).
+    ext = os.path.splitext(path)[1].lower()
+    if ext == '.sdf':
+        try:
+            parsed = molfile.read_sdf(path)
+        except (molfile.MolFileError, IOError) as exc:
+            return ([], ['setloader: cannot read %s: %s'
+                         % (os.path.basename(path), exc)])
+    elif ext == '.mol2':
+        try:
+            parsed = molfile.read_mol2(path)
+        except (molfile.MolFileError, IOError) as exc:
+            return ([], ['setloader: cannot read %s: %s'
+                         % (os.path.basename(path), exc)])
+    else:
+        return ([], ['unsupported molecule file type: %s '
+                     '(use .sdf or .mol2)' % ext])
+
+    # Compute upload names and update titles so gate reasons carry the
+    # correct name (title if non-blank, else 'upload_<record_index>').
+    for record in parsed:
+        title = record.get('title', '').strip()
+        if not title:
+            record['title'] = 'upload_%d' % record['record_index']
+        else:
+            record['title'] = title
+
+    # Gate per record.
+    accepted, rejected = molfile.gate_set(parsed)
+
+    # Rejections: the gate reason already has '<name>: <detail>' format.
+    errors = [reason for _record, reason in rejected]
+
+    # Build records for accepted molecules.
+    records = []
+    if not accepted:
+        return (records, errors)
+
+    is_multi = len(parsed) > 1
+    if is_multi and ext == '.sdf':
+        # Multi-record SDF: split each accepted record into a
+        # single-record SDF file in one srp_upload_ tempdir.
+        upload_dir = tempfile.mkdtemp(prefix='srp_upload_')
+        for record in accepted:
+            idx = record['record_index']
+            split_name = 'upload_%d.sdf' % idx
+            split_path = os.path.join(upload_dir, split_name)
+            with open(split_path, 'w') as handle:
+                handle.write(molfile.write_sdf_text(record))
+            records.append(_build_record(
+                record,
+                id='upload_%d' % idx,
+                name=record['title'],
+                file=split_path,
+                set_id=UPLOAD_SET_ID,
+                source='upload',
+                stacking_data=stacking_data))
+    else:
+        # Single-record SDF or mol2: file = original path.
+        for record in accepted:
+            idx = record['record_index']
+            records.append(_build_record(
+                record,
+                id='upload_%d' % idx,
+                name=record['title'],
+                file=path,
+                set_id=UPLOAD_SET_ID,
+                source='upload',
+                stacking_data=stacking_data))
+
+    return (records, errors)
