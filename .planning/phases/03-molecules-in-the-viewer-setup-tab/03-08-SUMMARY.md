@@ -19,7 +19,7 @@ provides:
   - "smoke/04_demo_e2e_smoke.py — real-demo-data end-to-end smoke (SMOKE-OK VIEWER-DEMO sentinel)"
   - "xtb detect-on-toggle fix (auto-detect surfaces resolved path immediately, not only post-Apply)"
   - "Boundary box linewidth default 2.0 -> 3.0 (clearly visible on dark background)"
-  - "Deferred Phase-5 design decision recorded: edge-on ring orientation (stacks along x/y, BOX_DISPLAY_Z=5.0 confirmed correct)"
+  - "Deferred Phase-5 design decision recorded: edge-on ring orientation (stacks along x/y); box z-depth measured against shipped diameters (anthracene 9.526 A) — BOX_DISPLAY_Z=5.0 retains worst-case fit (no margin); Phase-5 options A (constrain orientation) / B (bump to 6.0 for margin) recorded"
 affects: [Phase 4, Phase 5, Phase 8]
 
 # Tech tracking
@@ -71,7 +71,7 @@ completed: 2026-09-12
 - Human-verify checkpoint APPROVED in real Windows PyMOL 2.5.0: all 10 verify steps PASS, covering SC1-SC5 end-to-end (form renders, demo leg, head pick, upload reject+accept, cleanup-with-own-object, .pse fresh-process session survival, xtb auto+manual, win-cap hessian warning, modeless sanity)
 - INFRA-04 fresh-process contract PROVEN: .pse save -> full PyMOL restart -> session reload (srp objects reappear, no plugin state) -> Cleanup removes exactly srp_* again, user object survives
 - Three fixes made under this plan (all re-verified green): real-demo-data e2e smoke added; xtb detect-on-toggle bug fixed; boundary box linewidth thickened
-- Phase-5 design decision captured: edge-on ring orientation (stacks along x/y) — BOX_DISPLAY_Z=5.0 confirmed correct as-is
+- Phase-5 design decision captured: edge-on ring orientation (stacks along x/y); measured diameters (max anthracene 9.526 A) show BOX_DISPLAY_Z=5.0 retains worst-case fit (10.0 >= 9.526, no margin) — Phase-5 options A/B recorded
 
 ## Task Commits
 
@@ -144,17 +144,33 @@ All three gate runs from the repo root (WSL), exit 0:
 - **Files modified:** serpentrum/pymol_bridge.py
 - **Verification:** no smoke/test asserts linewidth style (verified by grep); step 2 PASS — box clearly visible
 
-## Deferred Design Decision (recorded for Phase 5 planning — user-confirmed)
+## Deferred Design Decision (recorded for Phase 5 planning — user-confirmed; corrected 03-08 follow-up with measured extents)
 
-**Stack presentation: edge-on ring orientation.** Molecule ring planes must be PERPENDICULAR to the screen/xy-plane (edge-on, coin-on-edge) at placement, so the pi-stack normal lies IN the xy-plane and stacks grow along x/y — every stack layer visible to the locked 2D camera.
+**Stack presentation: edge-on ring orientation.** The 2D game engine (Phase 2, continuous-2D, segment centroids in xy) forces the Phase-5 pi-stack normal to lie IN the xy-plane — molecules are presented EDGE-ON (ring planes perpendicular to the screen, coin-on-edge) so stacks grow across the screen (along x/y) and every layer is visible to the locked 2D camera. (Rejected alternative, by the user: rings parallel to screen / stacks along z — the viewer would see only the top molecule.)
 
-Consequences:
-- (a) Box z-extent only ever holds ONE molecule's edge-on width (~5 A) -> `BOX_DISPLAY_Z = 5.0` is correct as-is, no depth change
-- (b) The 2D gameplay boundary/body rules naturally bound the visible stack
-- (c) Phase 5 must orient head/pickup ring frames edge-on at materialization/placement (ring frame normal in-plane)
-- (d) Verify per-molecule edge-on z-width fits 10 A at <=3-ring scope (anthracene/phenanthrene orientation detail)
+**Binding constraint for box z-depth.** In the edge-on presentation a single molecule's own long axis can project onto z. The box z-depth (faces at z = ±BOX_DISPLAY_Z, total 2·BOX_DISPLAY_Z) must accommodate the worst-case single-molecule extent along z, which equals the molecule's point-cloud DIAMETER (max pairwise atom-atom distance) when the long axis is aligned with z.
 
-**Rejected alternative** (by the user): rings parallel to screen, stacks along z — the viewer would see only the top molecule.
+**Measured molecular diameters** (pure-python, `serpentrum.molfile.read_sdf` on the shipped PubChem 3D SDF bytes — no fabrication, no PyMOL; throwaway script under gitignored `tmp/`):
+
+| molecule | atoms | diameter (A) | stored x-span | stored y-span | stored z-span (A) |
+|----------|-------|--------------|---------------|---------------|-------------------|
+| benzene | 12 | 4.962 | 4.315 | 4.962 | 0.000 |
+| naphthalene | 18 | 7.187 | 6.747 | 4.964 | 0.000 |
+| anthracene | 24 | 9.526 | 9.198 | 4.968 | 0.001 |
+| phenanthrene | 24 | 9.296 | 9.296 | 5.556 | 0.002 |
+| biphenyl | 22 | 9.198 | 9.198 | 3.426 | 3.426 |
+| methane (smoke fixture) | 5 | 1.778 | 1.540 | 1.778 | 1.452 |
+
+Max single-molecule diameter = **9.526 A (anthracene)** — the two terminal hydrogens at opposite long-axis ends. Worst-case |z| half-depth needed (diameter/2, no margin, ANY orientation) = 4.763 A. (The stored PubChem conformers are near-planar in xy — z-spans ~0 — but that is the *stored* orientation, not the worst case; the diameter is orientation-independent.)
+
+**Phase-5 options (BOTH recorded with measured numbers):**
+
+- **Option A — constrain orientation (long axis in-plane horizontal).** If Phase 5 orients each head/pickup so its long axis lies in the xy-plane (only the short axis, ~5 A, projects onto z), then `BOX_DISPLAY_Z = 5.0` is ample (10.0 A total >> ~5 A short-axis need). This was the original 03-08 assumption, now backed by the measured short-axis spans (~5 A).
+- **Option B — be worst-case-safe regardless of orientation.** Box z-depth must fit the full diameter with margin: `2·BOX_DISPLAY_Z >= max_diameter + margin`. Current `2·5.0 = 10.0 A >= 9.526 A` — satisfies the rule with NO margin (0.474 A total slack, 0.237 A/face). A margin-safe bump to `BOX_DISPLAY_Z = 6.0` (12.0 A total = 9.526 + 2.0 margin, rounded to a clean 0.5 A) covers any orientation with a 2.0 A cushion.
+
+**Which constant satisfies the rule today:** the CURRENT `BOX_DISPLAY_Z = 5.0` satisfies the no-margin rule (10.0 >= 9.526; worst_need 4.763 <= 5.0) — a single shipped molecule in ANY orientation fits the ±5.0 faces, though with only 0.237 A/face slack and NO margin. It does NOT satisfy the +2.0 A margin rule (10.0 < 11.526). The bumped 6.0 would satisfy the margin rule. The 03-08 follow-up bump condition (`max_diameter/2 > 5.0` = `4.763 > 5.0`) is FALSE, so NO bump was applied — the current value is retained with the measured evidence above. Phase 5 may still choose Option A (keep 5.0, ample under orientation constraint) or Option B's bump to 6.0 (margin cushion, orientation-independent).
+
+**Carried-forward Phase-5 task:** orient head/pickup ring frames edge-on at materialization/placement (ring-frame normal in-plane); the 2D gameplay boundary/body rules bound the visible stack.
 
 ## Success Criteria Mapping (SC1-SC5)
 
@@ -183,7 +199,7 @@ Consequences:
 - xtb detect result surfaces on toggle (not only Apply) — UX requirement for auto-detect feedback
 - Box linewidth 3.0 default (human-verified visible); cgo_build's 2.0 default is a separate, untouched concern
 - Head-dropdown persists records after Cleanup by design (re-Apply support)
-- Edge-on ring orientation locked for Phase 5 (stacks along x/y, BOX_DISPLAY_Z=5.0 correct as-is); parallel-to-screen rejected
+- Edge-on ring orientation locked for Phase 5 (stacks along x/y); measured diameters (max anthracene 9.526 A) — BOX_DISPLAY_Z=5.0 retains worst-case fit (10.0 >= 9.526, no margin; margin-safe bump to 6.0 is Phase-5 Option B); parallel-to-screen rejected
 
 ## Deviations from Plan
 
@@ -203,7 +219,7 @@ None — no external service configuration required. Demo Set A SDFs already shi
 - Phase 3 CLOSED: SC1-SC5 each human-confirmed, SETUP-02..06 + DATA-03 + INFRA-04 delivered
 - The roadmap's human-verify note discharged: uploaded set loads; box renders; cleanup-after-.pse-reload proven in a fresh process
 - Phase 4 (Game Loop & Input) can proceed: Setup tab form, viewer bridge, anchored setup state, srp_* cleanup all verified live
-- Phase 5 must implement edge-on ring orientation at placement (recorded decision above); BOX_DISPLAY_Z=5.0 confirmed correct — no depth change needed
+- Phase 5 must implement edge-on ring orientation at placement (recorded decision above); box z-depth measured against shipped diameters — BOX_DISPLAY_Z=5.0 retains worst-case fit (anthracene 9.526 A <= 10.0 A, no margin); Phase 5 may constrain orientation (Option A, keeps 5.0 ample) or bump to 6.0 for a margin cushion (Option B)
 - Phase 8 will replace the temporary Apply/Cleanup buttons with the canonical 6-button row (SETUP-07/08)
 
 ---
