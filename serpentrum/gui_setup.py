@@ -305,11 +305,21 @@ class SetupTab(QtWidgets.QWidget):
             self.hessian_label.hide()
 
     def _on_xtb_auto_changed(self):
-        """Enable/disable the xtb path field per the auto-detect checkbox."""
+        """Enable/disable the xtb path field per the auto-detect checkbox.
+
+        When auto-detect is ON, surface the detect result immediately
+        (resolved path or not-found note) so the user sees whether xtb
+        was found without clicking Apply. When OFF, revert to the
+        validate() verdict (which includes the 'empty path -> error'
+        rule for a manually-cleared path field).
+        """
         auto = self.xtb_auto_check.isChecked()
         self.xtb_path_field.setEnabled(not auto)
         self.browse_xtb_btn.setEnabled(not auto)
-        self._refresh_status()
+        if not auto or self._loading:
+            self._refresh_status()
+            return
+        self._refresh_status_with_xtb()
 
     def _refresh_status(self):
         """Refresh the status label from validate(collect_state())."""
@@ -322,6 +332,27 @@ class SetupTab(QtWidgets.QWidget):
             self.status_label.setText('warning: ' + '; '.join(warnings))
         else:
             self.status_label.setText('ready')
+
+    def _refresh_status_with_xtb(self):
+        """Show the xtb detect result, unless validate reports errors.
+
+        Errors take precedence (they block Apply anyway). When validate
+        is clean, the status shows the resolved xtb path or a not-found
+        note -- the same detect call Apply uses, surfaced immediately on
+        the auto-detect toggle so the user does not have to Apply first.
+        """
+        setup = self.collect_state()
+        errors, _warnings = setup_logic.validate(setup)
+        if errors:
+            self.status_label.setText('errors: ' + '; '.join(errors))
+            return
+        resolved = xtbenv.detect_binary(
+            configured_path=setup.get('xtb_path'))
+        if resolved:
+            self.status_label.setText('xtb: ' + resolved)
+        else:
+            self.status_label.setText(
+                'xtb not found - set a manual path or add xtb to PATH')
 
     def _on_browse_upload(self):
         """Open a file dialog to choose an upload molecule set file."""
@@ -404,7 +435,12 @@ class SetupTab(QtWidgets.QWidget):
             return
 
         # Repopulate head combo from loaded records, then re-read state.
+        # _loading guard (defense-in-depth alongside _populate_head_combo's
+        # blockSignals) prevents any leaked signal from clobbering the
+        # post-Apply status text set below.
+        self._loading = True
         self._populate_head_combo(records)
+        self._loading = False
         setup = self.collect_state()
 
         # Materialize box + head via the bridge (the only cmd path).
