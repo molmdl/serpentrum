@@ -65,9 +65,10 @@ BOX_DISPLAY_Z = 5.0
 BOX_NAME = 'srp_box'   # CGO boundary box (cgo_build.box_cgo -> cmd.load_cgo)
 HEAD_NAME = 'srp_head'  # head molecule (cmd.load object=, spheres rep)
 
-# Default box appearance (matches cgo_build.box_cgo defaults).
+# Default box appearance. Linewidth 3.0 (thicker than cgo_build's 2.0
+# default) so the boundary box is clearly visible on a dark background.
 DEFAULT_BOX_COLOR = (1.0, 0.4, 0.1)   # warm orange (visible on dark bg)
-DEFAULT_BOX_LINEWIDTH = 2.0
+DEFAULT_BOX_LINEWIDTH = 3.0
 
 
 def load_molecule(path, srp_name=HEAD_NAME, zoom=0):
