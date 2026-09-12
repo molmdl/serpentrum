@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
-**Current focus:** Phase 3 — Molecules in the Viewer & Setup Tab (complete, verified)
+**Current focus:** Phase 4 — Game Loop & Input (executing; wave 1 done + merged, PAUSED before wave 2)
 
 ## Current Position
 
-Phase: 3 of 8 (Molecules in the Viewer & Setup Tab)
-Plan: 8 of 8 in current phase (03-01..03-08 complete)
-Status: Phase complete — verified (5/5 success criteria, 32/32 plan must-haves, 03-VERIFICATION.md status: passed)
-Last activity: 2026-09-12 — Phase 3 executed (5 waves; wave 1 = 3 worktree-parallel plans; human SDF gate + human-verify approved) + verified; 433 tests green, all 5 gates + 3 smokes green
+Phase: 4 of 8 (Game Loop & Input)
+Plan: 3 of 9 complete (04-01..04-03, wave 1 — worktree-parallel, merged to main); paused by user before wave 2
+Status: Wave 1 merged; 451 tests green, 3 default gates green on merged main (smoke 05 LOOP-CAMERA proven in its worktree; full --smoke pass deferred to plan 04-09)
+Last activity: 2026-09-13 — Phase 4 wave 1 executed (04-01 purity prereg, 04-02 TDD hud_logic + engine property, 04-03 bridge movement/lock_camera + REQUIRED smoke 05); worktrees exec/04-01..03 merged in dependency order and removed
 
 Progress: [███████░░░] ~74% (28 of ~38 estimated plans — Phases 1-3 firm at 6+14+8; Phases 4-8 TBD per roadmap estimates)
 
@@ -80,7 +80,7 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-09-12 (execute-phase orchestrator — Phase 3 full run)
-Stopped at: Phase 3 complete + verified (8/8 plans, 03-VERIFICATION.md status: passed); ROADMAP/STATE/REQUIREMENTS updated
+Last session: 2026-09-13 (execute-phase orchestrator — Phase 4, wave 1)
+Stopped at: Wave 1 (04-01, 04-02, 04-03) executed in worktrees, merged to main (52ba79c), gates green, worktrees cleaned; user requested pause before wave 2
 Resume file: None
-Next action: /gsd-plan-phase 4 (Game Loop & Input — input spike first: up/down set_key bindability, Wizard event-mask, focus stealing; fallback = Qt application-level event filter). Alternative per roadmap F∥D/E parallelism: /gsd-plan-phase 6 (xtb pipeline) can run in parallel with Phases 4-5.
+Next action: resume /gsd-execute-phase 4 — remaining: wave 2 (04-04 input wizard + 04-05 GameTab, worktree-parallel; both depend on wave-1), wave 3 (04-06 dialog wiring, then 04-07 HUMAN keys checkpoint), wave 4 (04-08 play wiring), wave 5 (04-09 full gate pass + final human-verify)
