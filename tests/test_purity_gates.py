@@ -329,6 +329,112 @@ class PurityFixtureTest(unittest.TestCase):
         self.assertEqual(violations[0][1], 5)  # the `import pmg_tk` line
         self.assertIn('pmg_tk', violations[0][2])
 
+    # -- case 23: input (BRIDGE, Phase 4 plan 04-01), pymol.wizard + cmd
+    #    at module level clean (mirrors case 11) -------------------------
+    def test_input_bridge_module_level_pymol_clean(self):
+        """Pins serpentrum/input.py as BRIDGE (plan 04-01). Rationale:
+        KeySteerWizard keyboard steering imports `from pymol import cmd` +
+        `from pymol.wizard import Wizard` at module level — see
+        04-RESEARCH-input.md "Module placement under purity rules" table."""
+        root = self.make_tree({
+            'serpentrum/__init__.py': '"""Entry."""\n',
+            'serpentrum/input.py': (
+                '"""Keyboard steering wizard (BRIDGE class)."""\n'
+                'from pymol import cmd\n'
+                'from pymol.wizard import Wizard\n'
+                '\n'
+                '\n'
+                'def install():\n'
+                '    return cmd.get_wizard()\n'
+            ),
+        })
+        self.assertEqual(check_purity.check_tree(root), [])
+
+    # -- case 24: input (BRIDGE), PyQt5 banned (mirrors case 13) --------
+    def test_input_bridge_pyqt5_banned(self):
+        """Qt must NEVER enter the BRIDGE steering module (plan 04-01);
+        if the eventFilter fallback is needed it lives in a separate GUI
+        file — 04-RESEARCH-input.md placement table."""
+        root = self.make_tree({
+            'serpentrum/__init__.py': '"""Entry."""\n',
+            'serpentrum/input.py': (
+                '"""Keyboard steering wizard (BRIDGE class)."""\n'
+                'from PyQt5 import QtWidgets\n'
+            ),
+        })
+        violations = check_purity.check_tree(root)
+        self.assertEqual(len(violations), 1, violations)
+        rel, lineno, msg = violations[0]
+        self.assertEqual(rel, 'serpentrum/input.py')
+        self.assertIn('PyQt5', msg)
+
+    # -- case 25: input (BRIDGE), numpy banned in a body (case 14) ------
+    def test_input_bridge_numpy_banned(self):
+        """numpy is banned in input.py at any level (plan 04-01);
+        BRIDGE grants pymol/pmg_tk only — 04-RESEARCH-input.md
+        placement table (pure modules do the math)."""
+        root = self.make_tree({
+            'serpentrum/__init__.py': '"""Entry."""\n',
+            'serpentrum/input.py': (
+                '"""Keyboard steering wizard (BRIDGE class)."""\n'
+                '\n'
+                '\n'
+                'def helper():\n'
+                '    import numpy\n'
+                '    return numpy.zeros(3)\n'
+            ),
+        })
+        violations = check_purity.check_tree(root)
+        self.assertEqual(len(violations), 1, violations)
+        rel, lineno, msg = violations[0]
+        self.assertEqual(rel, 'serpentrum/input.py')
+        self.assertIn('numpy', msg)
+
+    # -- case 26: gui_game (GUI, Phase 4 plan 04-01), pymol.Qt clean ----
+    def test_gui_game_pymol_qt_clean(self):
+        """Pins serpentrum/gui_game.py as GUI (plan 04-01). Rationale:
+        the Game tab HUD builds widgets from `from pymol.Qt import
+        QtWidgets, QtCore` — see 04-RESEARCH-hud.md Q5 (allowlist edit
+        mirrors gui_setup.py)."""
+        root = self.make_tree({
+            'serpentrum/__init__.py': '"""Entry."""\n',
+            'serpentrum/gui_game.py': (
+                '"""Game tab HUD (GUI class)."""\n'
+                'from pymol.Qt import QtWidgets, QtCore\n'
+            ),
+        })
+        self.assertEqual(check_purity.check_tree(root), [])
+
+    # -- case 27: gui_game (GUI), bare pymol flagged any level (17) -----
+    def test_gui_game_bare_pymol_flagged(self):
+        """bare pymol/pmg_tk banned anywhere in gui_game.py (plan 04-01);
+        the GUI allowlist is pymol.Qt only — 04-RESEARCH-hud.md Q5."""
+        module_level = (
+            '"""Game tab HUD (GUI class)."""\n'
+            'from pymol import cmd\n'
+        )
+        violations = check_purity.check_tree(self.make_tree({
+            'serpentrum/gui_game.py': module_level,
+        }))
+        self.assertEqual(len(violations), 1, violations)
+        self.assertEqual(violations[0][0], 'serpentrum/gui_game.py')
+        self.assertIn('pymol', violations[0][2])
+
+        in_body = (
+            '"""Game tab HUD (GUI class)."""\n'
+            '\n'
+            '\n'
+            'def refresh():\n'
+            '    import pmg_tk.startup\n'
+            '    return pmg_tk.startup\n'
+        )
+        violations = check_purity.check_tree(self.make_tree({
+            'serpentrum/gui_game.py': in_body,
+        }))
+        self.assertEqual(len(violations), 1, violations)
+        self.assertEqual(violations[0][1], 5)  # the `import pmg_tk` line
+        self.assertIn('pmg_tk', violations[0][2])
+
 
 class RealRepoCleanTest(unittest.TestCase):
     """Case 10: the actual repo must pass the checker (validates 01-01
