@@ -19,10 +19,10 @@ path                         class   rule summary
                                      function/method bodies; module level is a
                                      violation. PyQt5/numpy never anywhere.
 ``serpentrum/gui.py``,       GUI     ONLY ``pymol.Qt`` / ``pymol.Qt.*`` import
-``serpentrum/gui_setup.py``          forms (any level); any other pymol*/pmg_tk
-                                     anywhere is a violation. PyQt5/numpy never.
-``serpentrum/pymol_bridge``  BRIDGE  pymol/pmg_tk allowed at any level; PyQt5/
-``.py``                              numpy never; ``.exec_()`` never.
+``serpentrum/gui_setup.py``,         forms (any level); any other pymol*/pmg_tk
+``serpentrum/gui_game.py``           anywhere is a violation. PyQt5/numpy never.
+``serpentrum/pymol_bridge``, BRIDGE  pymol/pmg_tk allowed at any level; PyQt5/
+``serpentrum/input.py``              numpy never; ``.exec_()`` never.
 anything else under          PURE    pymol/pmg_tk/PyQt5/numpy never anywhere
 ``serpentrum/``                      (module level OR function bodies).
 ===========================  ======  =============================================
@@ -55,14 +55,22 @@ import sys
 
 # Explicit GUI allowlist — extend consciously in later phases: a new GUI
 # module must be added here deliberately. Everything else defaults PURE.
-GUI_MODULES = {'serpentrum/gui.py', 'serpentrum/gui_setup.py'}
+# gui_game.py = Game tab HUD (Phase 4, plan 04-05): pymol.Qt only —
+# 04-RESEARCH-hud.md Q5 (edit mirrors gui_setup.py's entry). Entries for
+# not-yet-created files are INERT: check_tree walks existing files only,
+# so RealRepoCleanTest must stay green before AND after the file lands.
+GUI_MODULES = {'serpentrum/gui.py', 'serpentrum/gui_setup.py',
+               'serpentrum/gui_game.py'}
 
 # Explicit cmd-bridge allowlist — the ONLY modules (besides ENTRY-lazy)
 # that may import pymol.cmd. Allows pymol/pmg_tk at module level AND in
 # bodies; bans PyQt5/numpy everywhere (Qt stays in GUI modules; numpy
 # never needed in the bridge — pure modules do the math). .exec_() stays
 # banned (the bridge builds no dialogs).
-BRIDGE_MODULES = {'serpentrum/pymol_bridge.py'}
+# input.py = KeySteerWizard keyboard steering (Phase 4, plan 04-04):
+# pymol.wizard + pymol.cmd at module level, NEVER Qt —
+# 04-RESEARCH-input.md "Module placement under purity rules" table.
+BRIDGE_MODULES = {'serpentrum/pymol_bridge.py', 'serpentrum/input.py'}
 
 ENTRY_MODULE = 'serpentrum/__init__.py'
 
