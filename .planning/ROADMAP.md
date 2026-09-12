@@ -116,7 +116,18 @@ Notes: Avoids molecule-hygiene traps (Pitfall 11) and cleanup semantics (8). Hum
   3. Play happens on a 2D plane with a locked camera, and the boundary box stays clearly visible throughout. [GAME-02]
   4. User sees the rolling info box, elapsed timer and molecules-remaining, and pause/resume + restart work mid-run. [GAME-07]
   5. Speed is constant regardless of snake length. [GAME-08]
-**Plans**: TBD (expected 3; the input spike should precede/steer HUD wiring — loop+countdown can be a parallel plan once the spike lands)
+**Plans**: 9 plans (5 waves)
+
+Plans:
+- [ ] 04-01-PLAN.md — Purity classes: input.py → BRIDGE, gui_game.py → GUI (pre-registration before the modules land) (Wave 1, parallel)
+- [ ] 04-02-PLAN.md — TDD pure HUD display helpers: hud_logic.format_elapsed/remaining_text + engine.molecules_remaining (Wave 1, parallel)
+- [ ] 04-03-PLAN.md — Bridge per-tick movement + locked camera (move_head_delta/lock_camera/unlock_camera) + REQUIRED smoke 05 (Wave 1, parallel)
+- [ ] 04-04-PLAN.md — Wizard steering input route (input.py, BRIDGE) + REQUIRED smoke 06 + real-GUI keys harness (Wave 2, parallel)
+- [ ] 04-05-PLAN.md — GameTab HUD: epoch-guarded countdown + 100 ms tick + pause/restart + anchored game_session (Wave 2, parallel)
+- [ ] 04-06-PLAN.md — Dialog wiring: temp Start button → start_requested → Game tab + begin_game (Wave 3, parallel)
+- [ ] 04-07-PLAN.md — CHECKPOINT: early keys human-verify (wizard route vs eventFilter fallback — failure-cheap) (Wave 3)
+- [ ] 04-08-PLAN.md — Play wiring: camera lock + input install at GO!, single _teardown_round, pause input-gating, focus auto-pause (Wave 4)
+- [ ] 04-09-PLAN.md — Phase-closing gate pass (5 REQUIRED smokes) + final human-verify of the full playable loop (Wave 5)
 
 Notes: **Spike scheduled here (the one open mechanism question):** up/down `set_key` bindability + Wizard event-mask behavior + focus stealing; fallback = Qt application-level event filter (verified design). First human-verify of keys happens here so failure is cheap. Avoids Pitfalls 4, 5 (pause semantics), 9. Pickup stick rendering arrives with pickups in Phase 5.
 
@@ -223,7 +234,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. Plugin Skeleton & Purity Harness | 6/6 | Complete (verified 5/5 must-haves) | 2026-09-06 |
 | 2. Pure Core — Game & Chemistry Logic | 14/14 | Complete (verified 4/4 must-haves) | 2026-09-10 |
 | 3. Molecules in the Viewer & Setup Tab | 8/8 | Complete (verified 5/5 must-haves) | 2026-09-12 |
-| 4. Game Loop & Input | 0/TBD | Not started | - |
+| 4. Game Loop & Input | 0/9 | Planned (9 plans, 5 waves) | - |
 | 5. Stacking & Game Rules Complete | 0/TBD | Not started | - |
 | 6. xtb Pipeline | 0/TBD | Not started | - |
 | 7. Spectra UI | 0/TBD | Not started | - |
