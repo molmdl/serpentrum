@@ -269,6 +269,19 @@ class GameEngine(object):
         self._budget_warned = False
         self._refusal_counts = {}
 
+    @property
+    def molecules_remaining(self):
+        """cap - molecules_stacked (None if cap is None). For the HUD (GAME-07).
+
+        Read-only derived value (plan 04-02, 04-RESEARCH-hud.md Q4:
+        keeps ``cap - molecules_stacked`` arithmetic in the pure engine,
+        WSL-testable; the HUD reads ``engine.molecules_remaining``).
+        Adds NO timing -- the engine has no wall-clock by design
+        (04-RESEARCH-gameloop.md Q5/S3). Reflects reset() immediately
+        (reset rebuilds cap and zeroes the counter in one epoch).
+        """
+        return None if self.cap is None else self.cap - self.molecules_stacked
+
     def _copy_segments(self, segments):
         """Copy the caller's segment list into fresh engine-owned dicts.
 
