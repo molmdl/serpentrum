@@ -5,23 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
-**Current focus:** Phase 2 — Pure Core — Game & Chemistry Logic (complete, verified)
+**Current focus:** Phase 3 — Molecules in the Viewer & Setup Tab (complete, verified)
 
 ## Current Position
 
-Phase: 2 of 8 (Pure Core — Game & Chemistry Logic)
-Plan: 14 of 14 in current phase (02-01..02-14 complete)
-Status: Phase complete — verified (4/4 success criteria, 02-VERIFICATION.md)
-Last activity: 2026-09-10 — Phase 2 executed (4 waves, worktree-parallel) + verified; 383 tests green, zero stubs
+Phase: 3 of 8 (Molecules in the Viewer & Setup Tab)
+Plan: 8 of 8 in current phase (03-01..03-08 complete)
+Status: Phase complete — verified (5/5 success criteria, 32/32 plan must-haves, 03-VERIFICATION.md status: passed)
+Last activity: 2026-09-12 — Phase 3 executed (5 waves; wave 1 = 3 worktree-parallel plans; human SDF gate + human-verify approved) + verified; 433 tests green, all 5 gates + 3 smokes green
 
-Progress: [█████░░░░░] ~53% (20 of ~38 estimated plans — Phases 1-2 firm at 6+14; Phases 3-8 TBD per roadmap estimates)
+Progress: [███████░░░] ~74% (28 of ~38 estimated plans — Phases 1-3 firm at 6+14+8; Phases 4-8 TBD per roadmap estimates)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 20
-- Average duration: ~21 min
-- Total execution time: ~430 min (Phase 1: 104; Phase 2: ~330 executor min incl. 1 re-spawn + 1 session resume)
+- Total plans completed: 28
+- Total execution time: ~600 executor min (Phase 1: 104; Phase 2: ~330; Phase 3: ~165 incl. smoke-04/fix/measure follow-up agents + verifier)
 
 **By Phase:**
 
@@ -29,10 +28,11 @@ Progress: [█████░░░░░] ~53% (20 of ~38 estimated plans — P
 |-------|-------|-------|----------|
 | 1. Plugin Skeleton & Purity Harness | 6/6 | 104 min | 17 min |
 | 2. Pure Core — Game & Chemistry Logic | 14/14 | ~330 min | ~24 min |
+| 3. Molecules in the Viewer & Setup Tab | 8/8 | ~165 min | ~21 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-14 (5 min), 02-13 (22 min), 02-12 (8 min), 02-11 (checkpoint pause + ~20 min continuation), 02-10 (26 min)
-- Trend: worktree-parallel waves held avg ~24 min/plan across 14 plans; the only slow plan was 02-04 (68 min — silent first attempt, re-spawned clean)
+- Phase 3: 03-01 (7 min), 03-02 (22), 03-03 (~15 incl. respawn after /home-symlink permission rejection), 03-04 (10), 03-05 (~8, single-plan direct on main), 03-06 (~25, Windows smokes), 03-07 (20), 03-08 (35 + 3 follow-up agents ~25)
+- Trend: single-plan waves ran directly on main (no worktree) per protocol; the /mnt/c path guard (never /home/lwng symlink) eliminated the permission-rejection failure class
 
 *Updated after each plan completion*
 
@@ -47,40 +47,40 @@ Recent decisions affecting current work:
 - Locked 2026-09-06: Demo Set A only (π-stack); distances pinned at data-prep + human approval; refuse-and-skip fallback (STACK-03)
 - Locked 2026-09-06: `xtb --ohess` (never `-o --hess`); broadened IR; static mode vectors; 6 buttons; crash still completes → spectra
 - Roadmap 2026-09-06: Phase 6 (xtb pipeline) depends only on Phase 2 — run parallel with Phases 3–5; worktree protocol for concurrent plans
-- Roadmap 2026-09-06: v1 requirement count corrected 41 → 44 (listed ID ranges sum to 44; all mapped exactly once)
-- 01-01 2026-09-06: Anchor live state on `pmg_tk.startup._serpentrum` (loader's own plugin namespace) — survives Plugin-Manager reload + double import (Pitfall 7 / INFRA-03); never module globals
-- 01-01 2026-09-06: Entry module is stdlib-only at module level; pymol imported inside `__init_plugin__`, Qt lazily inside `run_plugin_gui` (INFRA-02 — zero-stub py3.6 gate green from commit one)
-- 01-01 2026-09-06: tests/ has NO `__init__.py`; discovery = `python3.6 -m unittest discover -s tests -p "test_*.py" -v` (never `-t .` — fails on py3.6 non-package start dir); every test file repeats the sys.path self-insert
-- 01-02 2026-09-06: gui.py docstrings stay free of banned literals (exec_(, from PyQt5, import PyQt5) — plan verify + 01-03 AST checker grep the raw text and docstring literals false-positive (research §1.4); contracts are documented in checker-safe wording instead
-- 01-03 2026-09-06: Purity gate is AST-based, not grep (docstring-proof; splits module-level vs lazy); "module level" = direct Module.body children only; GUI allowlist accepts only `pymol.Qt`/`pymol.Qt.*` import paths — extend GUI_MODULES deliberately, everything else defaults PURE
-- 01-04 2026-09-06: Under `-cq`, `__file__` IS defined but is PyMOL's own launcher (`...\site-packages\pymol\__init__.py`), NOT the script — smokes resolve ROOT by validating candidates against `serpentrum/__init__.py`; never trust `__file__` (probe-verified; append to `pmg_tk.startup.__path__` itself is safe — regular package, plain list)
-- 01-05 2026-09-06: Offscreen dialog mechanism is a DEAD END — `QApplication([])` constructs OK under `QT_QPA_PLATFORM=offscreen`, but `PluginDialog()` construction kills the process silently (no sentinel, rc 0 through the .bat); smoke 02 stays as the documented experiment, never promote to required; dialog verdicts stay with human-verify
-- 01-05 2026-09-06: Windows-exe probe pattern: `subprocess.run([exe, ...], cwd=ROOT)` with WSL-style exe path + /mnt/c-backed cwd + bare relative args; verdict asserts output content ('xtb version' + 'normal termination') even though direct-exec rc is meaningful
-- 01-05 2026-09-06: winpath is harness/dev-side ONLY (strict ValueError on non-`/mnt` paths, never mangles); the plugin runtime never converts paths (Windows PyMOL + Windows exe + relative names)
-- 01-06 2026-09-06: Human-verify approved in real Windows PyMOL (3 launches): single menu item → 3-tab modeless dialog; single-instance + reload-via-restart hold [SETUP-01, INFRA-03, INFRA-05]
-- 01-06 2026-09-06: Reload phrasing for future docs: "restart PyMOL OR re-add the plugin directory in Plugin Manager" (restart is the simpler, equally valid reload path — step-6 wording confused the user; no code impact)
-- Phase 2 2026-09-10: **π-stack APPROVED (DATA-02, human decision option-a): 3.60 Å centroid-centroid @ 20° off-normal, encoded distance_a 3.383 / lateral_offset_a 1.231** — the dataset file (`serpentrum/data/stacking_pi_stack.json`) is the shipping contract; place_pickup composition: distance_a = perpendicular component, lateral_offset_a = in-plane; composed = sqrt(d²+l²), angle = atan2(l,d). 3.4 Å stays UNVERIFIED/do-not-ship; DATA_SOURCES.md stays DRAFT-headed (full DATA-02/04 checklist sign-off is Phase 8)
-- Phase 2 2026-09-10: Trivial-mode filter is |freq| < threshold ONLY (never sign — dimer modes 7-9 are negative REAL modes; never selection column; never hardcoded 5/6 count — CO2 has 5, dimer has 6)
-- Phase 2 2026-09-10: Spectra broaden(): grid [0, max(3600, max_freq+5σ)], σ = fwhm/2.35482 (runtime-computed in tests), empty modes → pinned zero curve; g98↔vibspectrum correspondence offset = 3N − n_g98_modes, tolerances 0.01 cm⁻¹ / 1e-4 intensity
-- Phase 2 2026-09-10: Engine referee event order: moved → boundary crash → body crash → stacked (≤1 capture/tick) → won; reject_pickup returns canonical ('refused', pickup_id, reason); body model = head-centroid vs polyline edges from segment centroids (skip newest 2 edges), strict < 2.0 Å
-- Phase 2 2026-09-10: GAME-10 sweeps: TURN_DEGREES 90 / TURN_TICKS 6 (15°/tick, 7-sample pre-check); pending applied exactly once at step start (refused requests consumed, fall through to forward motion); sweep-level 180° judged vs sweep target, newest-wins buffering in-sweep; pickup sweep leg is atom-level at 2.5 Å (SWEEP_PICKUP_CLEARANCE_A)
-- Phase 2 2026-09-10: Worktree protocol proven at scale: 14 plans, 3+3+2+3+2+1 parallel spawns across 4 waves — zero shared-index races, zero merge conflicts (disjoint files_modified); executors skip STATE.md during parallel waves (orchestrator-owned)
+- 01-01 2026-09-06: Anchor live state on `pmg_tk.startup._serpentrum` — survives Plugin-Manager reload + double import (Pitfall 7); never module globals
+- 01-03 2026-09-06: Purity gate is AST-based; GUI allowlist accepts only `pymol.Qt`/`pymol.Qt.*`; extend classes deliberately, everything else defaults PURE
+- 01-05 2026-09-06: Offscreen Qt route is a DEAD END (dialog construction kills the process silently) — do NOT retry; dialog verdicts stay human-verify
+- 01-06 2026-09-06: Reload phrasing: "restart PyMOL OR re-add the plugin directory in Plugin Manager"
+- Phase 2 2026-09-10: π-stack APPROVED (DATA-02, human option-a): 3.60 Å centroid-centroid @ 20° off-normal, encoded distance_a 3.383 / lateral_offset_a 1.231; dataset file is the shipping contract; DATA_SOURCES.md stays DRAFT-headed (full sign-off Phase 8)
+- Phase 2 2026-09-10: Engine referee event order moved→boundary→body→stacked→won; body = head-centroid vs polyline edges (skip newest 2), strict < 2.0 Å; GAME-10 sweeps 90°/6 ticks, newest-wins, pickup leg 2.5 Å
+- Phase 2 2026-09-10: Worktree protocol proven at scale; executors skip STATE.md during parallel waves (orchestrator-owned)
+- 03-01 2026-09-11: BRIDGE purity class live — `serpentrum/pymol_bridge.py` may import pymol/pmg_tk at ANY level; PyQt5/numpy banned there at any level; .exec_() banned (bridge builds no dialogs); `serpentrum/gui_setup.py` added to GUI_MODULES
+- 03-02 2026-09-11: molfile — ring count = cyclomatic mu = E−V+C (stdlib BFS); SDF M CHG formal charges summed; mol2 = partial charges only → charge 0 + warning; gate order rings→explicit-H→inorganic-advisory, charge never rejects; write_sdf_text round-trip enables the upload split; MolFileError mirrors xyzio line+snippet contract
+- 03-03 2026-09-11: `setup_logic._xtb_path_problems` delegates to `xtbenv.validate_binary_path` — single source of the rules; messages byte-identical (existing matrix green unmodified)
+- 03-04 2026-09-11: `'__upload__'` sentinel is the skip-policy keying (uploaded molecules NEVER inherit set_a's stacking entry); demo load cross-verifies manifest atom_count/charge/ring_count against parsed reality (mismatch → exclude + error); multi-record uploads split via write_sdf_text into `srp_upload_*` tempdirs
+- 03-05 2026-09-11: Demo Set A shipped — human-placed PubChem 3D SDFs (CIDs 241/931/8418/995/7095), manifest built by tools/build_demo_manifest.py from parsed reality (abort on mismatch); ring_atoms = full 2-core via find_ring_atoms — **Phase 5 must extract ONE planar 6-ring in ring order before stacking.ring_frame (biphenyl's twisted 2-core would fail the 0.15 Å planarity check)**
+- 03-06 2026-09-12: `cmd.get_names('public_objects')` is the proven 2.5.0 type ('all_objects' raises); `cmd.get_extent` returns `[[minx,miny,minz],[maxx,maxy,maxz]]` (nested lists); materialize ALWAYS cleanup_srp() first → unknown head id = box-only scene (srp_head absent, not stale); BOX_DISPLAY_Z 5.0; camera = one-shot cmd.zoom('srp_*') only, NEVER ortho/set_view (Phase 4 owns GAME-02)
+- 03-07 2026-09-12: setup dict's demo_set holds only KNOWN_SETS values ('__upload__' is UI-routing truth only — collect_state maps it to the last real set); hessian warning = inline QLabel shown on cap > 10 (valueChanged + apply_state); xtb detect is advisory in Phase 3; setup dict anchored on `_serpentrum.setup` (initialized on FIRST anchor creation only — reload must not reset it)
+- 03-08 2026-09-12: xtb detect result surfaces IMMEDIATELY on auto-detect toggle (root cause of "status shows ready": toggle path had no detect surfacing, not a signal storm — head-combo already blockSignals'd); box linewidth 3.0; **human-verify APPROVED (10/10 steps, real Windows PyMOL, two rounds)** [SETUP-02..06, DATA-03, INFRA-04 delivered]
+- 03-08 2026-09-12: **Stack presentation for Phase 5 (human-confirmed): molecule ring planes EDGE-ON (perpendicular to screen/xy) so the π-stack normal lies IN the movement plane — stacks grow along x/y, every layer visible to the locked camera.** Measured from shipped SDFs: max diameter = anthracene 9.526 Å (phenanthrene 9.296, biphenyl 9.198, naphthalene 7.187, benzene 4.962); 2·BOX_DISPLAY_Z = 10.0 Å ≥ 9.526 fits worst-case with 0.474 Å slack (no margin); Option B (BOX_DISPLAY_Z 6.0 = +2 Å margin) recorded in 03-08-SUMMARY.md — decide at Phase 5 planning
+- 2026-09-11: Agent path discipline — ALL agent work uses /mnt/c/Users/nglok/Desktop/WORKDIR/molmdl/serpentrum (the /home/lwng/... symlink view triggered permission rejections twice); single-plan waves run directly on main (no worktree)
 
 ### Pending Todos
 
-None yet.
+- **Phase 5 (stacking):** (a) ring-plane orientation — edge-on presentation per the 03-08 decision above; pick BOX_DISPLAY_Z 5.0 (fits, no margin) vs 6.0 (+2 Å margin) using the measured diameters in 03-08-SUMMARY.md; (b) manifest ring_atoms is the FULL 2-core — extract ONE planar 6-ring in ring order before calling stacking.ring_frame (biphenyl planarity trap).
+- Phase 6 calibration pending: QProcess-in-conda smoke, ~100-atom `--ohess` wall time, OMP env (`[TRAIN]`) — Phase 6 can run parallel with Phases 4-5 (depends only on Phase 2).
+- Demo-data FULL DATA_SOURCES.md checklist sign-off (all molecules + attribution) remains Phase 8-gated — Set A data placement is done (03-05), not the full DATA-02/04 approval.
+- `tmp/upload_test/` holds the human-checkpoint upload test files (reject_4_rings.sdf tetracene C18H12, reject_no_h.sdf, accept_naphthalene.sdf, accept_benzene.mol2) — gitignored, disposable, regenerate per 03-08-SUMMARY if needed.
 
 ### Blockers/Concerns
 
-- Demo-data: distance leg of DATA-02 is DONE (π-stack APPROVED 3.6 Å @ 20°); the FULL DATA_SOURCES.md checklist sign-off (all molecules + attribution) remains Phase 8-gated — do not treat Set A data as fully approved.
-- Phase 4 spike: up/down arrow-key binding is the one open mechanism question (Qt event-filter fallback already designed).
-- Phase 6 calibration pending: QProcess-in-conda smoke, ~100-atom `--ohess` wall time, OMP env (`[TRAIN]`).
-- Phase 3 consumes Phase 2's pure halves: setup_logic (schema/defaults), molecule_data (loader), stacking (placement+clash), xyzio (loads), cgo_build (box+head rendering). The bridge wiring is Phase 3's job — nothing in serpentrum/ imports these modules yet (pure modules stay mutually decoupled by design).
-- Offscreen route closed (01-05): headless dialog assertions are impossible in PyMOL 2.5.0's Qt build even with `QT_QPA_PLATFORM=offscreen` + QApplication-first — do NOT spend time on Qt-offscreen spikes again; smoke 02 remains informational (abort → no sentinel → non-blocking FAIL note)
+- Phase 4 spike: up/down arrow-key binding is the one open mechanism question (Qt event-filter fallback already designed). First human-verify of keys lands in Phase 4 so failure is cheap.
+- Offscreen route closed (01-05): headless dialog assertions impossible in PyMOL 2.5.0's Qt build — smoke 02 stays informational (non-blocking FAIL); GUI verdicts are human-verify only.
+- Phase 5 consumes: setloader records (incl. demo ring_atoms), stacking placement math, GAME-10 sweep machinery; watch the two pending-todo items above.
 
 ## Session Continuity
 
-Last session: 2026-09-10 (execute-phase orchestrator — Phase 2 full run)
-Stopped at: Phase 2 complete + verified (14/14 plans, 02-VERIFICATION.md status: passed); ROADMAP/STATE/REQUIREMENTS updated
+Last session: 2026-09-12 (execute-phase orchestrator — Phase 3 full run)
+Stopped at: Phase 3 complete + verified (8/8 plans, 03-VERIFICATION.md status: passed); ROADMAP/STATE/REQUIREMENTS updated
 Resume file: None
-Next action: /gsd-plan-phase 3 (Molecules in the Viewer & Setup Tab — bridge/loader + validation gate, box/camera/cleanup, setup-tab UI; consumes setup_logic + molecule_data + stacking + cgo_build)
+Next action: /gsd-plan-phase 4 (Game Loop & Input — input spike first: up/down set_key bindability, Wizard event-mask, focus stealing; fallback = Qt application-level event filter). Alternative per roadmap F∥D/E parallelism: /gsd-plan-phase 6 (xtb pipeline) can run in parallel with Phases 4-5.

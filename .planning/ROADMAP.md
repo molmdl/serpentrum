@@ -18,7 +18,7 @@ A PyMOL plugin game: steer a molecular head around a bounded box, stack real sma
 
 - [x] **Phase 1: Plugin Skeleton & Purity Harness** - Installable plugin, single-instance modeless 3-tab dialog, purity/test harness built in from commit one *(research A)*
 - [x] **Phase 2: Pure Core — Game & Chemistry Logic** - All game/chemistry rules as stdlib-only WSL-tested modules; spectra parser fixture-first; demo-data approval track starts *(research B)*
-- [ ] **Phase 3: Molecules in the Viewer & Setup Tab** - Configure a game in the Setup tab; box + head molecule materialize in the viewer; uploads gated *(research C)*
+- [x] **Phase 3: Molecules in the Viewer & Setup Tab** - Configure a game in the Setup tab; box + head molecule materialize in the viewer; uploads gated *(research C)*
 - [ ] **Phase 4: Game Loop & Input** - Arrow-key steered movement on a 2D locked-camera plane with countdown, HUD, pause/restart *(research D — input spike)*
 - [ ] **Phase 5: Stacking & Game Rules Complete** - Pickups stack at cited geometry; rigid-pivot turns; collisions end runs; win/crash both reach spectra *(research E)*
 - [ ] **Phase 6: xtb Pipeline** - Async cancellable `xtb --ohess` with verified success contract and calibrated atom-budget guard *(research F — parallel track)*
@@ -94,14 +94,14 @@ Notes: Fixtures-first rule (Pitfalls 1/12); success contract as a pure function 
 **Plans**: 8 plans (5 waves)
 
 Plans:
-- [ ] 03-01-PLAN.md — Purity checker: BRIDGE cmd-seam class + gui_setup GUI allowlist entry (Wave 1)
-- [ ] 03-02-PLAN.md — TDD molfile: SDF V2000/mol2 readers, cyclomatic ring count, ring finder, ≤3-ring gate (Wave 1, parallel)
-- [ ] 03-03-PLAN.md — Unify xtb path validation via xtbenv.validate_binary_path (Wave 1, parallel)
-- [ ] 03-04-PLAN.md — TDD setloader: demo/upload molecule records, __upload__ skip keying, multi-record split (Wave 2)
-- [ ] 03-05-PLAN.md — Demo Set A data: human SDF checkpoint + manifest build + real-file regression tests (Wave 2, parallel; HUMAN GATE)
-- [ ] 03-06-PLAN.md — pymol_bridge cmd-seam + headless viewer smoke (.pse survival, wildcard cleanup) (Wave 3)
-- [ ] 03-07-PLAN.md — SetupTab form + gui.py page-0 registration + anchored setup dict (Wave 4)
-- [ ] 03-08-PLAN.md — Full gate pass + checkpoint:human-verify in real Windows PyMOL (Wave 5)
+- [x] 03-01-PLAN.md — Purity checker: BRIDGE cmd-seam class + gui_setup GUI allowlist entry (Wave 1)
+- [x] 03-02-PLAN.md — TDD molfile: SDF V2000/mol2 readers, cyclomatic ring count, ring finder, ≤3-ring gate (Wave 1, parallel)
+- [x] 03-03-PLAN.md — Unify xtb path validation via xtbenv.validate_binary_path (Wave 1, parallel)
+- [x] 03-04-PLAN.md — TDD setloader: demo/upload molecule records, __upload__ skip keying, multi-record split (Wave 2)
+- [x] 03-05-PLAN.md — Demo Set A data: human SDF checkpoint + manifest build + real-file regression tests (Wave 2, parallel; HUMAN GATE)
+- [x] 03-06-PLAN.md — pymol_bridge cmd-seam + headless viewer smoke (.pse survival, wildcard cleanup) (Wave 3)
+- [x] 03-07-PLAN.md — SetupTab form + gui.py page-0 registration + anchored setup dict (Wave 4)
+- [x] 03-08-PLAN.md — Full gate pass + checkpoint:human-verify in real Windows PyMOL (Wave 5)
 
 Notes: Avoids molecule-hygiene traps (Pitfall 11) and cleanup semantics (8). Human-verify: uploaded set loads; box renders.
 
@@ -222,7 +222,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. Plugin Skeleton & Purity Harness | 6/6 | Complete (verified 5/5 must-haves) | 2026-09-06 |
 | 2. Pure Core — Game & Chemistry Logic | 14/14 | Complete (verified 4/4 must-haves) | 2026-09-10 |
-| 3. Molecules in the Viewer & Setup Tab | 0/8 | Not started | - |
+| 3. Molecules in the Viewer & Setup Tab | 8/8 | Complete (verified 5/5 must-haves) | 2026-09-12 |
 | 4. Game Loop & Input | 0/TBD | Not started | - |
 | 5. Stacking & Game Rules Complete | 0/TBD | Not started | - |
 | 6. xtb Pipeline | 0/TBD | Not started | - |

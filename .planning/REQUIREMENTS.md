@@ -12,11 +12,11 @@ Requirements for initial release. Each maps to roadmap phases.
 > UI note: the popup dialog (tabs, layout, widget patterns) may borrow from `tmp/bioCHEMeleon`'s popup UI — the author's prior PyMOL game plugin.
 
 - [ ] **SETUP-01**: Plugin installs as a standard PyMOL plugin (Plugin Manager or plugin path) and shows a single "serpentrum" menu item that opens one 3-tab dialog (Setup / Game / Spectra)
-- [ ] **SETUP-02**: Setup tab lets the user choose the demo set from a dropdown (v1 ships Set A) or upload their own small-molecule SDF/mol2 set
-- [ ] **SETUP-03**: Setup tab offers preset box sizes via dropdown
-- [ ] **SETUP-04**: Setup tab lets the user select the head molecule from the set, with "random" as default
-- [ ] **SETUP-05**: Setup tab lets the user set the xtb path and xtb env resources, defaulting to auto-detect; detection handles both `xtb` and `xtb.exe`
-- [ ] **SETUP-06**: Setup tab lets the user set the win cap (snake molecule count), with a safe default (~10 molecules / ~100 atoms) and a visible warning when raised beyond the safe atom budget (hessian cost ~N³)
+- [x] **SETUP-02**: Setup tab lets the user choose the demo set from a dropdown (v1 ships Set A) or upload their own small-molecule SDF/mol2 set
+- [x] **SETUP-03**: Setup tab offers preset box sizes via dropdown
+- [x] **SETUP-04**: Setup tab lets the user select the head molecule from the set, with "random" as default
+- [x] **SETUP-05**: Setup tab lets the user set the xtb path and xtb env resources, defaulting to auto-detect; detection handles both `xtb` and `xtb.exe`
+- [x] **SETUP-06**: Setup tab lets the user set the win cap (snake molecule count), with a safe default (~10 molecules / ~100 atoms) and a visible warning when raised beyond the safe atom budget (hessian cost ~N³)
 - [ ] **SETUP-07**: Bottom action row has 6 buttons: Reset, Randomize, Save Setup, Load Setup, Cleanup model, Start
 - [ ] **SETUP-08**: Save Setup writes a setup file that another user (e.g. educator) can Load Setup to reproduce the exact game configuration
 
@@ -56,7 +56,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **DATA-01**: v1 ships Demo Set A (aromatic π-stack: benzene, naphthalene, anthracene, phenanthrene, biphenyl) with PubChem 3D SDFs (CID-cited) and the π-stack interaction dataset
 - [ ] **DATA-02**: Every shipped distance number is pinned from a real source (Janiak 2000 full text or a measured COD CIF) and explicitly approved by the human before shipping — no invented data anywhere
-- [ ] **DATA-03**: Uploaded molecule sets are size-gated (≤3 rings); uploaded molecules without stacking dataset entries follow the skip policy (STACK-03)
+- [x] **DATA-03**: Uploaded molecule sets are size-gated (≤3 rings); uploaded molecules without stacking dataset entries follow the skip policy (STACK-03)
 - [ ] **DATA-04**: DATA_SOURCES.md documents every molecule (source DB, ID, DOI, license, attribution) in the bioCHEMeleon format; CSD/CCDC data is never redistributed (cite published values only; prefer CC0 COD for shipped measurements)
 
 ### Infrastructure & Environment
@@ -64,7 +64,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **INFRA-01**: The full pipeline works in the established environment: WSL python3.6 test suite, headless Windows PyMOL 2.5.0 smokes via cmd.exe, Windows xtb invoked from WSL with path conversion
 - [ ] **INFRA-02**: Pure modules import stdlib + other pure modules only (no pymol/Qt/numpy at module level or in function bodies); Qt imports go through `pymol.Qt` (never `from PyQt5 import`); tests use zero sys.modules stubs
 - [ ] **INFRA-03**: Plugin live state is anchored outside module globals so Plugin-Manager reload or double import never creates duplicate controllers
-- [ ] **INFRA-04**: All game-generated objects live in an `srp_*` namespace; Cleanup model removes only game-generated objects and works in a fresh process after a session save/reload
+- [x] **INFRA-04**: All game-generated objects live in an `srp_*` namespace; Cleanup model removes only game-generated objects and works in a fresh process after a session save/reload
 - [ ] **INFRA-05**: The dialog is modeless; the Qt main thread is never blocked (no modal dialogs during play, no synchronous xtb waits, no threads calling cmd.*)
 - [ ] **INFRA-06**: All code parses under python3.6 (py_compile gate) and matches the Windows conda runtime discipline
 
@@ -123,11 +123,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | SETUP-01 | Phase 1 | Complete |
-| SETUP-02 | Phase 3 | Pending |
-| SETUP-03 | Phase 3 | Pending |
-| SETUP-04 | Phase 3 | Pending |
-| SETUP-05 | Phase 3 | Pending |
-| SETUP-06 | Phase 3 | Pending |
+| SETUP-02 | Phase 3 | Complete |
+| SETUP-03 | Phase 3 | Complete |
+| SETUP-04 | Phase 3 | Complete |
+| SETUP-05 | Phase 3 | Complete |
+| SETUP-06 | Phase 3 | Complete |
 | SETUP-07 | Phase 8 | Pending |
 | SETUP-08 | Phase 8 | Pending |
 | GAME-01 | Phase 4 | Pending |
@@ -153,12 +153,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SPECTRA-06 | Phase 6 | Pending |
 | DATA-01 | Phase 8 | Pending |
 | DATA-02 | Phase 8 | Pending |
-| DATA-03 | Phase 3 | Pending |
+| DATA-03 | Phase 3 | Complete |
 | DATA-04 | Phase 8 | Pending |
 | INFRA-01 | Phase 1 | Complete |
 | INFRA-02 | Phase 1 | Complete |
 | INFRA-03 | Phase 1 | Complete |
-| INFRA-04 | Phase 3 | Pending |
+| INFRA-04 | Phase 3 | Complete |
 | INFRA-05 | Phase 1 | Complete |
 | INFRA-06 | Phase 1 | Complete |
 | DOCS-01 | Phase 8 | Pending |
@@ -176,4 +176,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-09-06*
-*Last updated: 2026-09-06 — roadmap created; traceability populated (44/44 mapped)*
+*Last updated: 2026-09-12 — Phase 3 complete (verified): SETUP-02..06, DATA-03, INFRA-04 marked Complete*
