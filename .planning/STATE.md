@@ -10,17 +10,17 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 ## Current Position
 
 Phase: 4 of 8 (Game Loop & Input)
-Plan: 6 of 9 complete (04-01..04-06; waves 1-2 worktree-parallel merged, 04-06 single-plan direct on main)
-Status: Start flow wired end-to-end (Setup-tab temp Start -> apply -> start_requested(setup) -> Game tab + begin_game); 451 tests green, 3 default gates green on main
-Last activity: 2026-09-13 — Completed 04-06-PLAN.md (Setup-tab Start button + signal; PluginDialog page-1 GameTab registration + _on_start_requested slot)
+Plan: 7 of 9 complete (04-01..04-07; waves 1-2 worktree-parallel merged, 04-06 single-plan direct on main, 04-07 = keys checkpoint finalization)
+Status: Keys human-verify APPROVED — KeySteerWizard do_special route is the shipping input route (no eventFilter fallback); next is 04-08 play wiring
+Last activity: 2026-09-13 — 04-07 keys human-verify APPROVED in real Windows PyMOL (W7 live dispatch + W4/W5/W8 + focus UX accepted; prior-wizard restore proven)
 
-Progress: [████████░░] ~76% (29 of ~38 estimated plans — Phases 1-3 firm at 6+14+8; Phases 4-8 TBD per roadmap estimates)
+Progress: [████████░░] ~79% (30 of ~38 estimated plans — Phases 1-3 firm at 6+14+8; Phases 4-8 TBD per roadmap estimates)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 29
-- Total execution time: ~607 executor min (Phase 1: 104; Phase 2: ~330; Phase 3: ~165 incl. smoke-04/fix/measure follow-up agents + verifier; Phase 4 so far: ~7 for 04-06)
+- Total plans completed: 30
+- Total execution time: ~612 executor min (Phase 1: 104; Phase 2: ~330; Phase 3: ~165 incl. smoke-04/fix/measure follow-up agents + verifier; Phase 4 so far: ~7 for 04-06 + ~5 for 04-07 finalization)
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: [████████░░] ~76% (29 of ~38 estimated plans — P
 | 1. Plugin Skeleton & Purity Harness | 6/6 | 104 min | 17 min |
 | 2. Pure Core — Game & Chemistry Logic | 14/14 | ~330 min | ~24 min |
 | 3. Molecules in the Viewer & Setup Tab | 8/8 | ~165 min | ~21 min |
-| 4. Game Loop & Input (in progress) | 6/9 | n/a (waves 1-2 merged by orchestrator; 04-06 = 7 min direct on main) | - |
+| 4. Game Loop & Input (in progress) | 7/9 | n/a (waves 1-2 merged by orchestrator; 04-06 = 7 min, 04-07 = ~5 min finalization direct on main) | - |
 
 **Recent Trend:**
 - Phase 3: 03-01 (7 min), 03-02 (22), 03-03 (~15 incl. respawn after /home-symlink permission rejection), 03-04 (10), 03-05 (~8, single-plan direct on main), 03-06 (~25, Windows smokes), 03-07 (20), 03-08 (35 + 3 follow-up agents ~25)
@@ -64,25 +64,27 @@ Recent decisions affecting current work:
 - 03-07 2026-09-12: setup dict's demo_set holds only KNOWN_SETS values ('__upload__' is UI-routing truth only — collect_state maps it to the last real set); hessian warning = inline QLabel shown on cap > 10 (valueChanged + apply_state); xtb detect is advisory in Phase 3; setup dict anchored on `_serpentrum.setup` (initialized on FIRST anchor creation only — reload must not reset it)
 - 03-08 2026-09-12: xtb detect result surfaces IMMEDIATELY on auto-detect toggle (root cause of "status shows ready": toggle path had no detect surfacing, not a signal storm — head-combo already blockSignals'd); box linewidth 3.0; **human-verify APPROVED (10/10 steps, real Windows PyMOL, two rounds)** [SETUP-02..06, DATA-03, INFRA-04 delivered]
 - 03-08 2026-09-12: **Stack presentation for Phase 5 (human-confirmed): molecule ring planes EDGE-ON (perpendicular to screen/xy) so the π-stack normal lies IN the movement plane — stacks grow along x/y, every layer visible to the locked camera.** Measured from shipped SDFs: max diameter = anthracene 9.526 Å (phenanthrene 9.296, biphenyl 9.198, naphthalene 7.187, benzene 4.962); 2·BOX_DISPLAY_Z = 10.0 Å ≥ 9.526 fits worst-case with 0.474 Å slack (no margin); Option B (BOX_DISPLAY_Z 6.0 = +2 Å margin) recorded in 03-08-SUMMARY.md — decide at Phase 5 planning
+- 04-07 2026-09-13: Keys checkpoint APPROVED — KeySteerWizard do_special route is the shipping input route (no gui_input.py fallback); click-viewer-to-steer UX accepted for v1 (auto-pause = 04-08 safety net); harness False-flood explained (no-tick buffer-full refusals are correct engine authority)
 - 04-06 2026-09-13: Start flow = HUD research Q1 model A — SetupTab emits `start_requested(setup)`, PluginDialog owns `setCurrentIndex(1)` (self.tabs lives there; GameTab never reaches up to its parent QTabWidget); Start applies FIRST (`_on_apply` bool contract — False on all three modal paths suppresses the emit) so GAME-01 always plays on a materialized scene; temp Start lives in the Setup-tab btn_row (Phase-3 precedent), Phase-8 bottom row byte-identical
 - 2026-09-11: Agent path discipline — ALL agent work uses /mnt/c/Users/nglok/Desktop/WORKDIR/molmdl/serpentrum (the /home/lwng/... symlink view triggered permission rejections twice); single-plan waves run directly on main (no worktree)
 
 ### Pending Todos
 
 - **Phase 5 (stacking):** (a) ring-plane orientation — edge-on presentation per the 03-08 decision above; pick BOX_DISPLAY_Z 5.0 (fits, no margin) vs 6.0 (+2 Å margin) using the measured diameters in 03-08-SUMMARY.md; (b) manifest ring_atoms is the FULL 2-core — extract ONE planar 6-ring in ring order before calling stacking.ring_frame (biphenyl planarity trap).
+- User remark (04-07, 2026-09-13): head currently displays the as-stored SDF orientation (ring flat on the xy board) — a pickup would contact via the hydrogen edge, not the ring face/centroid; edge-on orientation at materialization/placement must land BEFORE any stacking (already the recorded 03-08 carried-forward task).
 - Phase 6 calibration pending: QProcess-in-conda smoke, ~100-atom `--ohess` wall time, OMP env (`[TRAIN]`) — Phase 6 can run parallel with Phases 4-5 (depends only on Phase 2).
 - Demo-data FULL DATA_SOURCES.md checklist sign-off (all molecules + attribution) remains Phase 8-gated — Set A data placement is done (03-05), not the full DATA-02/04 approval.
 - `tmp/upload_test/` holds the human-checkpoint upload test files (reject_4_rings.sdf tetracene C18H12, reject_no_h.sdf, accept_naphthalene.sdf, accept_benzene.mol2) — gitignored, disposable, regenerate per 03-08-SUMMARY if needed.
 
 ### Blockers/Concerns
 
-- Phase 4 spike: up/down arrow-key binding is the one open mechanism question (Qt event-filter fallback already designed). First human-verify of keys lands in Phase 4 so failure is cheap.
+- Phase 4 spike: up/down arrow-key mechanism question RESOLVED 2026-09-13 (04-07 keys checkpoint APPROVED — wizard do_special route dispatches all four arrows live; eventFilter fallback not needed).
 - Offscreen route closed (01-05): headless dialog assertions impossible in PyMOL 2.5.0's Qt build — smoke 02 stays informational (non-blocking FAIL); GUI verdicts are human-verify only.
 - Phase 5 consumes: setloader records (incl. demo ring_atoms), stacking placement math, GAME-10 sweep machinery; watch the two pending-todo items above.
 
 ## Session Continuity
 
-Last session: 2026-09-13 (gsd-executor — Phase 4, plan 04-06, single-plan direct on main)
-Stopped at: Completed 04-06-PLAN.md (commits fe74ef2, 9c5373d + docs metadata)
+Last session: 2026-09-13 (gsd-executor — Phase 4, plan 04-07 keys checkpoint finalization, single-plan direct on main)
+Stopped at: Completed 04-07-PLAN.md (keys human-verify APPROVED — wizard route stands, zero code changes; docs metadata commit)
 Resume file: None
-Next action: resume /gsd-execute-phase 4 — remaining: 04-07 HUMAN keys checkpoint (wave 3), 04-08 play wiring (wave 4: camera lock + input install + auto-pause), 04-09 full gate pass + final human-verify (wave 5)
+Next action: resume /gsd-execute-phase 4 — remaining: wave 4 (04-08 play wiring: camera lock + input install at GO!, single _teardown_round, pause input-gating, focus auto-pause), then wave 5 (04-09 full gate pass + final human-verify)

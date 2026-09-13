@@ -125,7 +125,7 @@ Plans:
 - [ ] 04-04-PLAN.md — Wizard steering input route (input.py, BRIDGE) + REQUIRED smoke 06 + real-GUI keys harness (Wave 2, parallel)
 - [ ] 04-05-PLAN.md — GameTab HUD: epoch-guarded countdown + 100 ms tick + pause/restart + anchored game_session (Wave 2, parallel)
 - [x] 04-06-PLAN.md — Dialog wiring: temp Start button → start_requested → Game tab + begin_game (Wave 3, parallel)
-- [ ] 04-07-PLAN.md — CHECKPOINT: early keys human-verify (wizard route vs eventFilter fallback — failure-cheap) (Wave 3)
+- [x] 04-07-PLAN.md — CHECKPOINT: early keys human-verify (wizard route vs eventFilter fallback — failure-cheap) (Wave 3)
 - [ ] 04-08-PLAN.md — Play wiring: camera lock + input install at GO!, single _teardown_round, pause input-gating, focus auto-pause (Wave 4)
 - [ ] 04-09-PLAN.md — Phase-closing gate pass (5 REQUIRED smokes) + final human-verify of the full playable loop (Wave 5)
 
