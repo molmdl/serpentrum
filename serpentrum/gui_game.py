@@ -5,10 +5,15 @@ the epoch-guarded 3-2-1-GO! countdown, the 100 ms movement tick that
 drives engine.step + pymol_bridge.move_head_delta, the 1 Hz
 wall-clock-delta elapsed label, the molecules-remaining label, the
 read-only rolling info box, pause/resume with the Pitfall 9.3 time
-rebase, and the deterministic restart. Camera lock/unlock and keyboard
-input install are plan 04-08's seams (clearly marked below); the Start
-button + tab switch are plan 04-06; pickups/stacking/win-handoff are
-Phase 5 (the engine is seeded with pickups=None here).
+rebase, and the deterministic restart. Plan 04-08 wired the play
+lifecycle: _begin_play locks the camera (GAME-02) + installs the
+steering wizard (GAME-03) BEFORE the timers start; _teardown_round is
+THE single teardown helper on every end path (Pitfall 9.2); pause gates
+steering via game_input.set_active (wizard stays installed, camera
+stays locked - research D5); request_auto_pause is the focus-stealing
+safety net (input research Q3 (b)). The Start button + tab switch are
+plan 04-06; pickups/stacking/win-handoff are Phase 5 (the engine is
+seeded with pickups=None here).
 
 Purity class: GUI (pymol.Qt ONLY at module level - the check_purity
 GUI_MODULES entry landed in plan 04-01; relative imports of the pure
@@ -26,7 +31,7 @@ _SerpentrumState in __init__.py, this plan's Task 1) and therefore
 survives reload - single-instance by construction, NEVER module globals
 and NEVER widget-owned. Every singleShot countdown callback closes over
 the epoch it was scheduled under and no-ops if stale (Pitfall 9.1 -
-singleShot chains cannot be cancelled); _teardown_live_session bumps
+singleShot chains cannot be cancelled); _teardown_round bumps
 self._epoch to kill any in-flight chain, and begin_game records the
 session epoch AFTER that bump (single epoch authority - no second
 increment).
@@ -47,6 +52,11 @@ from . import game_engine
 from . import hud_logic
 from . import pymol_bridge
 from . import setup_logic
+# ROUTE-AGNOSTIC input seam (04-07 verdict APPROVED the wizard route).
+# Both routes expose identical install/set_active/teardown signatures,
+# so a fallback verdict would swap this ONE line to
+# ``from . import gui_input as game_input`` (nothing else changes).
+from . import input as game_input
 
 # Movement tick: 100 ms with dt=0.1 s passed to engine.step -> exactly
 # 0.3 A/tick at SPEED_A_PER_S=3.0, matching the engine's tested
@@ -156,7 +166,7 @@ class GameTab(QtWidgets.QWidget):
         then runs the epoch-guarded countdown. The movement tick starts
         at _begin_play (after GO!).
         """
-        self._teardown_live_session()  # stops timers, bumps epoch
+        self._teardown_round()  # timers, epoch, input, camera (ONE helper)
         if pymol_bridge.object_exists(pymol_bridge.HEAD_NAME):
             pymol_bridge.place_head(pymol_bridge.HEAD_NAME)
         engine = self._build_engine(setup)
@@ -218,17 +228,26 @@ class GameTab(QtWidgets.QWidget):
         self._run_countdown(n)
 
     def _begin_play(self, scheduled):
+        """GO!: arm lock + steering, then start the timers (gameloop Q6).
+
+        Order matters: lock_camera + input install BEFORE the timers so
+        the first tick is already locked/steerable (GAME-02 + GAME-03
+        arm together at the same instant). Everything runs on the GUI
+        thread (gameloop Q1/T4) - no marshaling.
+        """
         if scheduled != self._epoch:
             return  # stale countdown chain
         session = self._session
         session['start_time'] = time.time()
         session['status'] = 'playing'
+        session['saved_cam'] = pymol_bridge.lock_camera()  # GAME-02 lock
+        self._input_handle = game_input.install(
+            session['engine'].request_direction)           # GAME-03 steering
         self._tick_timer.start()
         self._elapsed_timer.start()
         self._update_remaining()
         self.pause_btn.setEnabled(True)
         self._log('Move with the arrow keys.')
-        # Plan 04-08 wires pymol_bridge.lock_camera() + input install HERE.
 
     # --- tick + elapsed ----------------------------------------------------
 
@@ -303,37 +322,69 @@ class GameTab(QtWidgets.QWidget):
     # --- pause / restart / end ---------------------------------------------
 
     def _on_pause_toggled(self, checked):
-        """Pause: freeze the tick; resume: rebase elapsed (Pitfall 9.3).
+        """Thin guard: needs a live session; delegates to _apply_pause_state.
 
         The SAME tick-timer instance is stop()/start()ed (never a new
-        timer - Pitfall 9.1 double-timer variant). The elapsed refresh
-        is also stopped/started so the label freezes during pause (the
-        formula's rebase lands on resume). Camera stays untouched and
-        input.set_active gating is plan 04-08 - the wizard is a live-GUI
-        concern, not this module's.
+        timer - Pitfall 9.1 double-timer variant).
+        """
+        if self._session is None:
+            return
+        self._apply_pause_state(bool(checked))
+
+    def _apply_pause_state(self, paused):
+        """Pause/resume mechanics shared with request_auto_pause.
+
+        Pause: freeze the tick + elapsed refresh, engine.pause(), gate
+        steering (game_input.set_active(False) - the wizard STAYS
+        installed but grabs-and-no-ops, so paused arrows neither steer
+        nor step movie frames, input research open-q 5 resolution).
+        Resume: rebase elapsed (Pitfall 9.3), engine.resume(), re-arm
+        steering AFTER the paused_accum rebase. The camera is NOT
+        touched on pause - it stays LOCKED (research D5: unlocking
+        would let the user rotate a frozen scene).
         """
         session = self._session
-        if session is None:
-            return
         engine = session['engine']
-        if checked:
+        if paused:
             engine.pause()
             self._tick_timer.stop()
             self._elapsed_timer.stop()
             session['_pause_time'] = time.time()
             session['status'] = 'paused'
+            game_input.set_active(False)  # grab-and-no-op, wizard stays
             self.pause_btn.setText('Resume')
             self._log('paused')
         else:
             pause_time = session.pop('_pause_time', None)
             if pause_time is not None:
                 session['paused_accum'] += time.time() - pause_time
+            game_input.set_active(True)   # re-arm steering after rebase
             engine.resume()
             self._tick_timer.start()
             self._elapsed_timer.start()
             session['status'] = 'playing'
             self.pause_btn.setText('Pause')
             self._log('resumed')
+
+    def request_auto_pause(self):
+        """Q3 focus-stealing mitigation (input research Q3 (b)).
+
+        Called by PluginDialog.focusInEvent: fires on ANY dialog focus
+        gain (including the Start click), but guards on
+        status == 'playing' so countdown/idle/over states are
+        unaffected. blockSignals prevents the programmatic setChecked
+        from re-entering _on_pause_toggled (Pitfall G). The snake can
+        no longer crash unattended while the user reads the HUD.
+        """
+        session = self._session
+        if session is None or session.get('status') != 'playing':
+            return
+        self.pause_btn.blockSignals(True)
+        self.pause_btn.setChecked(True)
+        self.pause_btn.blockSignals(False)
+        self._apply_pause_state(True)
+        self._log('auto-paused (dialog took focus - click Resume, '
+                  'then the 3D viewer)')
 
     def _on_restart(self):
         """Restart mid-game (GAME-07): deterministic re-run of the countdown.
@@ -348,29 +399,49 @@ class GameTab(QtWidgets.QWidget):
         if setup is None:
             self._log('restart needs a setup dict')
             return
-        self._teardown_live_session()
+        self._teardown_round()
         self.begin_game(setup)
 
     def _end_run(self, engine):
-        """End the run: stop BOTH timers, freeze the HUD, log the verdict."""
-        self._tick_timer.stop()
-        self._elapsed_timer.stop()
+        """End the run: log the verdict, then tear down via the ONE helper.
+
+        The verdict is logged FIRST so it stays visible in the info box;
+        timers/input/camera then die with the run via _teardown_round.
+        """
         if self._session is not None:
             self._session['status'] = 'over'
-        self.pause_btn.setEnabled(False)
         self._log('run over: %s' % (engine.result or 'over'))
-        # Plan 04-08 adds full camera/input teardown (_teardown_round) HERE.
+        self._teardown_round()
 
-    def _teardown_live_session(self):
-        """Stop timers + bump epoch (kills stale singleShot chains).
+    def shutdown(self):
+        """dialog-close hook (PluginDialog.closeEvent) - every end path
+        funnels here (Pitfall 9.2)."""
+        self._teardown_round()
 
-        The pause button is reset PROGRAMMATICALLY under blockSignals
-        (Pitfall G: a naked setChecked(False) would fire toggled and
-        trigger a spurious resume on a dead/rebuilt engine).
+    def _teardown_round(self):
+        """THE single teardown helper (Pitfall 9.2), idempotent.
+
+        Called by EVERY end path (begin_game restart/first-start,
+        _end_run crash/won, dialog close via shutdown()): (a) stop both
+        timers; (b) bump the epoch (kills stale singleShot chains);
+        (c) input teardown (teardown(handle) accepts-and-IGNORES on the
+        wizard route - uniform with the fallback route, input research
+        Q5); (d) camera restore - read the CURRENT session BEFORE it
+        could be replaced/nulled, and pop saved_cam so a double-touch
+        unlock is impossible by construction; (e) the pause button is
+        reset PROGRAMMATICALLY under blockSignals (Pitfall G: a naked
+        setChecked(False) would fire toggled and trigger a spurious
+        resume on a dead/rebuilt engine).
         """
         self._tick_timer.stop()
         self._elapsed_timer.stop()
         self._epoch += 1  # any in-flight singleShot now no-ops
+        handle = getattr(self, '_input_handle', None)
+        game_input.teardown(handle)
+        self._input_handle = None
+        session = self._session
+        if session is not None:
+            pymol_bridge.unlock_camera(session.pop('saved_cam', None))
         self.pause_btn.blockSignals(True)
         self.pause_btn.setChecked(False)
         self.pause_btn.setText('Pause')
