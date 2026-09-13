@@ -23,6 +23,12 @@ def _anchor():
             dialog = None       # the single PluginDialog instance
             controller = None   # the single live game controller (later phases)
             setup = None        # the live setup dict (Phase 3, plan 03-07)
+            game_session = None  # the live game session dict (Phase 4, plan 04-05):
+                                 # {'engine', 'epoch', 'start_time', 'paused_accum',
+                                 #  'status'} — created by GameTab.begin_game; None
+                                 #  until first Start; anchor survives Plugin-Manager
+                                 #  reload (Pitfall 7) so the session dict is
+                                 #  single-instance by construction.
         state = _SerpentrumState()
         from . import setup_logic  # lazy relative import (ENTRY-legal)
         state.setup = setup_logic.new_setup()
