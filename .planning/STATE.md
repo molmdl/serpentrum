@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
-**Current focus:** Phase 4 — Game Loop & Input (executing; wave 1 done + merged, PAUSED before wave 2)
+**Current focus:** Phase 4 — Game Loop & Input (executing; waves 1-2 merged, 04-06 done — Start flow wired)
 
 ## Current Position
 
 Phase: 4 of 8 (Game Loop & Input)
-Plan: 3 of 9 complete (04-01..04-03, wave 1 — worktree-parallel, merged to main); paused by user before wave 2
-Status: Wave 1 merged; 451 tests green, 3 default gates green on merged main (smoke 05 LOOP-CAMERA proven in its worktree; full --smoke pass deferred to plan 04-09)
-Last activity: 2026-09-13 — Phase 4 wave 1 executed (04-01 purity prereg, 04-02 TDD hud_logic + engine property, 04-03 bridge movement/lock_camera + REQUIRED smoke 05); worktrees exec/04-01..03 merged in dependency order and removed
+Plan: 6 of 9 complete (04-01..04-06; waves 1-2 worktree-parallel merged, 04-06 single-plan direct on main)
+Status: Start flow wired end-to-end (Setup-tab temp Start -> apply -> start_requested(setup) -> Game tab + begin_game); 451 tests green, 3 default gates green on main
+Last activity: 2026-09-13 — Completed 04-06-PLAN.md (Setup-tab Start button + signal; PluginDialog page-1 GameTab registration + _on_start_requested slot)
 
-Progress: [███████░░░] ~74% (28 of ~38 estimated plans — Phases 1-3 firm at 6+14+8; Phases 4-8 TBD per roadmap estimates)
+Progress: [████████░░] ~76% (29 of ~38 estimated plans — Phases 1-3 firm at 6+14+8; Phases 4-8 TBD per roadmap estimates)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 28
-- Total execution time: ~600 executor min (Phase 1: 104; Phase 2: ~330; Phase 3: ~165 incl. smoke-04/fix/measure follow-up agents + verifier)
+- Total plans completed: 29
+- Total execution time: ~607 executor min (Phase 1: 104; Phase 2: ~330; Phase 3: ~165 incl. smoke-04/fix/measure follow-up agents + verifier; Phase 4 so far: ~7 for 04-06)
 
 **By Phase:**
 
@@ -29,6 +29,7 @@ Progress: [███████░░░] ~74% (28 of ~38 estimated plans — P
 | 1. Plugin Skeleton & Purity Harness | 6/6 | 104 min | 17 min |
 | 2. Pure Core — Game & Chemistry Logic | 14/14 | ~330 min | ~24 min |
 | 3. Molecules in the Viewer & Setup Tab | 8/8 | ~165 min | ~21 min |
+| 4. Game Loop & Input (in progress) | 6/9 | n/a (waves 1-2 merged by orchestrator; 04-06 = 7 min direct on main) | - |
 
 **Recent Trend:**
 - Phase 3: 03-01 (7 min), 03-02 (22), 03-03 (~15 incl. respawn after /home-symlink permission rejection), 03-04 (10), 03-05 (~8, single-plan direct on main), 03-06 (~25, Windows smokes), 03-07 (20), 03-08 (35 + 3 follow-up agents ~25)
@@ -63,6 +64,7 @@ Recent decisions affecting current work:
 - 03-07 2026-09-12: setup dict's demo_set holds only KNOWN_SETS values ('__upload__' is UI-routing truth only — collect_state maps it to the last real set); hessian warning = inline QLabel shown on cap > 10 (valueChanged + apply_state); xtb detect is advisory in Phase 3; setup dict anchored on `_serpentrum.setup` (initialized on FIRST anchor creation only — reload must not reset it)
 - 03-08 2026-09-12: xtb detect result surfaces IMMEDIATELY on auto-detect toggle (root cause of "status shows ready": toggle path had no detect surfacing, not a signal storm — head-combo already blockSignals'd); box linewidth 3.0; **human-verify APPROVED (10/10 steps, real Windows PyMOL, two rounds)** [SETUP-02..06, DATA-03, INFRA-04 delivered]
 - 03-08 2026-09-12: **Stack presentation for Phase 5 (human-confirmed): molecule ring planes EDGE-ON (perpendicular to screen/xy) so the π-stack normal lies IN the movement plane — stacks grow along x/y, every layer visible to the locked camera.** Measured from shipped SDFs: max diameter = anthracene 9.526 Å (phenanthrene 9.296, biphenyl 9.198, naphthalene 7.187, benzene 4.962); 2·BOX_DISPLAY_Z = 10.0 Å ≥ 9.526 fits worst-case with 0.474 Å slack (no margin); Option B (BOX_DISPLAY_Z 6.0 = +2 Å margin) recorded in 03-08-SUMMARY.md — decide at Phase 5 planning
+- 04-06 2026-09-13: Start flow = HUD research Q1 model A — SetupTab emits `start_requested(setup)`, PluginDialog owns `setCurrentIndex(1)` (self.tabs lives there; GameTab never reaches up to its parent QTabWidget); Start applies FIRST (`_on_apply` bool contract — False on all three modal paths suppresses the emit) so GAME-01 always plays on a materialized scene; temp Start lives in the Setup-tab btn_row (Phase-3 precedent), Phase-8 bottom row byte-identical
 - 2026-09-11: Agent path discipline — ALL agent work uses /mnt/c/Users/nglok/Desktop/WORKDIR/molmdl/serpentrum (the /home/lwng/... symlink view triggered permission rejections twice); single-plan waves run directly on main (no worktree)
 
 ### Pending Todos
@@ -80,7 +82,7 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-09-13 (execute-phase orchestrator — Phase 4, wave 1)
-Stopped at: Wave 1 (04-01, 04-02, 04-03) executed in worktrees, merged to main (52ba79c), gates green, worktrees cleaned; user requested pause before wave 2
+Last session: 2026-09-13 (gsd-executor — Phase 4, plan 04-06, single-plan direct on main)
+Stopped at: Completed 04-06-PLAN.md (commits fe74ef2, 9c5373d + docs metadata)
 Resume file: None
-Next action: resume /gsd-execute-phase 4 — remaining: wave 2 (04-04 input wizard + 04-05 GameTab, worktree-parallel; both depend on wave-1), wave 3 (04-06 dialog wiring, then 04-07 HUMAN keys checkpoint), wave 4 (04-08 play wiring), wave 5 (04-09 full gate pass + final human-verify)
+Next action: resume /gsd-execute-phase 4 — remaining: 04-07 HUMAN keys checkpoint (wave 3), 04-08 play wiring (wave 4: camera lock + input install + auto-pause), 04-09 full gate pass + final human-verify (wave 5)
