@@ -55,7 +55,8 @@ SAFETY_DIRS = ('tests', 'smoke', 'tools')
 REQUIRED_SMOKES = ('smoke/01_skeleton_smoke.py',
                     'smoke/03_viewer_bridge_smoke.py',
                     'smoke/04_demo_e2e_smoke.py',
-                    'smoke/05_loop_camera_smoke.py')
+                    'smoke/05_loop_camera_smoke.py',
+                    'smoke/06_input_smoke.py')
 
 SMOKE_BAT = 'C:\\src\\run-conda-pymol.bat'
 SMOKE_TIMEOUT = 90  # seconds, per research Q3
