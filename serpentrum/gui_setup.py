@@ -3,9 +3,9 @@
 Phase 3 plan 03-07. SetupTab(QWidget) is the live configuration form that
 makes SETUP-02..06 user-visible: demo-set dropdown + upload picker, box
 preset, head molecule, xtb auto-detect + manual path, win cap with the
-inline hessian warning, and a persistent validate() status label. Two
-TEMPORARY buttons (Apply / Show in Viewer + Cleanup) live INSIDE this
-page -- the canonical 6-button bottom row (SETUP-07) and save/load
+inline hessian warning, and a persistent validate() status label. Three
+TEMPORARY buttons (Apply / Show in Viewer, Cleanup, Start) live INSIDE
+this page -- the canonical 6-button bottom row (SETUP-07) and save/load
 (SETUP-08) stay in Phase 8; the reserved bottom QHBoxLayout in gui.py is
 untouched.
 
@@ -55,12 +55,17 @@ class SetupTab(QtWidgets.QWidget):
     """The Setup configuration form.
 
     Five QGroupBox sections (Molecule set, Box, Head molecule, xtb, Win
-    cap) + a persistent status QLabel + two temporary buttons (Apply /
-    Show in Viewer, Cleanup). collect_state()/apply_state() round-trip
-    is the established pattern: collect_state reads widgets into the
-    setup dict; apply_state populates widgets from the dict. A _loading
-    flag guards apply_state against cascading signal recompute.
+    cap) + a persistent status QLabel + three temporary buttons (Apply /
+    Show in Viewer, Cleanup, Start). collect_state()/apply_state()
+    round-trip is the established pattern: collect_state reads widgets
+    into the setup dict; apply_state populates widgets from the dict. A
+    _loading flag guards apply_state against cascading signal recompute.
     """
+
+    # Emitted with the collected setup dict when Start succeeds (apply
+    # first). Temp Phase-4 signal; the canonical Start button lives in
+    # the Phase-8 bottom row (SETUP-07).
+    start_requested = QtCore.Signal(object)
 
     def __init__(self, anchor_state=None, parent=None):
         super(SetupTab, self).__init__(parent)
@@ -127,6 +132,7 @@ class SetupTab(QtWidgets.QWidget):
         self.apply_btn = QtWidgets.QPushButton(
             'Apply / Show in Viewer', self)
         self.cleanup_btn = QtWidgets.QPushButton('Cleanup', self)
+        self.start_btn = QtWidgets.QPushButton('Start', self)
 
     def _build_layout(self):
         """Arrange widgets into 5 QGroupBox sections + status + buttons."""
@@ -191,6 +197,7 @@ class SetupTab(QtWidgets.QWidget):
         btn_row = QtWidgets.QHBoxLayout()
         btn_row.addWidget(self.apply_btn)
         btn_row.addWidget(self.cleanup_btn)
+        btn_row.addWidget(self.start_btn)
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
 
@@ -206,6 +213,7 @@ class SetupTab(QtWidgets.QWidget):
         self.win_cap_spin.valueChanged.connect(self._refresh_status)
         self.apply_btn.clicked.connect(self._on_apply)
         self.cleanup_btn.clicked.connect(self._on_cleanup)
+        self.start_btn.clicked.connect(self._on_start)
         self.browse_upload_btn.clicked.connect(self._on_browse_upload)
         self.browse_xtb_btn.clicked.connect(self._on_browse_xtb)
 
@@ -409,6 +417,8 @@ class SetupTab(QtWidgets.QWidget):
           5. Success: status message + xtb detect note + validate
              warnings; write the dict back to the anchor.
         All dialogs are static QMessageBox.warning(self, title, body).
+        Returns True when the scene materialized; False otherwise
+        (Start suppresses its emit on any False path).
         """
         setup = self.collect_state()
         errors, warnings = setup_logic.validate(setup)
@@ -416,7 +426,7 @@ class SetupTab(QtWidgets.QWidget):
             QtWidgets.QMessageBox.warning(
                 self, 'Cannot apply', '\n'.join(errors))
             self.status_label.setText('errors: ' + '; '.join(errors))
-            return
+            return False
 
         # Record building: route by the demo combo's currentData().
         source = self.demo_combo.currentData()
@@ -432,7 +442,7 @@ class SetupTab(QtWidgets.QWidget):
                 self, error_title, '\n'.join(load_errors))
             self.status_label.setText(
                 'load errors: ' + '; '.join(load_errors))
-            return
+            return False
 
         # Repopulate head combo from loaded records, then re-read state.
         # _loading guard (defense-in-depth alongside _populate_head_combo's
@@ -450,7 +460,7 @@ class SetupTab(QtWidgets.QWidget):
                 self, 'Load failed', '\n'.join(bridge_errors))
             self.status_label.setText(
                 'load failed: ' + '; '.join(bridge_errors))
-            return
+            return False
 
         # Success: build the status message.
         parts = ['Box + head materialized']
@@ -471,6 +481,19 @@ class SetupTab(QtWidgets.QWidget):
         # but be explicit after a successful apply).
         if self._anchor is not None:
             self._anchor.setup = self._setup
+        return True
+
+    def _on_start(self):
+        """Start (temp, Phase 4): apply the current config, then emit.
+
+        Applies FIRST so the game always plays on a materialized scene
+        (box + head exist for visible movement -- GAME-01); a failed
+        apply (validation/load/bridge modal) suppresses the emit. Emits
+        the post-apply setup dict; PluginDialog switches tabs and calls
+        GameTab.begin_game (HUD research Q1 model A).
+        """
+        if self._on_apply():
+            self.start_requested.emit(self.collect_state())
 
     def _on_cleanup(self):
         """Cleanup: remove all srp_* objects from the viewer."""
