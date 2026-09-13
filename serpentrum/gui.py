@@ -39,6 +39,13 @@ class PluginDialog(QtWidgets.QDialog):
     (GAME-01) is owned HERE: SetupTab.start_requested connects to
     _on_start_requested, which setCurrentIndex(1) + begin_game(setup);
     the Game tab never reaches up to its parent QTabWidget.
+
+    Lifecycle hooks (plan 04-08): focusInEvent delegates to
+    game_tab.request_auto_pause() (the Q3 focus-stealing safety net --
+    a mid-run dialog focus gain pauses the game before the snake can
+    crash unattended); closeEvent delegates to game_tab.shutdown()
+    (mid-game dialog close tears down timers + wizard + camera lock --
+    Pitfalls 8/9). Both guard with getattr(self, 'game_tab', None).
     """
 
     def __init__(self, parent=None, anchor_state=None):
@@ -82,6 +89,33 @@ class PluginDialog(QtWidgets.QDialog):
         """
         self.tabs.setCurrentIndex(1)
         self.game_tab.begin_game(setup)
+
+    def focusInEvent(self, event):
+        """Q3 focus-stealing safety net (04-RESEARCH-input.md Q3 (b)).
+
+        Fires on ANY dialog focus gain (including the Start click), but
+        request_auto_pause guards on status == 'playing', so
+        countdown/idle/over states are unaffected; only a mid-run focus
+        steal auto-pauses. The snake can no longer crash unattended
+        while the user reads the HUD.
+        """
+        QtWidgets.QDialog.focusInEvent(self, event)
+        game_tab = getattr(self, 'game_tab', None)
+        if game_tab is not None:
+            game_tab.request_auto_pause()
+
+    def closeEvent(self, event):
+        """Mid-game dialog close must tear down the live round (Pitfall
+        8/9: a closed dialog must never leave a locked mouse or an
+        orphaned do_special). shutdown() funnels into the single
+        _teardown_round (timers + epoch + input + camera); the session
+        anchor survives for a later reopen via begin_game's
+        teardown-first discipline.
+        """
+        game_tab = getattr(self, 'game_tab', None)
+        if game_tab is not None:
+            game_tab.shutdown()
+        QtWidgets.QDialog.closeEvent(self, event)
 
     @classmethod
     def find_existing(cls):
