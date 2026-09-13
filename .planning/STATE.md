@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
-**Current focus:** Phase 4 — Game Loop & Input (executing; waves 1-2 merged, 04-06 done — Start flow wired)
+**Current focus:** Phase 4 — Game Loop & Input (executing; 04-08 done — playable loop mechanically complete; 04-09 final verification remains)
 
 ## Current Position
 
 Phase: 4 of 8 (Game Loop & Input)
-Plan: 7 of 9 complete (04-01..04-07; waves 1-2 worktree-parallel merged, 04-06 single-plan direct on main, 04-07 = keys checkpoint finalization)
-Status: Keys human-verify APPROVED — KeySteerWizard do_special route is the shipping input route (no eventFilter fallback); next is 04-08 play wiring
-Last activity: 2026-09-13 — 04-07 keys human-verify APPROVED in real Windows PyMOL (W7 live dispatch + W4/W5/W8 + focus UX accepted; prior-wizard restore proven)
+Plan: 8 of 9 complete (04-01..04-08; waves 1-2 worktree-parallel merged, 04-06..04-08 single-plan direct on main, 04-07 = keys checkpoint finalization)
+Status: Play lifecycle wired — lock+steering arm at GO!, ONE _teardown_round on every end path, pause steering-gated, focus auto-pause + dialog-close teardown live; next is 04-09 phase-closing verification (full gate pass + final human-verify)
+Last activity: 2026-09-13 — 04-08 play wiring complete (gates + 5 smokes green; lifecycle audit: one lock/one unlock/one teardown call site, all end paths funnel through _teardown_round)
 
-Progress: [████████░░] ~79% (30 of ~38 estimated plans — Phases 1-3 firm at 6+14+8; Phases 4-8 TBD per roadmap estimates)
+Progress: [████████░░] ~82% (31 of ~38 estimated plans — Phases 1-3 firm at 6+14+8; Phases 4-8 TBD per roadmap estimates)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 30
+- Total plans completed: 31
 - Total execution time: ~612 executor min (Phase 1: 104; Phase 2: ~330; Phase 3: ~165 incl. smoke-04/fix/measure follow-up agents + verifier; Phase 4 so far: ~7 for 04-06 + ~5 for 04-07 finalization)
 
 **By Phase:**
@@ -29,7 +29,7 @@ Progress: [████████░░] ~79% (30 of ~38 estimated plans — P
 | 1. Plugin Skeleton & Purity Harness | 6/6 | 104 min | 17 min |
 | 2. Pure Core — Game & Chemistry Logic | 14/14 | ~330 min | ~24 min |
 | 3. Molecules in the Viewer & Setup Tab | 8/8 | ~165 min | ~21 min |
-| 4. Game Loop & Input (in progress) | 7/9 | n/a (waves 1-2 merged by orchestrator; 04-06 = 7 min, 04-07 = ~5 min finalization direct on main) | - |
+| 4. Game Loop & Input (in progress) | 8/9 | n/a (waves 1-2 merged by orchestrator; 04-06 = 7 min, 04-07 = ~5 min finalization, 04-08 = 6 min — both direct on main) | - |
 
 **Recent Trend:**
 - Phase 3: 03-01 (7 min), 03-02 (22), 03-03 (~15 incl. respawn after /home-symlink permission rejection), 03-04 (10), 03-05 (~8, single-plan direct on main), 03-06 (~25, Windows smokes), 03-07 (20), 03-08 (35 + 3 follow-up agents ~25)
@@ -65,6 +65,7 @@ Recent decisions affecting current work:
 - 03-08 2026-09-12: xtb detect result surfaces IMMEDIATELY on auto-detect toggle (root cause of "status shows ready": toggle path had no detect surfacing, not a signal storm — head-combo already blockSignals'd); box linewidth 3.0; **human-verify APPROVED (10/10 steps, real Windows PyMOL, two rounds)** [SETUP-02..06, DATA-03, INFRA-04 delivered]
 - 03-08 2026-09-12: **Stack presentation for Phase 5 (human-confirmed): molecule ring planes EDGE-ON (perpendicular to screen/xy) so the π-stack normal lies IN the movement plane — stacks grow along x/y, every layer visible to the locked camera.** Measured from shipped SDFs: max diameter = anthracene 9.526 Å (phenanthrene 9.296, biphenyl 9.198, naphthalene 7.187, benzene 4.962); 2·BOX_DISPLAY_Z = 10.0 Å ≥ 9.526 fits worst-case with 0.474 Å slack (no margin); Option B (BOX_DISPLAY_Z 6.0 = +2 Å margin) recorded in 03-08-SUMMARY.md — decide at Phase 5 planning
 - 04-07 2026-09-13: Keys checkpoint APPROVED — KeySteerWizard do_special route is the shipping input route (no gui_input.py fallback); click-viewer-to-steer UX accepted for v1 (auto-pause = 04-08 safety net); harness False-flood explained (no-tick buffer-full refusals are correct engine authority)
+- 04-08 2026-09-13: Play lifecycle wiring locked — camera lock + wizard install arm BEFORE timers at GO! (gameloop Q6); _teardown_round is THE single teardown on every end path (Pitfall 9.2, idempotent, saved_cam popped); pause keeps wizard installed (set_active grab-and-no-op) AND camera locked (D5); request_auto_pause guards status=='playing' (focusInEvent fires on Start click too); Phase 5 adds pickup teardown INTO _teardown_round, never a second helper
 - 04-06 2026-09-13: Start flow = HUD research Q1 model A — SetupTab emits `start_requested(setup)`, PluginDialog owns `setCurrentIndex(1)` (self.tabs lives there; GameTab never reaches up to its parent QTabWidget); Start applies FIRST (`_on_apply` bool contract — False on all three modal paths suppresses the emit) so GAME-01 always plays on a materialized scene; temp Start lives in the Setup-tab btn_row (Phase-3 precedent), Phase-8 bottom row byte-identical
 - 2026-09-11: Agent path discipline — ALL agent work uses /mnt/c/Users/nglok/Desktop/WORKDIR/molmdl/serpentrum (the /home/lwng/... symlink view triggered permission rejections twice); single-plan waves run directly on main (no worktree)
 
@@ -84,7 +85,7 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-09-13 (gsd-executor — Phase 4, plan 04-07 keys checkpoint finalization, single-plan direct on main)
-Stopped at: Completed 04-07-PLAN.md (keys human-verify APPROVED — wizard route stands, zero code changes; docs metadata commit)
+Last session: 2026-09-13 19:44 UTC (gsd-executor — Phase 4, plan 04-08 play wiring, single-plan direct on main)
+Stopped at: Completed 04-08-PLAN.md (play lifecycle wired; gates + 5 sentinel smokes green; SUMMARY + STATE committed)
 Resume file: None
-Next action: resume /gsd-execute-phase 4 — remaining: wave 4 (04-08 play wiring: camera lock + input install at GO!, single _teardown_round, pause input-gating, focus auto-pause), then wave 5 (04-09 full gate pass + final human-verify)
+Next action: resume /gsd-execute-phase 4 — remaining: wave 5 (04-09 full gate pass + final human-verify of the complete playable loop: camera immovable, steering mid-run, pause/restart, focus auto-pause, no leaks)
