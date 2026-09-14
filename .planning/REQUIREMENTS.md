@@ -24,14 +24,14 @@ Requirements for initial release. Each maps to roadmap phases.
 
 > Turn model (DECIDED 2026-09-06, user-approved): **rigid chain pivot** — pairwise stacking transforms stay frozen at cited geometry at all times; a turn sweeps the whole chain around the head (animated over a few ticks); a turn whose sweep would hit the boundary or body is refused; 180° reversal forbidden. Implemented as GAME-10.
 
-- [ ] **GAME-01**: Clicking Start switches to the Game tab, counts down 3-2-1, then starts movement
-- [ ] **GAME-02**: Gameplay runs on a 2D plane inside the 3D viewer with a locked camera; the box boundary is clearly displayed at all times
-- [ ] **GAME-03**: The head renders as spheres and pickups as sticks; the snake moves forward continuously and the 4 arrow keys steer it (cannot stop)
+- [x] **GAME-01**: Clicking Start switches to the Game tab, counts down 3-2-1, then starts movement
+- [x] **GAME-02**: Gameplay runs on a 2D plane inside the 3D viewer with a locked camera; the box boundary is clearly displayed at all times
+- [x] **GAME-03**: The head renders as spheres and pickups as sticks; the snake moves forward continuously and the 4 arrow keys steer it (cannot stop)
 - [ ] **GAME-04**: Picking up a molecule stacks it onto the snake; molecule count and atom count are tracked (hidden, used for the pre-xtb atom-budget check)
 - [ ] **GAME-05**: Hitting the boundary or the snake's own body (segment-based collision: head-centroid vs chain segments) ends the run, but the snake is still "complete"
 - [ ] **GAME-06**: The player wins when snake length exceeds the configured cap
-- [ ] **GAME-07**: Game tab shows a rolling info box, elapsed timer, molecules-remaining-before-win, a pause/resume toggle, and a restart button that resets to the initial state
-- [ ] **GAME-08**: Snake speed is constant for v1
+- [x] **GAME-07**: Game tab shows a rolling info box, elapsed timer, molecules-remaining-before-win, a pause/resume toggle, and a restart button that resets to the initial state
+- [x] **GAME-08**: Snake speed is constant for v1
 - [ ] **GAME-09**: On completion (win or crash): viewer clears, camera focuses the completed snake, info box shows snake length + total score (molecule count), and "Get Spectra" activates
 - [ ] **GAME-10**: Turning rotates the entire chain as a rigid body (stacking geometry immutable at all times); a turn whose sweep would collide with the boundary or body is refused; 180° reversal is forbidden
 
@@ -130,14 +130,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SETUP-06 | Phase 3 | Complete |
 | SETUP-07 | Phase 8 | Pending |
 | SETUP-08 | Phase 8 | Pending |
-| GAME-01 | Phase 4 | Pending |
-| GAME-02 | Phase 4 | Pending |
-| GAME-03 | Phase 4 | Pending |
+| GAME-01 | Phase 4 | Complete |
+| GAME-02 | Phase 4 | Complete |
+| GAME-03 | Phase 4 | Complete |
 | GAME-04 | Phase 5 | Pending |
 | GAME-05 | Phase 5 | Pending |
 | GAME-06 | Phase 5 | Pending |
-| GAME-07 | Phase 4 | Pending |
-| GAME-08 | Phase 4 | Pending |
+| GAME-07 | Phase 4 | Complete |
+| GAME-08 | Phase 4 | Complete |
 | GAME-09 | Phase 5 | Pending |
 | GAME-10 | Phase 5 | Pending |
 | STACK-01 | Phase 5 | Pending |
@@ -176,4 +176,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-09-06*
-*Last updated: 2026-09-12 — Phase 3 complete (verified): SETUP-02..06, DATA-03, INFRA-04 marked Complete*
+*Last updated: 2026-09-14 — Phase 4 complete (verified 40/40 must-haves): GAME-01, GAME-02, GAME-03, GAME-07, GAME-08 marked Complete*

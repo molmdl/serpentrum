@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
-**Current focus:** Phase 4 — Game Loop & Input (all 9 plans complete; 04-09 phase-closing verification APPROVED — pending phase goal verification, then Phase 5)
+**Current focus:** Phase 4 — Game Loop & Input (COMPLETE + VERIFIED 2026-09-14, 40/40 must-haves) — next: Phase 5 Stacking & Game Rules Complete
 
 ## Current Position
 
-Phase: 4 of 8 (Game Loop & Input)
-Plan: 9 of 9 complete (04-01..04-09; 04-09 phase-closing verification APPROVED — 12/12 live steps + all automated gates green, zero fixes)
-Status: Phase 4 playable loop verified live in real Windows PyMOL 2.5.0 (countdown, constant-speed movement, 4-key steering, locked camera, HUD, pause/restart, crash, teardown leak checks); next is phase goal verification (gsd-verifier), then Phase 5
-Last activity: 2026-09-14 — 04-09 phase-closing human-verify APPROVED (full playable loop live: countdown, constant-speed movement, 4-key steering, locked camera, HUD, pause/restart, crash, teardown leak checks; 451 tests + 5 REQUIRED smokes green, zero fixes)
+Phase: 4 of 8 (Game Loop & Input) — COMPLETE + VERIFIED
+Plan: 9 of 9 complete (04-01..04-09); 04-VERIFICATION.md status: passed (40/40 must-haves: 35/35 plan truths + 5/5 phase success criteria; verifier independently re-ran gates + re-checked wiring)
+Status: Phase 4 playable loop verified live (human 12/12 APPROVED) + structurally (gates green, wiring grep-audited); Phase 5 is next
+Last activity: 2026-09-14 — Phase 4 verified (gsd-verifier: passed, zero gaps) + ROADMAP/REQUIREMENTS finalized
 
 Progress: [████████░░] ~84% (32 of ~38 estimated plans — Phases 1-4 firm at 6+14+8+9; Phases 5-8 TBD per roadmap estimates)
 
@@ -87,8 +87,8 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-09-14 (gsd-executor — Phase 4, plan 04-09 phase-closing verification finalization, single-plan direct on main)
-Stopped at: Completed 04-09-PLAN.md (phase-closing human-verify APPROVED 12/12; 451 tests + 5 REQUIRED smokes green, zero fixes; SUMMARY + STATE + ROADMAP committed)
+Last session: 2026-09-14 (execute-phase orchestrator — Phase 4 full run + verification)
+Stopped at: Phase 4 COMPLETE + VERIFIED (04-VERIFICATION.md: passed, 40/40; REQUIREMENTS GAME-01/02/03/07/08 → Complete; ROADMAP Phase-4 row updated)
 Resume file: None
-Next action: phase goal verification (gsd-verifier, spawned from the execute-phase orchestrator), then ROADMAP/REQUIREMENTS status updates + Phase 5 (Stacking & Game Rules Complete)
+Next action: /gsd-plan-phase 5 (Stacking & Game Rules Complete — consumes setloader records incl. demo ring_atoms, stacking placement math, GAME-10 sweep machinery; edge-on ring orientation at materialization/placement is a hard prerequisite — see the Phase-5 pending todos with the 04-07 user remark)
 Date convention: planning-doc dates are UTC (git commit dates authoritative) — the dev shell is HKT (UTC+8); never stamp from the local date.
