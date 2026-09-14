@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 Phase: 4 of 8 (Game Loop & Input)
 Plan: 9 of 9 complete (04-01..04-09; 04-09 phase-closing verification APPROVED — 12/12 live steps + all automated gates green, zero fixes)
 Status: Phase 4 playable loop verified live in real Windows PyMOL 2.5.0 (countdown, constant-speed movement, 4-key steering, locked camera, HUD, pause/restart, crash, teardown leak checks); next is phase goal verification (gsd-verifier), then Phase 5
-Last activity: 2026-09-13 — 04-09 phase-closing human-verify APPROVED (full playable loop live: countdown, constant-speed movement, 4-key steering, locked camera, HUD, pause/restart, crash, teardown leak checks; 451 tests + 5 REQUIRED smokes green, zero fixes)
+Last activity: 2026-09-14 — 04-09 phase-closing human-verify APPROVED (full playable loop live: countdown, constant-speed movement, 4-key steering, locked camera, HUD, pause/restart, crash, teardown leak checks; 451 tests + 5 REQUIRED smokes green, zero fixes)
 
 Progress: [████████░░] ~84% (32 of ~38 estimated plans — Phases 1-4 firm at 6+14+8+9; Phases 5-8 TBD per roadmap estimates)
 
@@ -68,7 +68,7 @@ Recent decisions affecting current work:
 - 04-07 2026-09-13: Keys checkpoint APPROVED — KeySteerWizard do_special route is the shipping input route (no gui_input.py fallback); click-viewer-to-steer UX accepted for v1 (auto-pause = 04-08 safety net); harness False-flood explained (no-tick buffer-full refusals are correct engine authority)
 - 04-08 2026-09-13: Play lifecycle wiring locked — camera lock + wizard install arm BEFORE timers at GO! (gameloop Q6); _teardown_round is THE single teardown on every end path (Pitfall 9.2, idempotent, saved_cam popped); pause keeps wizard installed (set_active grab-and-no-op) AND camera locked (D5); request_auto_pause guards status=='playing' (focusInEvent fires on Start click too); Phase 5 adds pickup teardown INTO _teardown_round, never a second helper
 - 04-06 2026-09-13: Start flow = HUD research Q1 model A — SetupTab emits `start_requested(setup)`, PluginDialog owns `setCurrentIndex(1)` (self.tabs lives there; GameTab never reaches up to its parent QTabWidget); Start applies FIRST (`_on_apply` bool contract — False on all three modal paths suppresses the emit) so GAME-01 always plays on a materialized scene; temp Start lives in the Setup-tab btn_row (Phase-3 precedent), Phase-8 bottom row byte-identical
-- 04-09 2026-09-13: Phase-4 closing APPROVED (12/12 live + gates green). Observations recorded: wall-crossing ~6 s on medium (plan estimate miscalibrated, speed correct); turn applies at the next 100 ms tick (designed; <1 s perceived latency — potential future game-feel tuning knob, NOT a defect; GAME-08 speed stays locked)
+- 04-09 2026-09-14: Phase-4 closing APPROVED (12/12 live + gates green). Observations recorded: wall-crossing ~6 s on medium (plan estimate miscalibrated, speed correct); turn applies at the next 100 ms tick (designed; <1 s perceived latency — potential future game-feel tuning knob, NOT a defect; GAME-08 speed stays locked)
 - 2026-09-11: Agent path discipline — ALL agent work uses /mnt/c/Users/nglok/Desktop/WORKDIR/molmdl/serpentrum (the /home/lwng/... symlink view triggered permission rejections twice); single-plan waves run directly on main (no worktree)
 
 ### Pending Todos
@@ -87,7 +87,8 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-09-13 (gsd-executor — Phase 4, plan 04-09 phase-closing verification finalization, single-plan direct on main)
+Last session: 2026-09-14 (gsd-executor — Phase 4, plan 04-09 phase-closing verification finalization, single-plan direct on main)
 Stopped at: Completed 04-09-PLAN.md (phase-closing human-verify APPROVED 12/12; 451 tests + 5 REQUIRED smokes green, zero fixes; SUMMARY + STATE + ROADMAP committed)
 Resume file: None
 Next action: phase goal verification (gsd-verifier, spawned from the execute-phase orchestrator), then ROADMAP/REQUIREMENTS status updates + Phase 5 (Stacking & Game Rules Complete)
+Date convention: planning-doc dates are UTC (git commit dates authoritative) — the dev shell is HKT (UTC+8); never stamp from the local date.
