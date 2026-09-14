@@ -119,15 +119,15 @@ Notes: Avoids molecule-hygiene traps (Pitfall 11) and cleanup semantics (8). Hum
 **Plans**: 9 plans (5 waves)
 
 Plans:
-- [ ] 04-01-PLAN.md — Purity classes: input.py → BRIDGE, gui_game.py → GUI (pre-registration before the modules land) (Wave 1, parallel)
-- [ ] 04-02-PLAN.md — TDD pure HUD display helpers: hud_logic.format_elapsed/remaining_text + engine.molecules_remaining (Wave 1, parallel)
-- [ ] 04-03-PLAN.md — Bridge per-tick movement + locked camera (move_head_delta/lock_camera/unlock_camera) + REQUIRED smoke 05 (Wave 1, parallel)
-- [ ] 04-04-PLAN.md — Wizard steering input route (input.py, BRIDGE) + REQUIRED smoke 06 + real-GUI keys harness (Wave 2, parallel)
-- [ ] 04-05-PLAN.md — GameTab HUD: epoch-guarded countdown + 100 ms tick + pause/restart + anchored game_session (Wave 2, parallel)
+- [x] 04-01-PLAN.md — Purity classes: input.py → BRIDGE, gui_game.py → GUI (pre-registration before the modules land) (Wave 1, parallel)
+- [x] 04-02-PLAN.md — TDD pure HUD display helpers: hud_logic.format_elapsed/remaining_text + engine.molecules_remaining (Wave 1, parallel)
+- [x] 04-03-PLAN.md — Bridge per-tick movement + locked camera (move_head_delta/lock_camera/unlock_camera) + REQUIRED smoke 05 (Wave 1, parallel)
+- [x] 04-04-PLAN.md — Wizard steering input route (input.py, BRIDGE) + REQUIRED smoke 06 + real-GUI keys harness (Wave 2, parallel)
+- [x] 04-05-PLAN.md — GameTab HUD: epoch-guarded countdown + 100 ms tick + pause/restart + anchored game_session (Wave 2, parallel)
 - [x] 04-06-PLAN.md — Dialog wiring: temp Start button → start_requested → Game tab + begin_game (Wave 3, parallel)
 - [x] 04-07-PLAN.md — CHECKPOINT: early keys human-verify (wizard route vs eventFilter fallback — failure-cheap) (Wave 3)
-- [ ] 04-08-PLAN.md — Play wiring: camera lock + input install at GO!, single _teardown_round, pause input-gating, focus auto-pause (Wave 4)
-- [ ] 04-09-PLAN.md — Phase-closing gate pass (5 REQUIRED smokes) + final human-verify of the full playable loop (Wave 5)
+- [x] 04-08-PLAN.md — Play wiring: camera lock + input install at GO!, single _teardown_round, pause input-gating, focus auto-pause (Wave 4)
+- [x] 04-09-PLAN.md — Phase-closing gate pass (5 REQUIRED smokes) + final human-verify of the full playable loop (Wave 5)
 
 Notes: **Spike scheduled here (the one open mechanism question):** up/down `set_key` bindability + Wizard event-mask behavior + focus stealing; fallback = Qt application-level event filter (verified design). First human-verify of keys happens here so failure is cheap. Avoids Pitfalls 4, 5 (pause semantics), 9. Pickup stick rendering arrives with pickups in Phase 5.
 

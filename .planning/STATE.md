@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
-**Current focus:** Phase 4 — Game Loop & Input (executing; 04-08 done — playable loop mechanically complete; 04-09 final verification remains)
+**Current focus:** Phase 4 — Game Loop & Input (all 9 plans complete; 04-09 phase-closing verification APPROVED — pending phase goal verification, then Phase 5)
 
 ## Current Position
 
 Phase: 4 of 8 (Game Loop & Input)
-Plan: 8 of 9 complete (04-01..04-08; waves 1-2 worktree-parallel merged, 04-06..04-08 single-plan direct on main, 04-07 = keys checkpoint finalization)
-Status: Play lifecycle wired — lock+steering arm at GO!, ONE _teardown_round on every end path, pause steering-gated, focus auto-pause + dialog-close teardown live; next is 04-09 phase-closing verification (full gate pass + final human-verify)
-Last activity: 2026-09-13 — 04-08 play wiring complete (gates + 5 smokes green; lifecycle audit: one lock/one unlock/one teardown call site, all end paths funnel through _teardown_round)
+Plan: 9 of 9 complete (04-01..04-09; 04-09 phase-closing verification APPROVED — 12/12 live steps + all automated gates green, zero fixes)
+Status: Phase 4 playable loop verified live in real Windows PyMOL 2.5.0 (countdown, constant-speed movement, 4-key steering, locked camera, HUD, pause/restart, crash, teardown leak checks); next is phase goal verification (gsd-verifier), then Phase 5
+Last activity: 2026-09-13 — 04-09 phase-closing human-verify APPROVED (full playable loop live: countdown, constant-speed movement, 4-key steering, locked camera, HUD, pause/restart, crash, teardown leak checks; 451 tests + 5 REQUIRED smokes green, zero fixes)
 
-Progress: [████████░░] ~82% (31 of ~38 estimated plans — Phases 1-3 firm at 6+14+8; Phases 4-8 TBD per roadmap estimates)
+Progress: [████████░░] ~84% (32 of ~38 estimated plans — Phases 1-4 firm at 6+14+8+9; Phases 5-8 TBD per roadmap estimates)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 31
-- Total execution time: ~612 executor min (Phase 1: 104; Phase 2: ~330; Phase 3: ~165 incl. smoke-04/fix/measure follow-up agents + verifier; Phase 4 so far: ~7 for 04-06 + ~5 for 04-07 finalization)
+- Total plans completed: 32
+- Total execution time: ~640 executor min (Phase 1: 104; Phase 2: ~330; Phase 3: ~165 incl. smoke-04/fix/measure follow-up agents + verifier; Phase 4: ~41 incl. waves 1-2 + 04-06..04-09)
 
 **By Phase:**
 
@@ -29,10 +29,11 @@ Progress: [████████░░] ~82% (31 of ~38 estimated plans — P
 | 1. Plugin Skeleton & Purity Harness | 6/6 | 104 min | 17 min |
 | 2. Pure Core — Game & Chemistry Logic | 14/14 | ~330 min | ~24 min |
 | 3. Molecules in the Viewer & Setup Tab | 8/8 | ~165 min | ~21 min |
-| 4. Game Loop & Input (in progress) | 8/9 | n/a (waves 1-2 merged by orchestrator; 04-06 = 7 min, 04-07 = ~5 min finalization, 04-08 = 6 min — both direct on main) | - |
+| 4. Game Loop & Input | 9/9 | ~41 min (waves 1-2 merged by orchestrator; 04-06 = 7 min, 04-07 = ~5 min finalization, 04-08 = 6 min direct on main, 04-09 = ~15 min clean gate pass + checkpoint finalization) | ~4.6 min |
 
 **Recent Trend:**
 - Phase 3: 03-01 (7 min), 03-02 (22), 03-03 (~15 incl. respawn after /home-symlink permission rejection), 03-04 (10), 03-05 (~8, single-plan direct on main), 03-06 (~25, Windows smokes), 03-07 (20), 03-08 (35 + 3 follow-up agents ~25)
+- Phase 4: 04-06 (7), 04-07 (~5 finalization), 04-08 (6), 04-09 (~15 clean gate pass + human-verify 12/12 APPROVED, zero fixes)
 - Trend: single-plan waves ran directly on main (no worktree) per protocol; the /mnt/c path guard (never /home/lwng symlink) eliminated the permission-rejection failure class
 
 *Updated after each plan completion*
@@ -67,6 +68,7 @@ Recent decisions affecting current work:
 - 04-07 2026-09-13: Keys checkpoint APPROVED — KeySteerWizard do_special route is the shipping input route (no gui_input.py fallback); click-viewer-to-steer UX accepted for v1 (auto-pause = 04-08 safety net); harness False-flood explained (no-tick buffer-full refusals are correct engine authority)
 - 04-08 2026-09-13: Play lifecycle wiring locked — camera lock + wizard install arm BEFORE timers at GO! (gameloop Q6); _teardown_round is THE single teardown on every end path (Pitfall 9.2, idempotent, saved_cam popped); pause keeps wizard installed (set_active grab-and-no-op) AND camera locked (D5); request_auto_pause guards status=='playing' (focusInEvent fires on Start click too); Phase 5 adds pickup teardown INTO _teardown_round, never a second helper
 - 04-06 2026-09-13: Start flow = HUD research Q1 model A — SetupTab emits `start_requested(setup)`, PluginDialog owns `setCurrentIndex(1)` (self.tabs lives there; GameTab never reaches up to its parent QTabWidget); Start applies FIRST (`_on_apply` bool contract — False on all three modal paths suppresses the emit) so GAME-01 always plays on a materialized scene; temp Start lives in the Setup-tab btn_row (Phase-3 precedent), Phase-8 bottom row byte-identical
+- 04-09 2026-09-13: Phase-4 closing APPROVED (12/12 live + gates green). Observations recorded: wall-crossing ~6 s on medium (plan estimate miscalibrated, speed correct); turn applies at the next 100 ms tick (designed; <1 s perceived latency — potential future game-feel tuning knob, NOT a defect; GAME-08 speed stays locked)
 - 2026-09-11: Agent path discipline — ALL agent work uses /mnt/c/Users/nglok/Desktop/WORKDIR/molmdl/serpentrum (the /home/lwng/... symlink view triggered permission rejections twice); single-plan waves run directly on main (no worktree)
 
 ### Pending Todos
@@ -85,7 +87,7 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-09-13 19:44 UTC (gsd-executor — Phase 4, plan 04-08 play wiring, single-plan direct on main)
-Stopped at: Completed 04-08-PLAN.md (play lifecycle wired; gates + 5 sentinel smokes green; SUMMARY + STATE committed)
+Last session: 2026-09-13 (gsd-executor — Phase 4, plan 04-09 phase-closing verification finalization, single-plan direct on main)
+Stopped at: Completed 04-09-PLAN.md (phase-closing human-verify APPROVED 12/12; 451 tests + 5 REQUIRED smokes green, zero fixes; SUMMARY + STATE + ROADMAP committed)
 Resume file: None
-Next action: resume /gsd-execute-phase 4 — remaining: wave 5 (04-09 full gate pass + final human-verify of the complete playable loop: camera immovable, steering mid-run, pause/restart, focus auto-pause, no leaks)
+Next action: phase goal verification (gsd-verifier, spawned from the execute-phase orchestrator), then ROADMAP/REQUIREMENTS status updates + Phase 5 (Stacking & Game Rules Complete)
