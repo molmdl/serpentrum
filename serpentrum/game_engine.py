@@ -777,6 +777,16 @@ class GameEngine(object):
         rejected), the counters are NOT rolled back (prevents double-
         decrement) but the refusal count is still tracked and the
         canonical tuple is still returned.
+
+        Won-rollback un-finish (gap G2, phase 5): 'won' fires on the
+        SAME tick as the cap-reaching 'stacked', before the controller
+        runs the clash gate. Rejecting that capture rolls the counters
+        back below cap; without this un-finish the run would stay
+        frozen at finished=True / result='won' with a sub-cap counter.
+        Crashed runs are NEVER un-finished (a crash has no sub-cap
+        rollback semantics); nor is a run whose post-rollback counter
+        still satisfies cap (defensive — unreachable via a single
+        public-API rollback, which always drops cap-ticks by one).
         """
         pickup = None
         for p in self.pickups:
@@ -795,4 +805,15 @@ class GameEngine(object):
         self.molecules_stacked -= 1
         self.atoms_total -= pickup['atoms_n']
         self.pickups_remaining += 1
+        # G2 (phase 5): a cap-reaching capture can be clash-rejected by
+        # the controller AFTER step() already emitted ('won',) and set
+        # finished/result on the same tick (event order is test-pinned
+        # and unchanged). Rolling the counters back below cap makes a
+        # frozen 'won' run a desync — un-finish so play resumes. Crash
+        # results are NEVER un-finished (a crashed run has no sub-cap
+        # rollback semantics).
+        if (self.finished and self.result == 'won' and
+                (self.cap is None or self.molecules_stacked < self.cap)):
+            self.finished = False
+            self.result = None
         return ('refused', pickup_id, reason)
