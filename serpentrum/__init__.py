@@ -29,6 +29,18 @@ def _anchor():
                                  #  until first Start; anchor survives Plugin-Manager
                                  #  reload (Pitfall 7) so the session dict is
                                  #  single-instance by construction.
+            records = None       # the live setloader records list (Phase 5, plan
+                                 # 05-06): written by SetupTab apply on success;
+                                 # consumed by GameTab begin_game for pickups +
+                                 # info content; survives reload like game_session.
+            stacking_data = None  # the live stacking dataset dict (Phase 5): the
+                                  # APPROVED-interaction source for the skip
+                                  # policy and STACK-04 content.
+            last_run = None      # the completed-run handoff record (Phase 5, plan
+                                 # 05-15): {'result', 'molecules_stacked',
+                                 # 'atoms_total', 'chain_objects', 'snake_id'};
+                                 # written at completion, consumed by the Spectra
+                                 # stage (Phases 6/7).
         state = _SerpentrumState()
         from . import setup_logic  # lazy relative import (ENTRY-legal)
         state.setup = setup_logic.new_setup()
