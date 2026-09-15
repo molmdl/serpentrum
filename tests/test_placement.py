@@ -227,5 +227,352 @@ class TestSkipTaxonomy(_FixtureBase):
             self.assertIsInstance(getattr(placement, name), str, name)
 
 
+class TestTailFrameGrowthPolicy(_FixtureBase):
+    """Task 2 pins 1/2/4: tail selection + growth normal policy (G6)."""
+
+    def _first_segment(self):
+        """One placed benzene segment on the empty chain (head as tail)."""
+        placed, _R, _t, ring_c = placement.attempt_place(
+            self.benzene_raw, _BENZENE_RING,
+            self.head_c, _MINUS_HEADING_EAST, self.head_r, self.interaction)
+        return {
+            'molecule_id': 'benzene',
+            'centroid': (ring_c[0], ring_c[1]),
+            'atoms': placed,
+            'atoms_n': len(placed),
+        }
+
+    def test_empty_chain_uses_head_frame_with_minus_heading_normal(self):
+        c, n, r = placement.tail_frame([], self.records_by_id,
+                                       self.head, _BENZENE_RING,
+                                       _HEADING_EAST)
+        # Centroid + ref come straight from the head's own ring frame...
+        for k in range(3):
+            self.assertAlmostEqual(c[k], self.head_c[k], places=12)
+            self.assertAlmostEqual(r[k], self.head_r[k], places=12)
+        # ...while the growth normal is -(heading) promoted to 3D, EXACTLY
+        # (behind the head, snake-canonical) — not the head's ring normal.
+        self.assertEqual(n, _MINUS_HEADING_EAST)
+
+    def test_first_capture_growth_is_along_minus_heading(self):
+        placed, _R, _t, ring_c = placement.attempt_place(
+            self.benzene_raw, _BENZENE_RING,
+            self.head_c, _MINUS_HEADING_EAST, self.head_r, self.interaction)
+        delta = tuple(ring_c[k] - self.head_c[k] for k in range(3))
+        # x decreases (placement lands BEHIND an east-moving head) and the
+        # along-normal component dominates the 20-degree lateral component.
+        self.assertLess(delta[0], 0.0)
+        self.assertGreater(abs(delta[0]), abs(delta[1]))
+
+    def test_nonempty_chain_uses_newest_segments_recomputed_frame(self):
+        seg = self._first_segment()
+        c, n, r = placement.tail_frame([seg], self.records_by_id,
+                                       self.head, _BENZENE_RING,
+                                       _HEADING_EAST)
+        exp_c, exp_n, exp_r = stacking.ring_frame(
+            _xyz(seg['atoms']), _BENZENE_RING)
+        for k in range(3):
+            self.assertAlmostEqual(c[k], exp_c[k], places=12)
+            self.assertAlmostEqual(n[k], exp_n[k], places=12)
+            self.assertAlmostEqual(r[k], exp_r[k], places=12)
+
+    def test_recomputed_normal_equals_placement_growth_normal(self):
+        # tail_frame RECOMPUTES the newest segment's frame from its current
+        # atoms; for a same-species stack that recomputed normal must equal
+        # the growth normal used at placement (here exactly (-1, 0, 0)) —
+        # the linear staircase the research measured clash-safe.
+        seg = self._first_segment()
+        growth_used = _MINUS_HEADING_EAST
+        _c, n, _r = placement.tail_frame([seg], self.records_by_id,
+                                         self.head, _BENZENE_RING,
+                                         _HEADING_EAST)
+        dot = sum(n[k] * growth_used[k] for k in range(3))
+        self.assertGreater(dot, 0.99)
+        # Chain-continuity companion: the centroid step head -> segment
+        # points along the growth normal at the dataset's pinned 20 deg
+        # (dot = 3.383/3.6000069 = 0.93972 exactly — the off-normal angle
+        # makes a centroid-based dot > 0.99 arithmetically impossible, so
+        # continuity is pinned against its exact geometric value).
+        c2, _n, _r = placement.tail_frame([seg], self.records_by_id,
+                                          self.head, _BENZENE_RING,
+                                          _HEADING_EAST)
+        delta3 = tuple(c2[k] - self.head_c[k] for k in range(3))
+        mag = math.sqrt(sum(v * v for v in delta3))
+        cos_step = sum(growth_used[k] * (delta3[k] / mag) for k in range(3))
+        expected_cos = (self.interaction['distance_a'] /
+                        math.sqrt(self.interaction['distance_a'] ** 2 +
+                                  self.interaction['lateral_offset_a'] ** 2))
+        self.assertAlmostEqual(cos_step, expected_cos, places=9)
+        self.assertGreater(cos_step, 0.93)
+
+    def test_staircase_second_step_is_clean_and_exact(self):
+        seg1 = self._first_segment()
+        c2, n2, r2 = placement.tail_frame([seg1], self.records_by_id,
+                                          self.head, _BENZENE_RING,
+                                          _HEADING_EAST)
+        placed2, _R2, _t2, ring_c2 = placement.attempt_place(
+            self.benzene_raw, _BENZENE_RING, c2, n2, r2, self.interaction)
+        step = tuple(ring_c2[k] - c2[k] for k in range(3))
+        step_len = math.sqrt(sum(v * v for v in step))
+        composed = math.sqrt(self.interaction['distance_a'] ** 2 +
+                             self.interaction['lateral_offset_a'] ** 2)
+        self.assertAlmostEqual(step_len, composed, places=9)
+        existing = _xyz(self.head) + _xyz(seg1['atoms'])
+        violation = placement.gate(placed2, existing,
+                                   _BOX_SMALL[0], _BOX_SMALL[1],
+                                   _DISPLAY_Z)
+        self.assertIsNone(violation)
+
+
+class TestPlacementExactness(_FixtureBase):
+    """Task 2 pin 3 (STACK-01): the placed geometry reproduces the APPROVED
+    dataset encoding EXACTLY — distance_a/lateral_offset_a decompose the
+    measured centroid step, and the composed value rounds to the approved
+    3.60 A @ 20 deg headline (Janiak 2000; encoding tolerance inherited
+    from test_stacking_dataset.py: the file stores 3.383/1.231, whose
+    exact composition sqrt(3.383^2+1.231^2) = 3.6000069 A rounds to 3.6000
+    and atan2(1.231, 3.383) = 19.9953 deg rounds to 20.0 deg — exactness is
+    pinned against the FORMULA, the headline against its rounding)."""
+
+    def test_placed_centroid_distance_matches_dataset_formula_exactly(self):
+        _placed, _R, _t, ring_c = placement.attempt_place(
+            self.benzene_raw, _BENZENE_RING,
+            self.head_c, _MINUS_HEADING_EAST, self.head_r, self.interaction)
+        delta = tuple(ring_c[k] - self.head_c[k] for k in range(3))
+        dist = math.sqrt(sum(v * v for v in delta))
+        composed = math.sqrt(self.interaction['distance_a'] ** 2 +
+                             self.interaction['lateral_offset_a'] ** 2)
+        self.assertAlmostEqual(dist, composed, places=9)
+        self.assertAlmostEqual(dist, 3.6000, places=4)  # headline rounding
+
+    def test_placed_components_and_off_normal_angle_reproduce_encoding(self):
+        _placed, _R, _t, ring_c = placement.attempt_place(
+            self.benzene_raw, _BENZENE_RING,
+            self.head_c, _MINUS_HEADING_EAST, self.head_r, self.interaction)
+        delta = tuple(ring_c[k] - self.head_c[k] for k in range(3))
+        along_normal = sum(delta[k] * _MINUS_HEADING_EAST[k]
+                           for k in range(3))
+        dist = math.sqrt(sum(v * v for v in delta))
+        lateral = math.sqrt(max(0.0, dist * dist - along_normal ** 2))
+        self.assertAlmostEqual(along_normal,
+                               self.interaction['distance_a'], places=9)
+        self.assertAlmostEqual(lateral,
+                               self.interaction['lateral_offset_a'],
+                               places=9)
+        angle = math.degrees(math.atan2(lateral, along_normal))
+        # Formula-exact reproduction of test_stacking_dataset's pinned
+        # expression, then the same 0.5 deg headline tolerance it uses.
+        self.assertAlmostEqual(
+            angle,
+            math.degrees(math.atan2(self.interaction['lateral_offset_a'],
+                                    self.interaction['distance_a'])),
+            places=9)
+        self.assertLessEqual(abs(angle - 20.0), 0.5)
+
+    def test_R_and_t_rigidly_explain_every_placed_atom(self):
+        placed, R, t, _ring_c = placement.attempt_place(
+            self.benzene_raw, _BENZENE_RING,
+            self.head_c, _MINUS_HEADING_EAST, self.head_r, self.interaction)
+        self.assertEqual(len(placed), len(self.benzene_raw))
+        self.assertEqual(len(R), 3)
+        self.assertEqual(len(t), 3)
+        src = _xyz(self.benzene_raw)
+        for i, p in enumerate(src):
+            expect = tuple(sum(R[k][j] * p[j] for j in range(3)) + t[k]
+                           for k in range(3))
+            got = placed[i][1:]
+            for k in range(3):
+                self.assertAlmostEqual(got[k], expect[k], places=9)
+        self.assertEqual([a[0] for a in placed],
+                         [a[0] for a in self.benzene_raw])
+
+
+class TestClashGateAssembly(_FixtureBase):
+    """Task 2 pin 5 (STACK-05): gate() is a THIN 3D-box wrapper over
+    stacking.check_clash; the existing set = head + segments + other live
+    pickups; a clean 3.6 A stack passes."""
+
+    def _placed_on_head(self):
+        placed, _R, _t, _rc = placement.attempt_place(
+            self.benzene_raw, _BENZENE_RING,
+            self.head_c, _MINUS_HEADING_EAST, self.head_r, self.interaction)
+        return placed
+
+    def test_thin_wrapper_matches_check_clash_on_3d_box(self):
+        placed = self._placed_on_head()
+        existing = _xyz(self.head) + _xyz(self.biphenyl_raw)
+        wrapped = placement.gate(placed, existing,
+                                 _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
+        direct = stacking.check_clash(
+            _xyz(placed), _xyz(existing),
+            (_BOX_SMALL[0][0], _BOX_SMALL[0][1], -_DISPLAY_Z),
+            (_BOX_SMALL[1][0], _BOX_SMALL[1][1], _DISPLAY_Z))
+        self.assertEqual(wrapped, direct)
+
+    def test_clean_3_6_a_stack_passes_over_full_existing_set(self):
+        seg1 = {'molecule_id': 'benzene', 'centroid': (0.0, 0.0),
+                'atoms': self._placed_on_head(),
+                'atoms_n': len(self.benzene_raw)}
+        # gate sees head + segments + OTHER live pickups (< 2.5 A away from
+        # each other but > 2.5 A from the landing zone): the landing zone
+        # next to the head stays clean, so none of the three blocks it.
+        live_far = [('C', 8.0, 8.0, 0.0), ('H', 9.0, 8.5, 0.0)]
+        live_far2 = [('C', 8.0, 6.0, 0.0)]
+        existing = (_xyz(self.head) + _xyz(seg1['atoms']) +
+                    _xyz(live_far) + _xyz(live_far2))
+        c2, n2, r2 = placement.tail_frame([seg1], self.records_by_id,
+                                          self.head, _BENZENE_RING,
+                                          _HEADING_EAST)
+        placed2, _R, _t, _rc = placement.attempt_place(
+            self.benzene_raw, _BENZENE_RING, c2, n2, r2, self.interaction)
+        self.assertIsNone(placement.gate(placed2, existing,
+                                         _BOX_SMALL[0], _BOX_SMALL[1],
+                                         _DISPLAY_Z))
+
+    def test_placement_overlapping_a_live_pickup_is_an_atom_violation(self):
+        placed = self._placed_on_head()
+        # A still-live pickup occupying the landing zone blocks the stack
+        # (research open Q7: other live pickups are part of the gate set).
+        existing = _xyz(self.head) + placed  # coincident live pickup
+        violation = placement.gate(placed, existing,
+                                   _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
+        self.assertIsNotNone(violation)
+        self.assertEqual(violation['kind'], 'atom')
+
+    def test_placement_past_the_display_z_face_is_a_wall_violation(self):
+        placed = [('C', 0.0, 0.0, _DISPLAY_Z + 0.5)]
+        violation = placement.gate(placed, [],
+                                   _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
+        self.assertIsNotNone(violation)
+        self.assertEqual(violation['kind'], 'wall')
+        self.assertAlmostEqual(violation['distance'], 0.5, places=9)
+
+    def test_placement_past_the_xy_face_is_a_wall_violation(self):
+        placed = [('C', _BOX_SMALL[1][0] + 0.25, 0.0, 0.0)]
+        violation = placement.gate(placed, [],
+                                   _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
+        self.assertEqual(violation['kind'], 'wall')
+        self.assertAlmostEqual(violation['distance'], 0.25, places=9)
+
+    def test_z_bounds_are_symmetric_about_zero(self):
+        high = placement.gate([('C', 0.0, 0.0, 5.5)], [],
+                              _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
+        low = placement.gate([('C', 0.0, 0.0, -5.5)], [],
+                             _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
+        self.assertEqual(high, low)
+
+
+class TestBiphenylRefusal(_FixtureBase):
+    """Task 2 pin 6 (locked decision: biphenyl is the permanent refuse-path
+    demonstrator — DATA OBSERVATION, never to be fixed): the shipped
+    biphenyl conformer has its rings at 90.00 deg, so every biphenyl stack
+    at dataset geometry clashes (matrix minima 0.688-2.145 A < 2.5 A).
+    resolve() must route it to ('refused', REFUSE_ATOM) with the measured
+    distance, never to 'placed' and never by fudging the data.
+
+    display_z=7.0 in this test only lifts the DISPLAY box above biphenyl's
+    z-extent (probe: max |z| 6.914 A) so the ATOM check is what refuses —
+    the plan pins the atom refusal specifically."""
+
+    def _biphenyl_pickup(self):
+        record = self.records_by_id['biphenyl']
+        return {
+            'molecule_id': 'biphenyl',
+            'id': 'biphenyl',
+            'set': record['set'],
+            'has_stack_entry': record['has_stack_entry'],
+            'stack_ring': record['stack_ring'],
+            'atoms': self.biphenyl_raw,
+            'atoms_n': len(self.biphenyl_raw),
+        }
+
+    def test_biphenyl_refuses_with_atom_clash_and_distance_detail(self):
+        outcome = placement.resolve(
+            self._biphenyl_pickup(), self.records_by_id, self.stacking_data,
+            self.head, _BENZENE_RING, _HEADING_EAST,
+            [], _xyz(self.head),
+            _BOX_SMALL[0], _BOX_SMALL[1], _WIDE_DISPLAY_Z)
+        self.assertEqual(outcome['status'], 'refused')
+        self.assertEqual(outcome['code'], placement.REFUSE_ATOM)
+        self.assertEqual(set(outcome), {'status', 'code', 'detail'})
+        # Detail carries the measured clash distance formatted '%.2f A'.
+        tail = outcome['detail']
+        self.assertTrue(tail.endswith(' A'), tail)
+        measured = float(tail[:-2])
+        self.assertLess(measured, stacking.CLASH_THRESHOLD_A)
+        self.assertGreater(measured, 0.0)
+
+
+class TestResolveOrchestrator(_FixtureBase):
+    """Task 2 pin 7 (STACK-01/03/05 outcome contract): resolve() assembles
+    skip -> tail -> place -> gate and returns the exact outcome dicts. As a
+    PURE function it never mutates engine state, so the GUI can ALWAYS call
+    engine.reject_pickup on skip/refuse (capture/rollback symmetry — the
+    win-vs-clash desync fix itself is plan 05-04's engine change)."""
+
+    def _benzene_pickup(self):
+        record = self.records_by_id['benzene']
+        return {
+            'molecule_id': 'benzene',
+            'id': 'benzene',
+            'set': record['set'],
+            'has_stack_entry': record['has_stack_entry'],
+            'stack_ring': record['stack_ring'],
+            'atoms': self.benzene_raw,
+            'atoms_n': len(self.benzene_raw),
+        }
+
+    def test_happy_path_returns_full_placed_contract(self):
+        outcome = placement.resolve(
+            self._benzene_pickup(), self.records_by_id, self.stacking_data,
+            self.head, _BENZENE_RING, _HEADING_EAST,
+            [], _xyz(self.head),
+            _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
+        self.assertEqual(outcome['status'], 'placed')
+        self.assertEqual(
+            set(outcome),
+            {'status', 'placed_atoms', 'R', 't', 'ring_centroid_xy',
+             'interaction', 'citation_short'})
+        placed = outcome['placed_atoms']
+        self.assertEqual(len(placed), len(self.benzene_raw))
+        for atom in placed:
+            self.assertEqual(len(atom), 4)
+        self.assertEqual([a[0] for a in placed],
+                         [a[0] for a in self.benzene_raw])
+        self.assertIs(outcome['interaction'], self.interaction)
+        self.assertEqual(outcome['citation_short'], 'Janiak 2000')
+        # ring_centroid_xy is the engine-attachable 2D centroid of the
+        # placed ring, at the dataset geometry behind the head.
+        rc = outcome['ring_centroid_xy']
+        self.assertEqual(len(rc), 2)
+        placed_c = stacking.ring_frame(_xyz(placed), _BENZENE_RING)[0]
+        self.assertAlmostEqual(rc[0], placed_c[0], places=12)
+        self.assertAlmostEqual(rc[1], placed_c[1], places=12)
+        self.assertLess(rc[0], self.head_c[0])
+
+    def test_upload_capture_skips_no_entry_without_placing(self):
+        upload_rec = {'set': '__upload__', 'has_stack_entry': False,
+                      'atoms': self.benzene_raw}
+        outcome = placement.resolve(
+            upload_rec, self.records_by_id, self.stacking_data,
+            self.head, _BENZENE_RING, _HEADING_EAST,
+            [], _xyz(self.head),
+            _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
+        self.assertEqual(outcome, {'status': 'skipped',
+                                   'code': placement.SKIP_NO_ENTRY})
+
+    def test_wall_placement_refuses_with_wall_code(self):
+        # Head parked 10 A west: the 3.6 A stack lands past the -x face.
+        head_w = _translated(self.head, -10.0, 0.0)
+        outcome = placement.resolve(
+            self._benzene_pickup(), self.records_by_id, self.stacking_data,
+            head_w, _BENZENE_RING, _HEADING_EAST,
+            [], _xyz(head_w),
+            _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
+        self.assertEqual(outcome['status'], 'refused')
+        self.assertEqual(outcome['code'], placement.REFUSE_WALL)
+        self.assertTrue(outcome['detail'].endswith(' A'))
+
+
 if __name__ == '__main__':
     unittest.main()
