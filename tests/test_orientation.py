@@ -185,15 +185,22 @@ class TestEdgeOn(unittest.TestCase):
 
     def test_ring_atoms_sit_on_the_yz_plane(self):
         # After edge-on the ring normal is +x, so every ring atom's x
-        # coordinate (its normal coordinate) is ~0.
+        # coordinate (its normal coordinate) is ~0. Bound is 1e-3, NOT
+        # tighter: the real PubChem 3D SDFs deviate up to ~8.1e-5 A from
+        # the ring mean plane (phenanthrene is the worst of the five), so
+        # a 1e-9 pin is unreachable for real data. 1e-3 gives >10x margin
+        # over the observed deviations while staying three orders below
+        # ring_frame's 0.15 A planarity admission bound (and ~2000x below
+        # the in-plane ring extents).
         for name in RINGS:
             with self.subTest(molecule=name):
                 rec = self.records[name]
                 placed = orientation.edge_on_atoms(
                     rec['elements'], rec['coords'], RINGS[name])
                 for i in RINGS[name]:
-                    self.assertAlmostEqual(placed[i][1], 0.0, delta=1e-9,
-                                           msg='atom %d of %s' % (i, name))
+                    self.assertTrue(abs(placed[i][1]) <= 1e-3,
+                                    'atom %d of %s off plane: %.3e'
+                                    % (i, name, placed[i][1]))
 
     def test_z_span_anchors_and_longer_axis_on_y(self):
         for name in RINGS:
