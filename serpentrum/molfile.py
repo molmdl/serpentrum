@@ -556,6 +556,82 @@ def find_ring_atoms(record):
     return [i for i in range(atom_count) if i not in removed]
 
 
+def _canonical_cycle(cycle):
+    """Normalize a cycle tuple for deterministic comparison.
+
+    Rotate so the smallest index is first, then take the lexicographic
+    minimum of the two walk orientations. This pins BOTH the starting
+    atom and the orientation: reversing a cycle flips the ring_frame
+    Newell normal, so the tie-break must fix orientation deterministically.
+    """
+    smallest = min(cycle)
+    best = None
+    for seq in (cycle, tuple(reversed(cycle))):
+        start = seq.index(smallest)
+        rotated = seq[start:] + seq[:start]
+        if best is None or rotated < best:
+            best = rotated
+    return best
+
+
+def ring_cycle(record):
+    """Return ONE planar 6-ring in RING-WALK order (STACK-01 shim, G1).
+
+    The manifest/setloader ``ring_atoms`` are the sorted 2-core of the
+    bond graph (see find_ring_atoms) and MUST NOT be fed to
+    ``stacking.ring_frame`` directly: sorted index order is not ring
+    order, so even exactly-flat benzene spuriously fails the 0.15 A
+    planarity check (star-polygon Newell normal, 1.133 A -- probe-verified
+    in 05-RESEARCH-core-integration.md "ring_extraction_spec").
+
+    For fused systems (naphthalene, anthracene, phenanthrene) returns ONE
+    outer ring, never the giant perimeter; for biphenyl (two rings at
+    90.00 deg in the shipped conformer) returns one phenyl ring, matching
+    stacking.py's one-planar-ring contract.
+
+    Algorithm (pure, stdlib; n <= 14 in the shipped set):
+      1. Restrict the bond adjacency to the 2-core from find_ring_atoms.
+      2. Enumerate simple cycles of length <= 6 via bounded DFS from each
+         start node, pruning branches to neighbors > start (each cycle is
+         found exactly once, at its smallest node).
+      3. Canonical selection: shortest length first; ties broken by the
+         lexicographic minimum over all rotation/reversal normalizations
+         (_canonical_cycle), fixing start atom AND walk orientation.
+
+    Returns a list of 0-based atom indices in ring-walk order, or ``[]``
+    when no 3..6-cycle exists (e.g. acyclic records like ethanol). Same
+    record -> identical list on every call (pure function).
+    """
+    core = find_ring_atoms(record)
+    if not core:
+        return []
+    core_set = set(core)
+    adjacency = dict((i, set()) for i in core)
+    for a, b in record['bonds']:
+        if a in core_set and b in core_set:
+            adjacency[a].add(b)
+            adjacency[b].add(a)
+
+    best = None
+    for start in sorted(adjacency):
+        stack = [(start, [start])]
+        while stack:
+            node, path = stack.pop()
+            for neighbor in adjacency[node]:
+                if neighbor == start:
+                    if len(path) >= 3:
+                        canonical = _canonical_cycle(tuple(path))
+                        key = (len(canonical), canonical)
+                        if best is None or key < best[0]:
+                            best = (key, canonical)
+                elif neighbor > start and neighbor not in path \
+                        and len(path) < 6:
+                    stack.append((neighbor, path + [neighbor]))
+    if best is None:
+        return []
+    return list(best[1])
+
+
 # Elements considered "organic" for the explicit-H gate.
 _ORGANIC_ELEMENTS = frozenset(('C', 'N', 'O'))
 
