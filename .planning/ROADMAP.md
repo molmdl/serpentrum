@@ -142,9 +142,27 @@ Notes: **Spike scheduled here (the one open mechanism question):** up/down `set_
   3. Hitting the boundary or the snake's own body (segment-based) ends the run but leaves the snake complete; the player wins when length exceeds the cap. [GAME-05, GAME-06]
   4. On completion (win or crash): the viewer clears, the camera focuses the completed snake, length + score (molecule count) display, and "Get Spectra" activates. [GAME-09]
   5. Pickups without a verified dataset entry are skipped with the reason in the info box, and the clash gate rejects placements that would collide. [STACK-03, STACK-05]
-**Plans**: TBD (expected 3–4; stacking transforms+clash gate ∥ turn+collision+scoring rules ∥ completion flow — separable around the shared engine)
+**Plans**: 16 plans (7 waves)
 
-Notes: The clash gate is a game rule, not a spectra afterthought (a clashing append makes xtb infer covalent bonds → garbage hessian; π-stack at 3.4 Å verified safe `[RUN]`). Verify during implementation: `transform_selection` matrix layout (read `editing.py:1946` docstring; fallback = `cmd.rotate`+`cmd.translate`). Avoids Pitfalls 9, 10, 4-restore, 11-aggregation.
+Plans:
+- [ ] 05-01-PLAN.md — TDD ring_cycle: canonical planar 6-ring extractor in molfile (Wave 1, parallel)
+- [ ] 05-02-PLAN.md — TDD orientation.py: verified TTT matrix layout + edge-on canonicalization (Wave 1, parallel)
+- [ ] 05-03-PLAN.md — TDD spawn.py: deterministic seeded pickup spawn policy (Wave 1, parallel)
+- [ ] 05-04-PLAN.md — TDD engine additive fix: reject-after-won un-finish (win-vs-clash desync) (Wave 1, parallel)
+- [ ] 05-05-PLAN.md — TDD placement.py: pure controller seam — skip taxonomy, tail/growth policy, clash gate (Wave 1, parallel)
+- [ ] 05-06-PLAN.md — Anchors: records/stacking_data/last_run on _serpentrum + gui_setup stacking_path wiring (Wave 1, parallel)
+- [ ] 05-07-PLAN.md — Bridge primitives (apply_matrix/sweep_chain/completion) + REQUIRED smoke 07 (Wave 1, parallel)
+- [ ] 05-08-PLAN.md — setloader stack_ring carry on demo records (Wave 2)
+- [ ] 05-09-PLAN.md — TDD-style hud_logic STACK-04 content builders (Wave 2, parallel)
+- [ ] 05-10-PLAN.md — Edge-on materialization (head + pickups as sticks) + REQUIRED smoke 08 real-data placement (Wave 2, parallel)
+- [ ] 05-11-PLAN.md — GameTab begin_game: head mirror, spawn/seed/materialize, teardown pickup cleanup (Wave 3)
+- [ ] 05-12-PLAN.md — Pure integration chain test: win/crash/refuse/skip/un-finish scenarios (Wave 3, parallel)
+- [ ] 05-13-PLAN.md — GameTab 'stacked' capture seam + 'won' guard (Wave 4)
+- [ ] 05-14-PLAN.md — GameTab 'turning' rigid sweep rendering + head mirror + budget line (Wave 5)
+- [ ] 05-15-PLAN.md — Completion presenter + Get Spectra button/model-A signal (Wave 6)
+- [ ] 05-16-PLAN.md — Phase-closing gates + consolidated human-verify checkpoint (Wave 7)
+
+Notes: The clash gate is a game rule, not a spectra afterthought (a clashing append makes xtb infer covalent bonds → garbage hessian; π-stack at 3.4 Å verified safe `[RUN]`). `transform_selection` matrix layout + one-call rigid sweep + placement exactness are researcher-VERIFIED (05-RESEARCH-pymol-mechanics.md) — plans wire them as-is, smokes replicate the probes as regression. Biphenyl ships with rings at 90° → every biphenyl stack clashes → it is the designed refuse-path demonstrator (data observation recorded, not fixed). Edge-on orientation lands at materialization BEFORE any stacking (locked 03-08 + 04-07). Avoids Pitfalls 9, 10, 4-restore, 11-aggregation.
 
 ### Phase 6: xtb Pipeline *(research phase F — parallel track, largely de-risked)*
 
@@ -235,7 +253,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. Pure Core — Game & Chemistry Logic | 14/14 | Complete (verified 4/4 must-haves) | 2026-09-10 |
 | 3. Molecules in the Viewer & Setup Tab | 8/8 | Complete (verified 5/5 must-haves) | 2026-09-12 |
 | 4. Game Loop & Input | 9/9 | Complete (verified 5/5 must-haves) | 2026-09-14 |
-| 5. Stacking & Game Rules Complete | 0/TBD | Not started | - |
+| 5. Stacking & Game Rules Complete | 0/16 | Not started | - |
 | 6. xtb Pipeline | 0/TBD | Not started | - |
 | 7. Spectra UI | 0/TBD | Not started | - |
 | 8. Demo Data, Docs & Release Audit | 0/TBD | Not started | - |
