@@ -133,6 +133,13 @@ class GameTab(QtWidgets.QWidget):
     _serpentrum.game_session so a Plugin-Manager reload cannot
     duplicate it; every singleShot/timeout callback is epoch-guarded
     (Pitfall 9.1).
+
+    Phase 5 note (plan 05-11): pickups + completion-flow cleanup are now
+    live - begin_game seeds/materializes the first pickup and
+    _teardown_round pattern-deletes srp_pickup_* on EVERY end path, so
+    an un-stacked pickup dies while the chain (srp_head/srp_seg_*)
+    stays complete (the GAME-09 'viewer clears' ordering: on the
+    _end_run path teardown runs BEFORE the completion presenter).
     """
 
     def __init__(self, anchor_state=None, parent=None):
@@ -651,7 +658,12 @@ class GameTab(QtWidgets.QWidget):
         unlock is impossible by construction; (e) the pause button is
         reset PROGRAMMATICALLY under blockSignals (Pitfall G: a naked
         setChecked(False) would fire toggled and trigger a spurious
-        resume on a dead/rebuilt engine).
+        resume on a dead/rebuilt engine); (f) pickup cleanup (plan
+        05-11): pattern-delete srp_pickup_* - un-stacked pickups die on
+        EVERY end path while srp_head/srp_seg_* are untouched, folded
+        INTO this ONE helper per locked decision 8 (never a second
+        helper); idempotent like the unlock, needed by restart AND by
+        the completion flow's 'viewer clears' semantics.
         """
         self._tick_timer.stop()
         self._elapsed_timer.stop()
@@ -662,6 +674,7 @@ class GameTab(QtWidgets.QWidget):
         session = self._session
         if session is not None:
             pymol_bridge.unlock_camera(session.pop('saved_cam', None))
+        pymol_bridge.delete_pickups()  # (f) live pickups die here, chain stays
         self.pause_btn.blockSignals(True)
         self.pause_btn.setChecked(False)
         self.pause_btn.setText('Pause')
