@@ -273,3 +273,98 @@ def materialize(setup, records):
         place_head(HEAD_NAME)
     frame_scene()
     return errors
+
+
+# --- Phase 5: placement, sweep, completion seams (G7 part 1) ----------------
+# Every function below is a THIN cmd forwarder — matrix math STAYS in the
+# pure layer (orientation.py builds the m16; the bridge never parses SDFs
+# and never composes transforms). All mechanisms are researcher-VERIFIED
+# (05-RESEARCH-pymol-mechanics.md probes A1/B/C/G); this section wires
+# them, it does not re-spike them. smoke/07_transform_sweep_smoke.py pins
+# each one live as regression.
+
+
+def apply_matrix(name, m16):
+    """Apply a 16-float TTT transform to object ``name``.
+
+    ``cmd.transform_selection(name, m16)``. Layout is PyMOL's TTT
+    (homogenous=0), verified end-to-end by probe A1 (max err 1.2e-07 A):
+    rows 0-2 cols 0-2 = row-major 3x3 R applied to the COLUMN vector;
+    col 3 (m[3], m[7], m[11]) = post-translation; the bottom row
+    (m[12], m[13], m[14]) = pre-translation applied BEFORE R. So
+    ``y = R . (x + pre) + t``. The matrix is built in the PURE layer;
+    the bridge only forwards. Atomic-coordinate writes regenerate
+    representations automatically (editing.py:1962-1988). NEVER verify
+    by reading back with cmd.get_object_ttt — it SEGFAULTS
+    (04 probe M5, pitfall P5-2); get_extent/get_model are safe.
+    """
+    cmd.transform_selection(name, m16)
+
+
+def sweep_chain(delta_deg, pivot_xy, selection='srp_head or srp_seg_*'):
+    """Rigidly sweep the whole chain: ONE cmd.rotate per ('turning',) tick.
+
+    ``cmd.rotate('z', delta, selection, camera=0, origin=[hx,hy,0])`` —
+    rigid multi-object rotation with atomic-coordinate writes (probe B:
+    10 objects ~0.4 ms; internal geometry preserved <5e-07 A). ``origin=``
+    is MANDATORY: the default is the current VIEW centre, not the head
+    (pitfall P5-4, editing.py:1807-1808). ``camera=0`` = model axes —
+    camera=1 would rotate about a camera-space axis (the
+    gameloop-pitfall-4 desync class). delta > 0 = CCW about +z, matching
+    the engine's ``_rotate_xy`` sign. The selection INCLUDES srp_head:
+    the pivot is the head centre, so the head rotates in place, keeping
+    its ring normal on the chain axis (Pattern 2, probe B). CGO members
+    (srp_box) are harmless — CGOs are not transformed (pitfall P5-7,
+    probe C2).
+    """
+    cmd.rotate('z', float(delta_deg), selection, camera=0,
+               origin=[float(pivot_xy[0]), float(pivot_xy[1]), 0.0])
+
+
+def zoom_chain(selection='srp_head or srp_seg_*'):
+    """Frame the completed chain: ``cmd.zoom`` + ``cmd.refresh`` (GAME-09).
+
+    MUST run AFTER unlock_camera: unlock ends with ``cmd.set_view``
+    (18 floats including scale/position), which clobbers any prior zoom
+    (pitfall P5-3, Pattern 4 completion ordering). The saved default
+    view looks down -z at the xy plane, so this zoom frames the snake
+    in 2D without ``cmd.orient`` (probe G3).
+    """
+    cmd.zoom(selection)
+    cmd.refresh()
+
+
+def delete_pickups():
+    """Delete every uneaten pickup: pattern delete ``srp_pickup_*``.
+
+    Verified G4; idempotent. Used by teardown AND by the completion
+    flow (stray pickups leave the framed scene). ``srp_seg_*`` /
+    ``srp_head`` are untouched — the pattern matches pickups only.
+    """
+    cmd.delete('srp_pickup_*')
+
+
+def rename_pickup(old, new):
+    """Rename a pickup object to its captured ``srp_seg_<n>`` name.
+
+    ``cmd.set_name(old, new)`` — bog-standard naming.py API (not probed
+    in research; smoke 07 verifies it live). Keeps the atom set
+    identical to what the player saw. Fallback if it ever fails:
+    delete + load fresh + apply the composed matrix via ``apply_matrix``
+    — but set_name is the shipping path (research Open Question 4).
+    """
+    cmd.set_name(old, new)
+
+
+def chain_object_names():
+    """Sorted public object names of the chain (head + segments).
+
+    Objects whose name starts ``srp_head`` or ``srp_seg``, via
+    ``cmd.get_names('public_objects')`` — the PROVEN 2.5.0 type
+    (03-06; 'all_objects' raises). Completion-ONLY read (framing / xyz
+    handoff); NEVER per tick — the engine tracks all positions as
+    floats and PyMOL is a pure renderer (Pattern 5).
+    """
+    names = cmd.get_names('public_objects')
+    return sorted(n for n in names
+                  if n.startswith('srp_head') or n.startswith('srp_seg'))
