@@ -16,9 +16,15 @@ Two public entry points:
   parses + gates every manifest molecule's SDF and VERIFIES the manifest
   declarations (atom_count, charge, ring_count) against the parsed
   reality. Any mismatch excludes the molecule with an error naming its
-  id. Demo records carry ``set=<set_id>`` and ``has_stack_entry``
+    id. Demo records carry ``set=<set_id>`` and ``has_stack_entry``
   computed via ``molecule_data.interaction_for`` against the stacking
-  dataset.
+  dataset; demo record keys: ``id, name, file, record_index, elements,
+  atom_count, charge, ring_count, has_explicit_h, has_stack_entry, set,
+  source, warnings, ring_atoms`` (the sorted 2-core from the manifest)
+  and ``stack_ring`` (the canonical ONE-ring cycle in ring-walk order
+  from ``molfile.ring_cycle``, computed at load time on the accepted
+  molecule -- locked decision 5; placement/tail frames index placed
+  atoms 1:1 by ``stack_ring``).
 
 - ``load_upload(path, stacking_path) -> (records, errors)``:
   routes by extension (.sdf / .mol2), gates per record, and for
@@ -64,7 +70,7 @@ def default_stacking_path():
 
 
 def _build_record(molfile_record, *, id, name, file, set_id, source,
-                  stacking_data, ring_atoms=None):
+                  stacking_data, ring_atoms=None, stack_ring=None):
     """Build a molecule record dict from a parsed molfile record.
 
     Computes ``has_stack_entry`` via
@@ -74,6 +80,12 @@ def _build_record(molfile_record, *, id, name, file, set_id, source,
     ``ring_atoms`` is passed through from the manifest for demo records;
     upload records omit it (they are skip-at-pickup, no stacking
     placement, so ``stacking.ring_frame`` is never called on them).
+
+    ``stack_ring`` is the canonical ONE-ring cycle in ring-walk order
+    (from ``molfile.ring_cycle``) -- the indices alignment contract
+    (same record's coords/elements order) makes placed-atom indexing
+    1:1. Demo records carry it (computed at load time); upload records
+    omit it by design (the skip policy keys on the absent ring).
     """
     has_stack_entry = False
     if stacking_data is not None:
@@ -96,6 +108,8 @@ def _build_record(molfile_record, *, id, name, file, set_id, source,
     }
     if ring_atoms is not None:
         record['ring_atoms'] = list(ring_atoms)
+    if stack_ring is not None:
+        record['stack_ring'] = list(stack_ring)
     return record
 
 
@@ -119,7 +133,8 @@ def load_demo_set(data_dir=None, set_id='set_a', stacking_path=None):
       2. ``gate_set`` -- gate reason -> error + exclude.
       3. atom_count / charge / ring_count cross-checks vs the manifest
          (each mismatch -> error + exclude).
-      4. record build (has_stack_entry via interaction_for).
+      4. stack_ring computation (``molfile.ring_cycle`` on the accepted
+         record) + record build (has_stack_entry via interaction_for).
 
     File/parse failures become error entries, never exceptions.
     """
@@ -195,7 +210,12 @@ def load_demo_set(data_dir=None, set_id='set_a', stacking_path=None):
         if mismatch:
             continue
 
-        # 4. Build the record.
+        # 4. Build the record. The canonical stacking ring is computed
+        # here -- AFTER the gate/mismatch checks, so only accepted
+        # molecules pay the cost -- from the SAME parsed record that
+        # feeds _build_record (bonds and coords come from one parse,
+        # keeping the 1:1 indices alignment contract).
+        stack_ring = molfile.ring_cycle(record)
         records.append(_build_record(
             record,
             id=mol_id,
@@ -204,7 +224,8 @@ def load_demo_set(data_dir=None, set_id='set_a', stacking_path=None):
             set_id=set_id,
             source='demo',
             stacking_data=stacking_data,
-            ring_atoms=molecule['ring_atoms']))
+            ring_atoms=molecule['ring_atoms'],
+            stack_ring=stack_ring))
 
     return (records, errors)
 
