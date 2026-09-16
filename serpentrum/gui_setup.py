@@ -39,6 +39,7 @@ from pymol.Qt import QtWidgets, QtCore
 
 from . import setup_logic
 from . import setloader
+from . import molecule_data
 from . import xtbenv
 from . import pymol_bridge
 
@@ -409,12 +410,16 @@ class SetupTab(QtWidgets.QWidget):
 
         Flow (per 03-RESEARCH-setup-ui.md Apply path):
           1. collect_state + validate -> errors stop with a warning modal.
-          2. Record building via setloader (demo vs upload routing) ->
-             load errors stop with a rejection modal.
-          3. Head combo repopulation from loaded records.
-          4. pymol_bridge.materialize -> bridge errors stop with a
+          2. Record building via setloader (demo vs upload routing,
+             WITH the stacking dataset so records carry has_stack_entry)
+             -> load errors stop with a rejection modal.
+          3. Anchor records + the stacking dataset on _serpentrum
+             (Phase 5, plan 05-06: begin_game, Restart determinism,
+             the skip policy, and the info-box builders consume them).
+          4. Head combo repopulation from loaded records.
+          5. pymol_bridge.materialize -> bridge errors stop with a
              'Load failed' modal.
-          5. Success: status message + xtb detect note + validate
+          6. Success: status message + xtb detect note + validate
              warnings; write the dict back to the anchor.
         All dialogs are static QMessageBox.warning(self, title, body).
         Returns True when the scene materialized; False otherwise
@@ -429,13 +434,20 @@ class SetupTab(QtWidgets.QWidget):
             return False
 
         # Record building: route by the demo combo's currentData().
+        # Phase 5, plan 05-06: both load paths get the stacking dataset
+        # so demo records carry has_stack_entry=True (set_a matches the
+        # shipped APPROVED pi-stack entry; uploads stay False via the
+        # '__upload__' skip-policy keying).
         source = self.demo_combo.currentData()
         if source == _UPLOAD_SENTINEL:
             path = self.upload_path_field.text().strip()
-            records, load_errors = setloader.load_upload(path)
+            records, load_errors = setloader.load_upload(
+                path, stacking_path=setloader.default_stacking_path())
             error_title = 'Upload rejected'
         else:
-            records, load_errors = setloader.load_demo_set(set_id=source)
+            records, load_errors = setloader.load_demo_set(
+                set_id=source,
+                stacking_path=setloader.default_stacking_path())
             error_title = 'Cannot load set'
         if load_errors:
             QtWidgets.QMessageBox.warning(
@@ -443,6 +455,27 @@ class SetupTab(QtWidgets.QWidget):
             self.status_label.setText(
                 'load errors: ' + '; '.join(load_errors))
             return False
+
+        # Anchor records + the stacking dataset on _serpentrum (Phase 5,
+        # plan 05-06; locked decision 10: NEVER module globals, NEVER
+        # the scalar-only setup dict). setloader returns only records +
+        # errors, so the dataset dict is loaded fresh here -- the file
+        # is tiny and static. On dataset failure, anchor records with
+        # stacking_data=None: has_stack_entry was already computed False
+        # in that case, so the skip policy degrades to SKIP_NO_ENTRY,
+        # which is correct.
+        stacking_note = None
+        if self._anchor is not None and records:
+            stacking_data = None
+            try:
+                stacking_data = molecule_data.load_stacking(
+                    setloader.default_stacking_path())
+            except (molecule_data.DataError, IOError):
+                stacking_note = (
+                    'stacking dataset unavailable - '
+                    'pickups will be skipped')
+            self._anchor.records = records
+            self._anchor.stacking_data = stacking_data
 
         # Repopulate head combo from loaded records, then re-read state.
         # _loading guard (defense-in-depth alongside _populate_head_combo's
@@ -464,6 +497,8 @@ class SetupTab(QtWidgets.QWidget):
 
         # Success: build the status message.
         parts = ['Box + head materialized']
+        if stacking_note is not None:
+            parts.append(stacking_note)
         if setup.get('head_molecule') == 'random':
             parts.append('head will be randomized at game start')
         # xtb detection (advisory in Phase 3; blocking is Phase 6).
