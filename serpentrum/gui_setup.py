@@ -40,6 +40,8 @@ from pymol.Qt import QtWidgets, QtCore
 from . import setup_logic
 from . import setloader
 from . import molecule_data
+from . import molfile
+from . import orientation
 from . import xtbenv
 from . import pymol_bridge
 
@@ -417,8 +419,9 @@ class SetupTab(QtWidgets.QWidget):
              (Phase 5, plan 05-06: begin_game, Restart determinism,
              the skip policy, and the info-box builders consume them).
           4. Head combo repopulation from loaded records.
-          5. pymol_bridge.materialize -> bridge errors stop with a
-             'Load failed' modal.
+          5. Edge-on head matrix computed PURE-ly (Phase 5, plan 05-10)
+             + pymol_bridge.materialize(head_m16=...) -> bridge errors
+             stop with a 'Load failed' modal.
           6. Success: status message + xtb detect note + validate
              warnings; write the dict back to the anchor.
         All dialogs are static QMessageBox.warning(self, title, body).
@@ -486,8 +489,35 @@ class SetupTab(QtWidgets.QWidget):
         self._loading = False
         setup = self.collect_state()
 
+        # Compute the edge-on head matrix BEFORE materialize (Phase 5,
+        # plan 05-10; locked 03-08 + 04-07: edge-on at materialization,
+        # BEFORE any stacking can work). The bridge never parses SDFs,
+        # so the pure m16 is computed HERE: _select_head_record is
+        # pure-with-respect-to-cmd (no cmd usage), so calling it again
+        # picks the SAME record materialize will (its advisory errors
+        # are re-generated inside materialize's own error list). A
+        # record without 'stack_ring' (uploads; demo records pre-05-08)
+        # or any parse/frame failure degrades to head_m16=None — today's
+        # flat head — rather than blocking Apply; load problems already
+        # surface through the record-building error list.
+        head_m16 = None
+        if records:
+            try:
+                head_errors = []
+                head_record = pymol_bridge._select_head_record(
+                    setup, records, head_errors)
+                if (head_record is not None
+                        and 'stack_ring' in head_record):
+                    parsed = molfile.read_sdf(head_record['file'])[0]
+                    head_m16 = orientation.edge_on_m16(
+                        parsed['elements'], parsed['coords'],
+                        head_record['stack_ring'])
+            except Exception:
+                head_m16 = None
+
         # Materialize box + head via the bridge (the only cmd path).
-        bridge_errors = pymol_bridge.materialize(setup, records)
+        bridge_errors = pymol_bridge.materialize(
+            setup, records, head_m16=head_m16)
         if bridge_errors:
             QtWidgets.QMessageBox.warning(
                 self, 'Load failed', '\n'.join(bridge_errors))

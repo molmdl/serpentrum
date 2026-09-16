@@ -244,7 +244,7 @@ def _select_head_record(setup, records, errors):
     return None
 
 
-def materialize(setup, records):
+def materialize(setup, records, head_m16=None):
     """The Apply path (03-RESEARCH-setup-ui.md sec 6.3).
 
     1. ``cleanup_srp`` first (removes leftover srp_* from a prior game).
@@ -253,8 +253,13 @@ def materialize(setup, records):
     3. Head selection via ``_select_head_record``: empty records or no
        match -> box-only scene (still framed). 'random' -> records[0].
        Named id -> that record.
-    4. On a selected record: ``load_molecule``, ``cmd.show('spheres')``,
-       ``place_head``.
+    4. On a selected record: ``load_molecule``, the OPTIONAL edge-on
+       ``head_m16`` transform, ``cmd.show('spheres')``, ``place_head``.
+       EDGE-ON FIRST (locked 03-08 + 04-07): the transform runs BEFORE
+       ``place_head`` so the extent being centered is the canonical one
+       (Pattern 1 of 05-RESEARCH-pymol-mechanics.md). ``head_m16`` is
+       computed by the CALLER from pure modules (molfile + orientation)
+       — the bridge never parses SDFs.
     5. ``frame_scene`` (one-shot zoom+refresh — the box is visible even
        when no head loads).
     Returns a list of error strings (empty on full success).
@@ -269,6 +274,8 @@ def materialize(setup, records):
     record = _select_head_record(setup, records, errors)
     if record is not None:
         load_molecule(record['file'], HEAD_NAME)
+        if head_m16 is not None:
+            cmd.transform_selection(HEAD_NAME, head_m16)
         cmd.show('spheres', HEAD_NAME)
         place_head(HEAD_NAME)
     frame_scene()
@@ -332,6 +339,23 @@ def zoom_chain(selection='srp_head or srp_seg_*'):
     """
     cmd.zoom(selection)
     cmd.refresh()
+
+
+def materialize_pickup(path, name, m16):
+    """Spawn ONE pickup object edge-on at its spawn centroid, as STICKS.
+
+    ``cmd.load(path, object=name, zoom=0)`` + ONE
+    ``cmd.transform_selection(name, m16)`` + ``cmd.show('sticks', name)``.
+    ``m16`` is composed by the CALLER from pure modules as
+    ``orientation.matrix_rt(R_edge, centroid, pre)`` —
+    ``y = R.(x + pre) + t`` lands the ring centroid at the spawn centroid
+    (the bridge never parses SDFs; the caller did). Pickups render as
+    STICKS (GAME-03; the head stays spheres). Returns ``name``.
+    """
+    cmd.load(path, object=name, zoom=0)
+    cmd.transform_selection(name, m16)
+    cmd.show('sticks', name)
+    return name
 
 
 def delete_pickups():
