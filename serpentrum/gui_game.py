@@ -561,6 +561,8 @@ class GameTab(QtWidgets.QWidget):
             self._handle_stack_event(ev[1], engine)
         elif kind == 'crashed':
             self._log('crashed into %s' % ev[1])
+        elif kind == 'budget_warning':
+            self._log(hud_logic.budget_text())
         elif kind == 'won':
             if engine.finished:
                 self._log('YOU WIN')
