@@ -162,7 +162,7 @@ class GameTab(QtWidgets.QWidget):
     synchronously in ONE tick via placement.resolve (skip -> tail ->
     place -> gate), attaches placed pickups to the chain (viewer
     transform + 'srp_seg_<n>' rename inside the srp_ prefix), and
-    rejects EVERY non-placed outcome through engine.reject_pickup
+        rejects EVERY non-placed outcome through engine.reject_pickup
     (locked decision 13 - counters can never desync, and a clash-
     refused cap capture un-finishes the run via 05-04). Every
     resolution appends to the session's stacked_history (the STACK-04
@@ -171,7 +171,23 @@ class GameTab(QtWidgets.QWidget):
     consumes at completion) and runs the one-spawn-per-resolution
     respawn gate (05-03). The 'won' branch logs only when
     engine.finished still holds, so a false YOU WIN is impossible.
+
+    Phase 5 note (plan 05-15): the GAME-09 completion flow is live -
+    _end_run now ends verdict log -> _teardown_round (timers/epoch/
+    input/camera unlock/live-pickup deletion/button reset) ->
+    _present_completion (zoom_chain AFTER the unlock so the restored
+    view cannot clobber it, P5-3/Pattern 4; revealed length + score +
+    atoms via hud_logic.completion_lines; the STACK-04 breakdown; the
+    last_run anchor record; Get Spectra enabled). Win and crash share
+    this IDENTICAL path (locked decision 8). The 'Get Spectra' button
+    is model-A wired (locked decision 9): this tab EMITS
+    spectra_requested; PluginDialog owns the QTabWidget switch - this
+    widget NEVER reaches up to its parent.
     """
+
+    # Model-A handoff (locked decision 9, the 04-06 start_requested
+    # template): PluginDialog connects this to its tabs.setCurrentIndex.
+    spectra_requested = QtCore.Signal()
 
     def __init__(self, anchor_state=None, parent=None):
         super(GameTab, self).__init__(parent)
@@ -211,6 +227,11 @@ class GameTab(QtWidgets.QWidget):
         self.pause_btn = QtWidgets.QPushButton('Pause', self)
         self.pause_btn.setCheckable(True)
         self.restart_btn = QtWidgets.QPushButton('Restart', self)
+        # GAME-09 (plan 05-15): enabled ONLY by _present_completion;
+        # disabled at construction and on every _teardown_round (so
+        # begin_game's teardown-first discipline re-disables it).
+        self.get_spectra_btn = QtWidgets.QPushButton('Get Spectra', self)
+        self.get_spectra_btn.setEnabled(False)
 
         self.hint_label = QtWidgets.QLabel(
             'Click Start on the Setup tab. Steer with arrow keys; '
@@ -234,6 +255,7 @@ class GameTab(QtWidgets.QWidget):
         btn_row = QtWidgets.QHBoxLayout()
         btn_row.addWidget(self.pause_btn)
         btn_row.addWidget(self.restart_btn)
+        btn_row.addWidget(self.get_spectra_btn)
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
 
@@ -243,6 +265,9 @@ class GameTab(QtWidgets.QWidget):
         """Connect widget signals to handlers."""
         self.pause_btn.toggled.connect(self._on_pause_toggled)
         self.restart_btn.clicked.connect(self._on_restart)
+        # Model-A: this tab EMITS only; PluginDialog owns the QTabWidget
+        # and performs the switch (locked decision 9).
+        self.get_spectra_btn.clicked.connect(self.spectra_requested.emit)
 
     # --- session lifecycle -------------------------------------------------
 
@@ -905,15 +930,71 @@ class GameTab(QtWidgets.QWidget):
         self.begin_game(setup)
 
     def _end_run(self, engine):
-        """End the run: log the verdict, then tear down via the ONE helper.
+        """End the run: verdict log -> teardown -> presenter (GAME-09).
 
         The verdict is logged FIRST so it stays visible in the info box;
-        timers/input/camera then die with the run via _teardown_round.
+        _teardown_round (the ONE helper) then kills timers/epoch/input,
+        restores the camera and deletes live pickups; the completion
+        PRESENTER runs LAST (never a second teardown - locked decision
+        8: win and crash share this identical path). The guard keeps a
+        session-less end (e.g. an engine finished without begin_game)
+        from presenting a half-built run.
         """
-        if self._session is not None:
-            self._session['status'] = 'over'
+        session = self._session
+        if session is not None:
+            session['status'] = 'over'
         self._log('run over: %s' % (engine.result or 'over'))
         self._teardown_round()
+        if session is not None:
+            self._present_completion(engine)
+
+    # --- Phase-5 completion presenter (plan 05-15, GAME-09) ------------------
+
+    def _present_completion(self, engine):
+        """Present the completed run (win OR crash - identical path).
+
+        Runs AFTER _teardown_round from _end_run. NOT a teardown: the
+        teardown already stopped timers, restored the camera and
+        pattern-deleted live pickups; this step only PRESENTS what is
+        left (05-RESEARCH-gui-lifecycle lifecycle_spec item 3):
+
+        a. Frame the chain: pymol_bridge.zoom_chain() - one-shot
+           cmd.zoom('srp_head or srp_seg_*') + refresh. MUST run after
+           the unlock: unlock_camera ends with cmd.set_view (18 floats
+           incl. scale/position), which clobbers any prior zoom
+           (pitfall P5-3, pymol-mechanics Pattern 4). Never per-tick
+           (pitfall 14).
+        b. Reveal counts: hud_logic.completion_lines - score =
+           molecules_stacked (GAME-06 cap = molecule count), length =
+           segments + 1 (head), atoms_total now visible (SPECTRA-06
+           context; the counters stayed hidden during play, GAME-04).
+        c. STACK-04 breakdown: hud_logic.breakdown_lines over the
+           session's stacked_history (stacked groups by name with
+           distance + citation; refused/skip groups with reasons).
+        d. Anchor the handoff record: _serpentrum.last_run =
+           {'result', 'molecules_stacked', 'atoms_total',
+            'chain_objects', 'snake_id'} - chain_object_names() is the
+           completion-ONLY name read (never per-tick); Phases 6/7
+           consume this from the anchor (reload-safe by construction).
+        e. Enable Get Spectra - the ONLY place the button goes live.
+        """
+        session = self._session
+        pymol_bridge.zoom_chain()  # (a) AFTER unlock_camera (P5-3)
+        for line in hud_logic.completion_lines(
+                engine.result, engine.molecules_stacked,
+                len(engine.segments) + 1, engine.atoms_total):
+            self._log(line)
+        for line in hud_logic.breakdown_lines(session['stacked_history']):
+            self._log(line)
+        if self._anchor is not None:
+            self._anchor.last_run = {
+                'result': engine.result,
+                'molecules_stacked': engine.molecules_stacked,
+                'atoms_total': engine.atoms_total,
+                'chain_objects': pymol_bridge.chain_object_names(),
+                'snake_id': 'run_%d' % session['epoch'],
+            }
+        self.get_spectra_btn.setEnabled(True)  # (e) presenter-only enable
 
     def shutdown(self):
         """dialog-close hook (PluginDialog.closeEvent) - every end path
@@ -938,7 +1019,17 @@ class GameTab(QtWidgets.QWidget):
         EVERY end path while srp_head/srp_seg_* are untouched, folded
         INTO this ONE helper per locked decision 8 (never a second
         helper); idempotent like the unlock, needed by restart AND by
-        the completion flow's 'viewer clears' semantics.
+        the completion flow's 'viewer clears' semantics; (g) Get
+        Spectra re-disables here (plan 05-15): the button is live ONLY
+        from _present_completion to the next teardown, so every new
+        round (begin_game's teardown-first) starts with it off.
+
+        Reload-mid-run hardening (research teardown_integration item
+        4): after a Plugin-Manager reload the new widget has
+        _session None while the ANCHOR session may still hold a stale
+        saved_cam - the (d) pop falls back to the anchor's game_session
+        under the SAME pop semantics, so the camera cannot stay
+        mouse-locked until the next full game cycle.
         """
         self._tick_timer.stop()
         self._elapsed_timer.stop()
@@ -947,6 +1038,9 @@ class GameTab(QtWidgets.QWidget):
         game_input.teardown(handle)
         self._input_handle = None
         session = self._session
+        if session is None and self._anchor is not None:
+            # Reload-mid-run: the anchored session may hold saved_cam.
+            session = getattr(self._anchor, 'game_session', None)
         if session is not None:
             pymol_bridge.unlock_camera(session.pop('saved_cam', None))
         pymol_bridge.delete_pickups()  # (f) live pickups die here, chain stays
@@ -955,6 +1049,7 @@ class GameTab(QtWidgets.QWidget):
         self.pause_btn.setText('Pause')
         self.pause_btn.setEnabled(False)
         self.pause_btn.blockSignals(False)
+        self.get_spectra_btn.setEnabled(False)  # (g) presenter-only enable
 
     # --- misc ---------------------------------------------------------------
 
