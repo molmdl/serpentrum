@@ -155,6 +155,21 @@ class GameTab(QtWidgets.QWidget):
     an un-stacked pickup dies while the chain (srp_head/srp_seg_*)
     stays complete (the GAME-09 'viewer clears' ordering: on the
     _end_run path teardown runs BEFORE the completion presenter).
+
+    Phase 5 note (plan 05-13): the 'stacked' capture seam is live -
+    _handle_stack_event resolves every ('stacked', pickup) event
+    synchronously in ONE tick via placement.resolve (skip -> tail ->
+    place -> gate), attaches placed pickups to the chain (viewer
+    transform + 'srp_seg_<n>' rename inside the srp_ prefix), and
+    rejects EVERY non-placed outcome through engine.reject_pickup
+    (locked decision 13 - counters can never desync, and a clash-
+    refused cap capture un-finishes the run via 05-04). Every
+    resolution appends to the session's stacked_history (the STACK-04
+    per-pickup record whose 'name'/'outcome'/'distance_a'/
+    'citation_short'/'interaction_id' fields hud_logic.breakdown_lines
+    consumes at completion) and runs the one-spawn-per-resolution
+    respawn gate (05-03). The 'won' branch logs only when
+    engine.finished still holds, so a false YOU WIN is impossible.
     """
 
     def __init__(self, anchor_state=None, parent=None):
