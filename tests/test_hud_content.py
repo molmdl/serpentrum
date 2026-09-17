@@ -310,5 +310,108 @@ class TestReasonText(unittest.TestCase):
             'skipped naphthalene: placement clashes')
 
 
+class TestDebugCaptureTrace(unittest.TestCase):
+    """debug_capture_trace: the SRP_DEBUG=1 per-capture trace (05-16
+    live-retest instrument). Exact-format pins; the builders are PURE
+    (all values arrive as args; zero viewer/engine reads)."""
+
+    def test_placed_full_line(self):
+        line = hud_logic.debug_capture_trace(
+            'pick_0003', 'naphthalene', 'placed',
+            placed_normal=(-1.0, 0.0, 0.0),
+            tail_normal=(-1.0, 0.0, 0.0),
+            distance=3.6000069, plane_gap=3.383, lateral_gap=1.231,
+            box_min=(-18.0, -18.0), box_max=(18.0, 18.0),
+            molecules_stacked=2, pickups_remaining=3)
+        self.assertEqual(
+            line,
+            'DBG capture pick_0003 naphthalene placed '
+            'n_placed=(-1.000,0.000,0.000) n_tail=(-1.000,0.000,0.000) '
+            'dot=1.000000 d=3.6000 plane=3.3830 lat=1.2310 '
+            'box=(-18.0,-18.0)/(18.0,18.0) stacked=2 pickups=3')
+
+    def test_dot_computed_from_args(self):
+        # Antiparallel normals still mean parallel planes: the sign is
+        # walk-order dependent and the trace must report it faithfully.
+        line = hud_logic.debug_capture_trace(
+            'p', 'benzene', 'placed',
+            placed_normal=(-1.0, 0.0, 0.0), tail_normal=(1.0, 0.0, 0.0),
+            distance=3.6, plane_gap=3.383, lateral_gap=1.231,
+            box_min=(-1.0, -1.0), box_max=(1.0, 1.0),
+            molecules_stacked=0, pickups_remaining=0)
+        self.assertIn('dot=-1.000000', line)
+
+    def test_refused_code_with_detail(self):
+        line = hud_logic.debug_capture_trace(
+            'pick_0004', 'biphenyl', placement.REFUSE_ATOM,
+            detail='2.10 A',
+            molecules_stacked=1, pickups_remaining=2)
+        self.assertEqual(
+            line,
+            'DBG capture pick_0004 biphenyl REFUSE_ATOM detail=2.10 A '
+            'stacked=1 pickups=2')
+
+    def test_skipped_code_omits_detail_when_none(self):
+        line = hud_logic.debug_capture_trace(
+            'pick_0007', 'naphthalene', placement.SKIP_NO_ENTRY,
+            molecules_stacked=0, pickups_remaining=4)
+        self.assertEqual(
+            line, 'DBG capture pick_0007 naphthalene SKIP_NO_ENTRY '
+            'stacked=0 pickups=4')
+        self.assertNotIn('detail=', line)
+        self.assertNotIn('n_placed=', line)
+        self.assertNotIn(' box=', line)
+
+    def test_single_line_no_newline(self):
+        line = hud_logic.debug_capture_trace(
+            'p', 'x', 'placed', placed_normal=(0.0, 0.0, 1.0),
+            tail_normal=(0.0, 0.0, 1.0), distance=1.0, plane_gap=1.0,
+            lateral_gap=0.0, box_min=(0.0, 0.0), box_max=(1.0, 1.0),
+            molecules_stacked=1, pickups_remaining=1)
+        self.assertNotIn('\n', line)
+
+
+class TestDebugEventTrace(unittest.TestCase):
+    """debug_event_trace: the SRP_DEBUG=1 event-line builder."""
+
+    def test_turning_first_tick(self):
+        line = hud_logic.debug_event_trace(
+            'turning', tick=12, heading='right', head_xy=(4.5, 0.0),
+            sweep_delta=-90.0)
+        self.assertEqual(
+            line, 'DBG event turning tick=12 heading=right '
+            'head=(4.50,0.00) delta=-90.0000')
+
+    def test_crashed_with_reason(self):
+        line = hud_logic.debug_event_trace(
+            'crashed', tick=200, heading='up', head_xy=(3.0, 17.5),
+            result='boundary')
+        self.assertEqual(
+            line, 'DBG event crashed tick=200 heading=up '
+            'head=(3.00,17.50) result=boundary')
+
+    def test_won_includes_counters(self):
+        line = hud_logic.debug_event_trace(
+            'won', tick=99, heading='left', head_xy=(0.0, 0.0),
+            molecules_stacked=10, pickups_remaining=2)
+        self.assertEqual(
+            line, 'DBG event won tick=99 heading=left head=(0.00,0.00) '
+            'stacked=10 pickups=2')
+
+    def test_end_run_result_and_counters(self):
+        line = hud_logic.debug_event_trace(
+            'end_run', result='won', molecules_stacked=10,
+            pickups_remaining=2)
+        self.assertEqual(line,
+                         'DBG event end_run result=won '
+                         'stacked=10 pickups=2')
+
+    def test_sparse_fields_omitted(self):
+        line = hud_logic.debug_event_trace('won')
+        self.assertEqual(line, 'DBG event won')
+        self.assertNotIn('tick=', line)
+        self.assertNotIn('heading=', line)
+
+
 if __name__ == '__main__':
     unittest.main()

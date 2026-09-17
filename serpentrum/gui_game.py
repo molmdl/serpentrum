@@ -69,6 +69,9 @@ from . import molfile
 from . import orientation
 from . import placement
 from . import spawn as spawn_mod
+# stacking is consumed ONLY on the SRP_DEBUG=1 trace path (ring normals
+# recomputed for the live capture trace; a PURE sibling import).
+from . import stacking
 # ROUTE-AGNOSTIC input seam (04-07 verdict APPROVED the wizard route).
 # Both routes expose identical install/set_active/teardown signatures,
 # so a fallback verdict would swap this ONE line to
@@ -183,6 +186,21 @@ class GameTab(QtWidgets.QWidget):
     is model-A wired (locked decision 9): this tab EMITS
     spectra_requested; PluginDialog owns the QTabWidget switch - this
     widget NEVER reaches up to its parent.
+
+    SRP_DEBUG=1 (live-retest tracer, 05-16 checkpoint follow-up): when
+    the environment variable SRP_DEBUG equals '1' -- read ONCE per
+    begin_game into the session (never per tick) -- the info box gains
+    a live debug trace, env-gated so default play has LITERAL zero
+    extra output (the chattiness policy is byte-identical with the flag
+    off): one 'DBG capture' line per capture resolution (pickup id /
+    name / outcome code, and for placed stacks the placed + tail ring
+    normals at 3 decimals, their dot, and the LIVE ring-centroid step
+    decomposed into plane gap + lateral shift at 4 decimals, plus the
+    gate box and engine counters), one 'DBG event turning' line per
+    sweep (first tick only: logical tick, heading, head xy, signed
+    sweep delta), and 'DBG event crashed' / 'won' / 'end_run' lines
+    with the engine counters. Every number is PURE (hud_logic builders
+    over engine state; NO viewer reads are added anywhere).
     """
 
     # Model-A handoff (locked decision 9, the 04-06 start_requested
@@ -310,6 +328,14 @@ class GameTab(QtWidgets.QWidget):
             'stacked_history': [],
             'live_pickup_names': [],
             'last_turn_delta': 0.0,
+            # SRP_DEBUG=1 live-debug trace (05-16 retest instrument):
+            # read ONCE per begin_game (NEVER per tick), captured into
+            # the session so every trace path is a cheap dict lookup;
+            # default-off preserves the chattiness policy with literal
+            # zero output. 'tick_n' is the debug-only logical tick
+            # counter printed by the event trace.
+            'debug': os.environ.get('SRP_DEBUG') == '1',
+            'tick_n': 0,
         }
         if self._anchor is not None:
             self._anchor.game_session = self._session
@@ -548,6 +574,7 @@ class GameTab(QtWidgets.QWidget):
             return
         old = engine.head
         events = engine.step(TICK_DT)
+        session['tick_n'] += 1  # SRP_DEBUG trace counter (dict-cheap)
         moved = False
         for ev in events:
             if ev[0] == 'moved':
@@ -599,11 +626,32 @@ class GameTab(QtWidgets.QWidget):
             self._handle_stack_event(ev[1], engine)
         elif kind == 'crashed':
             self._log('crashed into %s' % ev[1])
+            self._dbg_event(engine, 'crashed', result=ev[1])
         elif kind == 'budget_warning':
             self._log(hud_logic.budget_text())
         elif kind == 'won':
             if engine.finished:
                 self._log('YOU WIN')
+                self._dbg_event(
+                    engine, 'won',
+                    molecules_stacked=engine.molecules_stacked,
+                    pickups_remaining=engine.pickups_remaining)
+
+    def _dbg_event(self, engine, kind, **kwargs):
+        """SRP_DEBUG=1 event trace through hud_logic.debug_event_trace.
+
+        Silent by construction when the session opt-in is off: the flag
+        was read ONCE at begin_game and lives on the session dict, so
+        this path is a dict lookup on every non-debug tick and the
+        chattiness policy is preserved (default: zero output).
+        """
+        session = self._session
+        if session is None or not session.get('debug'):
+            return
+        self._log(hud_logic.debug_event_trace(
+            kind, tick=session.get('tick_n'),
+            heading=_heading_name(engine.heading), head_xy=engine.head,
+            **kwargs))
 
     # --- Phase-5 sweep rendering (plan 05-14, GAME-10 viewer half) ---------
 
@@ -647,6 +695,14 @@ class GameTab(QtWidgets.QWidget):
         if sweep is not None:
             delta = sweep['angle_signed'] / float(sweep['total_ticks'])
             session['last_turn_delta'] = delta
+            # SRP_DEBUG=1: ONE line per sweep (first tick only -- the
+            # 6-tick sweep would otherwise print 6 lines).
+            if (session.get('debug') and sweep['tick'] == 1):
+                self._log(hud_logic.debug_event_trace(
+                    'turning', tick=session.get('tick_n'),
+                    heading=_heading_name(engine.heading),
+                    head_xy=engine.head,
+                    sweep_delta=sweep['angle_signed']))
         else:
             # Final sweep tick: engine cleared sweeping; reuse the
             # stored per-tick delta (same signed 15-degree step).
@@ -735,6 +791,16 @@ class GameTab(QtWidgets.QWidget):
                 if (p['id'] in engine.live_pickup_ids
                         and p['id'] != pickup_rec['id']):
                     existing_atoms.extend(p['atoms'])
+            # SRP_DEBUG=1: capture the PRE-RESOLUTION tail frame (the
+            # same inputs resolve consumes below; resolve returns the
+            # PLACEMENT geometry, never the tail, so the trace pairs
+            # the placed ring against its own recomputed tail).
+            debug = session.get('debug')
+            debug_tail = None
+            if debug:
+                debug_tail = placement.tail_frame(
+                    engine.segments, records_by_id, head_atoms,
+                    head_stack_ring, engine.heading)
             outcome = placement.resolve(
                 resolve_rec, records_by_id, stacking_data,
                 head_atoms, head_stack_ring, engine.heading,
@@ -764,6 +830,10 @@ class GameTab(QtWidgets.QWidget):
                 })
                 self._log(hud_logic.pickup_block(
                     name, outcome['interaction'], outcome['citation_short']))
+                if debug_tail is not None:
+                    self._log(self._dbg_capture_line(
+                        pickup_rec, name, 'placed', outcome, debug_tail,
+                        engine))
             else:
                 code = outcome['code']
                 # reject_pickup on EVERY non-placed outcome (locked
@@ -774,6 +844,12 @@ class GameTab(QtWidgets.QWidget):
                     code, outcome.get('detail'), name))
                 session['stacked_history'].append({
                     'name': name, 'outcome': code})
+                if debug_tail is not None:
+                    self._log(hud_logic.debug_capture_trace(
+                        pickup_rec['id'], name, code,
+                        detail=outcome.get('detail'),
+                        molecules_stacked=engine.molecules_stacked,
+                        pickups_remaining=engine.pickups_remaining))
                 if outcome['status'] == 'refused':
                     # The viewer object stays VISIBLE (re-armed) and
                     # the run continues - the G2 un-finish line.
@@ -786,6 +862,42 @@ class GameTab(QtWidgets.QWidget):
                 # dangling. Skipped when the segment already attached
                 # (rolling back there would desync the counters).
                 engine.reject_pickup(pickup_rec['id'], 'error')
+
+    def _dbg_capture_line(self, pickup_rec, name, code, outcome,
+                          tail_frame, engine):
+        """SRP_DEBUG=1 placed-capture trace (hud_logic.debug_capture_trace).
+
+        Recomputes the PLACED ring frame from outcome['placed_atoms']
+        (pure stacking.ring_frame; NO viewer reads anywhere on this
+        path) and pairs it with the pre-resolution --- tail_frame --- so
+        the user can watch, live: both ring normals (parallel-displaced
+        => |dot| = 1.0), the LIVE ring-centroid step decomposed into
+        the along-normal plane gap and the perpendicular lateral shift
+        (the DATA-02 3.60 A @ 20 deg encoding decodes to plane ~3.383 /
+        lat ~1.231), the 2D gate box and the engine counters.
+        """
+        xyz = [(a[1], a[2], a[3]) for a in outcome['placed_atoms']]
+        stack_ring = self._session['records_by_id'][
+            pickup_rec['molecule_id']]['stack_ring']
+        placed_c, placed_n, _placed_r = stacking.ring_frame(xyz, stack_ring)
+        tail_c, tail_n, _tail_r = tail_frame
+        growth = (placed_c[0] - tail_c[0],
+                  placed_c[1] - tail_c[1],
+                  placed_c[2] - tail_c[2])
+        distance = math.sqrt(growth[0] ** 2 + growth[1] ** 2 +
+                             growth[2] ** 2)
+        plane_gap = (growth[0] * tail_n[0] + growth[1] * tail_n[1] +
+                     growth[2] * tail_n[2])
+        lateral_gap = math.sqrt(max(0.0, distance * distance -
+                                    plane_gap * plane_gap))
+        return hud_logic.debug_capture_trace(
+            pickup_rec['id'], name, code,
+            placed_normal=placed_n, tail_normal=tail_n,
+            distance=distance, plane_gap=plane_gap,
+            lateral_gap=lateral_gap,
+            box_min=engine.box_min, box_max=engine.box_max,
+            molecules_stacked=engine.molecules_stacked,
+            pickups_remaining=engine.pickups_remaining)
 
     def _respawn_pickup(self, session, engine):
         """The ONE-spawn-per-resolution respawn gate (plan 05-03).
@@ -957,6 +1069,9 @@ class GameTab(QtWidgets.QWidget):
         if session is not None:
             session['status'] = 'over'
         self._log('run over: %s' % (engine.result or 'over'))
+        self._dbg_event(engine, 'end_run', result=(engine.result or 'over'),
+                        molecules_stacked=engine.molecules_stacked,
+                        pickups_remaining=engine.pickups_remaining)
         self._teardown_round()
         if session is not None:
             self._present_completion(engine)

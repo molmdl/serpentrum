@@ -186,3 +186,93 @@ def resume_note(name):
     `name` is accepted for call-site symmetry but deliberately unused:
     this is a run-state fact, not molecule-level chemistry."""
     return 'placement refused - run continues (cap not reached yet)'
+
+
+# ---------------------------------------------------------------------------
+# SRP_DEBUG=1 live-debug trace builders (05-16 checkpoint follow-up).
+# Env-gated in gui_game (read ONCE per begin_game); these PURE builders
+# only ever RUN when the user opts in -- default-off silence preserves
+# the chattiness policy: nothing here fires per tick in normal play, and
+# nothing here contains viewer reads (all numbers arrive as plain args).
+# The trace answers "is my stack parallel-displaced?": every placed
+# capture prints the placed/tail ring normals (3 decimals), their dot
+# (parallel planes = |1.0|), the ring-centroid distance decomposed into
+# the along-normal plane gap + lateral shift (4 decimals -- the live
+# heights the DATA-02 3.60 A @ 20 deg encoding decodes to), the gate
+# box, and the engine counters.
+# ---------------------------------------------------------------------------
+
+
+def _fmt_v3(v):
+    """'(x,y,z)' at 3 decimals (the ring-normal formatting block)."""
+    return '(%.3f,%.3f,%.3f)' % (v[0], v[1], v[2])
+
+
+def debug_capture_trace(pickup_id, name, code, detail=None,
+                        placed_normal=None, tail_normal=None,
+                        distance=None, plane_gap=None, lateral_gap=None,
+                        box_min=None, box_max=None,
+                        molecules_stacked=None, pickups_remaining=None):
+    """One debug line per capture resolution (SRP_DEBUG=1 only).
+
+    pickup_id / name: the captured pickup. code: 'placed' or the
+    placement.py outcome code (SKIP_*/REFUSE_* -- the ONE taxonomy).
+    detail: refuse detail (clash distance string) when present.
+    placed_normal / tail_normal: 3-vectors at 3 decimals, plus their
+    dot at 6 decimals; parallel-displaced prints |dot| = 1.0.
+    distance / plane_gap / lateral_gap: the LIVE ring-centroid step
+    decomposed (4 decimals): distance = |step|, plane_gap = step along
+    the growth normal (the 3.383 A encoding), lateral_gap = the
+    perpendicular remainder (the 1.231 A encoding). box_min / box_max:
+    the 2D gate box the clash check ran against. molecules_stacked /
+    pickups_remaining: engine counters AFTER the resolution.
+    """
+    line = 'DBG capture %s %s %s' % (pickup_id, name, code)
+    if detail is not None:
+        line += ' detail=%s' % detail
+    if placed_normal is not None and tail_normal is not None:
+        dot = (placed_normal[0] * tail_normal[0] +
+               placed_normal[1] * tail_normal[1] +
+               placed_normal[2] * tail_normal[2])
+        line += (' n_placed=%s n_tail=%s dot=%.6f'
+                 % (_fmt_v3(placed_normal), _fmt_v3(tail_normal), dot))
+    if distance is not None:
+        line += (' d=%.4f plane=%.4f lat=%.4f'
+                 % (distance, plane_gap, lateral_gap))
+    if box_min is not None and box_max is not None:
+        line += (' box=(%.1f,%.1f)/(%.1f,%.1f)'
+                 % (box_min[0], box_min[1], box_max[0], box_max[1]))
+    if molecules_stacked is not None:
+        line += ' stacked=%d pickups=%d' % (molecules_stacked,
+                                            pickups_remaining)
+    return line
+
+
+def debug_event_trace(kind, tick=None, heading=None, head_xy=None,
+                      sweep_delta=None, result=None,
+                      molecules_stacked=None, pickups_remaining=None):
+    """One debug line per notable engine event (SRP_DEBUG=1 only).
+
+    kind: 'turning' (first sweep tick only, so a 6-tick sweep prints
+    ONCE), 'crashed', 'won', 'end_run'. tick: the controller's logical
+    tick counter; heading: axis name; head_xy: engine head; sweep_delta:
+    the signed sweep angle in degrees when turning; result: the engine
+    result at run end; molecules_stacked / pickups_remaining: engine
+    counters when known.
+    """
+    line = 'DBG event %s' % kind
+    if tick is not None:
+        line += ' tick=%d' % tick
+    if heading is not None:
+        line += ' heading=%s' % heading
+    if head_xy is not None:
+        line += ' head=(%.2f,%.2f)' % head_xy
+    if sweep_delta is not None:
+        line += ' delta=%+.4f' % sweep_delta
+    if result is not None:
+        line += ' result=%s' % result
+    if molecules_stacked is not None:
+        line += ' stacked=%d' % molecules_stacked
+    if pickups_remaining is not None:
+        line += ' pickups=%d' % pickups_remaining
+    return line
