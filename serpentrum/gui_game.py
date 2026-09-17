@@ -124,6 +124,21 @@ def _read_record(path):
     return molfile.read_sdf(path)[0]
 
 
+def _heading_name(heading):
+    """Reverse-lookup the DIRS name for an engine heading unit vector.
+
+    spawn.PickupSpawner's contract takes the heading NAME ('left' /
+    'right' / 'up' / 'down' - spawn.py _DIRS keying) while the engine
+    stores the unit vector. Rigid 90-degree sweeps keep the engine
+    heading EXACTLY on one of the four axis vectors, so an exact
+    match always exists during play.
+    """
+    for name, unit in game_engine.DIRS.items():
+        if unit == heading:
+            return name
+    raise ValueError('heading %r is not an axis direction' % (heading,))
+
+
 class GameTab(QtWidgets.QWidget):
     """The Game tab HUD.
 
@@ -504,19 +519,196 @@ class GameTab(QtWidgets.QWidget):
             self._end_run(engine)
 
     def _handle_event(self, ev, engine):
-        """Route one engine event to the info box (or silence).
+        """Route one engine event to the info box (or the Phase-5 seams).
 
         'moved'/'turning' are silent (too chatty at 10 Hz, research
-        Q2). 'won' is unreachable in Phase 4 (pickups=None) and kept
-        for Phase 5.
+        Q2). 'stacked' funnels into _handle_stack_event (the Phase-5
+        capture seam, plan 05-13) - it arrives BEFORE 'budget_warning'
+        and 'won' in the engine's pinned per-tick event order, so a
+        clash-refused cap capture has already un-finished the engine
+        (plan 05-04) when 'won' is dispatched next; the 'won' branch
+        therefore logs only if engine.finished still holds (a false
+        YOU WIN is impossible by construction).
         """
         kind = ev[0]
         if kind == 'turn_refused':
             self._log('turn refused: %s' % ev[1])
+        elif kind == 'stacked':
+            self._handle_stack_event(ev[1], engine)
         elif kind == 'crashed':
             self._log('crashed into %s' % ev[1])
         elif kind == 'won':
-            self._log('YOU WIN')
+            if engine.finished:
+                self._log('YOU WIN')
+
+    # --- Phase-5 capture seam (plan 05-13) -----------------------------------
+
+    def _handle_stack_event(self, pickup_rec, engine):
+        """The 'stacked' capture seam - the Phase-5 connector.
+
+        ONE synchronous resolution per ('stacked', pickup) event, a
+        line-by-line GUI transcription of tests/test_phase5_integration.
+        py's capture() helper - SAME ORDER: skip -> tail -> place ->
+        gate (all inside placement.resolve) -> attach/reject:
+
+          placed  -> engine.attach_segment (counter-neutral; the
+                     capture already counted), viewer transform
+                     (orientation.matrix_rt(R, t) via bridge), rename
+                     'srp_pickup_<id>' -> 'srp_seg_<n>' (the srp_
+                     prefix contract: cleanup_srp + delete_pickups
+                     only ever see game objects), STACK-04 structured
+                     pickup block, stacked_history entry.
+          skipped/refused -> engine.reject_pickup ALWAYS (locked
+                     decision 13 - the capture already incremented
+                     the counters, and the un-finish fix from plan
+                     05-04 lives on this path, so counters can never
+                     desync), then the educator-readable reason line.
+                     A refused pickup's viewer object stays VISIBLE
+                     (reject re-arms it), and hud_logic.resume_note
+                     records the G2 un-finish for the player.
+
+        After EVERY resolution (success or refusal, plan 05-03 spawn
+        policy) the respawn gate runs: at most ONE new spawn per
+        resolution, gated by MAX_LIVE_PICKUPS. The engine has no
+        spawn API; the controller extends the seeded pickups list /
+        live id set / remaining counter exactly as reset() would
+        have - same record shape, engine-owned thereafter.
+
+        The whole body is wrapped in try/except -> 'placement error'
+        + reject_pickup(id, 'error') as the last-resort counter
+        guard (a capture may never dangle). A segment already
+        attached is never rolled back (attach == counted == tracked:
+        rejecting there would DESYNC the counters it guards).
+        Viewer-read discipline: placement decides in PURE math from
+        the session/engine mirrors; the ONLY cmd calls here are
+        transform/rename/materialize WRITES (research Never-do list).
+        """
+        session = self._session
+        attached = False
+        try:
+            records_by_id = session['records_by_id']
+            stacking_data = None
+            if self._anchor is not None:
+                stacking_data = getattr(self._anchor, 'stacking_data', None)
+            head_atoms = session['head_atoms'] or []
+            head_stack_ring = session['head_stack_ring']
+            display_z = pymol_bridge.BOX_DISPLAY_Z
+            # Resolution-time enrichment: the engine pickup record
+            # carries only the seed keys; placement's skip taxonomy
+            # needs the record's stack_ring / has_stack_entry / set
+            # (the test seam's pickup_seed carries them on the seed;
+            # enriching here from records_by_id keeps ONE truth and
+            # covers begin_game-seeded pickups identically).
+            record = records_by_id[pickup_rec['molecule_id']]
+            resolve_rec = dict(pickup_rec)
+            if 'stack_ring' in record:
+                resolve_rec['stack_ring'] = list(record['stack_ring'])
+            resolve_rec['has_stack_entry'] = record.get('has_stack_entry')
+            resolve_rec['set'] = record.get('set')
+            # Locked clash-gate set (plan 05-05): head + ALL segment
+            # atoms + OTHER live pickups' atoms (own atoms excluded).
+            existing_atoms = list(head_atoms)
+            for seg in engine.segments:
+                existing_atoms.extend(seg['atoms'])
+            for p in engine.pickups:
+                if (p['id'] in engine.live_pickup_ids
+                        and p['id'] != pickup_rec['id']):
+                    existing_atoms.extend(p['atoms'])
+            outcome = placement.resolve(
+                resolve_rec, records_by_id, stacking_data,
+                head_atoms, head_stack_ring, engine.heading,
+                engine.segments, existing_atoms,
+                engine.box_min, engine.box_max, display_z)
+            name = record['name']
+            if outcome['status'] == 'placed':
+                engine.attach_segment(pickup_rec['molecule_id'],
+                                      outcome['ring_centroid_xy'],
+                                      outcome['placed_atoms'])
+                attached = True
+                old_name = 'srp_pickup_%s' % pickup_rec['id']
+                m16 = orientation.matrix_rt(outcome['R'], outcome['t'])
+                pymol_bridge.apply_matrix(old_name, m16)
+                # len(engine.segments) AFTER attach -> 1-based index
+                # (smoke 07 verified cmd.set_name live).
+                new_name = 'srp_seg_%d' % len(engine.segments)
+                pymol_bridge.rename_pickup(old_name, new_name)
+                if old_name in session['live_pickup_names']:
+                    session['live_pickup_names'].remove(old_name)
+                session['stacked_history'].append({
+                    'name': name,
+                    'outcome': 'stacked',
+                    'distance_a': outcome['interaction']['distance_a'],
+                    'citation_short': outcome['citation_short'],
+                    'interaction_id': outcome['interaction']['id'],
+                })
+                self._log(hud_logic.pickup_block(
+                    name, outcome['interaction'], outcome['citation_short']))
+            else:
+                code = outcome['code']
+                # reject_pickup on EVERY non-placed outcome (locked
+                # decision 13): capture counters roll back, pickup
+                # re-arms, a cap-reaching 'won' un-finishes (05-04).
+                engine.reject_pickup(pickup_rec['id'], code)
+                self._log(hud_logic.reason_text(
+                    code, outcome.get('detail'), name))
+                session['stacked_history'].append({
+                    'name': name, 'outcome': code})
+                if outcome['status'] == 'refused':
+                    # The viewer object stays VISIBLE (re-armed) and
+                    # the run continues - the G2 un-finish line.
+                    self._log(hud_logic.resume_note(name))
+            self._respawn_pickup(session, engine)
+        except Exception as exc:
+            self._log('placement error: %s' % exc)
+            if not attached:
+                # Last-resort counter guard: never leave a capture
+                # dangling. Skipped when the segment already attached
+                # (rolling back there would desync the counters).
+                engine.reject_pickup(pickup_rec['id'], 'error')
+
+    def _respawn_pickup(self, session, engine):
+        """The ONE-spawn-per-resolution respawn gate (plan 05-03).
+
+        At most one new pickup per resolution, gated by the spawner's
+        MAX_LIVE_PICKUPS ceiling. The engine has no spawn API, so the
+        controller APPENDS the seed dict to engine.pickups, adds the
+        pid to engine.live_pickup_ids and bumps
+        engine.pickups_remaining - the exact engine-owned state
+        GameEngine(pickups=[seed]) builds at reset() (same record
+        shape, unknown keys carried through engine copies). The
+        viewer object materializes edge-on as sticks at the spawn
+        centroid ('m16 from edge_on + centroid', the same _pickup_m16
+        begin_game uses) and registers in live_pickup_names.
+        """
+        spawner = session['spawner']
+        if spawner is None:
+            return
+        if not spawner.can_spawn(len(engine.live_pickup_ids)):
+            return
+        chain_atoms = list(session['head_atoms'] or [])
+        for seg in engine.segments:
+            chain_atoms.extend(seg['atoms'])
+        live_centroids = [p['centroid'] for p in engine.pickups
+                          if p['id'] in engine.live_pickup_ids]
+        result = spawner.next_after(
+            engine.head, _heading_name(engine.heading),
+            chain_atoms, live_centroids)
+        if result is None:
+            return  # no legal position: NO state advance (05-03)
+        record, pid, centroid = result
+        seed = spawn_mod.build_pickup_seed(
+            record, pid, centroid, self._mirror_atoms(record))
+        if 'stack_ring' in record:
+            seed['stack_ring'] = list(record['stack_ring'])
+        seed['has_stack_entry'] = record.get('has_stack_entry')
+        seed['set'] = record.get('set')
+        engine.pickups.append(seed)
+        engine.live_pickup_ids.add(pid)
+        engine.pickups_remaining += 1
+        name = 'srp_pickup_%s' % pid
+        pymol_bridge.materialize_pickup(
+            record['file'], name, self._pickup_m16(record, centroid))
+        session['live_pickup_names'].append(name)
 
     def _on_elapsed_tick(self):
         """1 Hz elapsed refresh - delta-based, NEVER accumulated (Pitfall 5).
