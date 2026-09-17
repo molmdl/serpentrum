@@ -50,6 +50,7 @@ spawned. Elapsed-time math is delta-based from the wall clock
 counts (Pitfall 5).
 """
 
+import math
 import os
 import time
 
@@ -536,18 +537,26 @@ class GameTab(QtWidgets.QWidget):
     def _handle_event(self, ev, engine):
         """Route one engine event to the info box (or the Phase-5 seams).
 
-        'moved'/'turning' are silent (too chatty at 10 Hz, research
-        Q2). 'stacked' funnels into _handle_stack_event (the Phase-5
-        capture seam, plan 05-13) - it arrives BEFORE 'budget_warning'
-        and 'won' in the engine's pinned per-tick event order, so a
+        'moved' is silent in the log (too chatty at 10 Hz, research
+        Q2); 'turning' ALSO stays log-silent but is not silent in the
+        viewer - the GAME-10 viewer half (plan 05-14) renders the
+        engine's rigid sweep there (see _handle_turn_event).
+        'stacked' funnels into _handle_stack_event (the Phase-5 capture
+        seam, plan 05-13) - it arrives BEFORE 'budget_warning' and
+        'won' in the engine's pinned per-tick event order, so a
         clash-refused cap capture has already un-finished the engine
         (plan 05-04) when 'won' is dispatched next; the 'won' branch
         therefore logs only if engine.finished still holds (a false
-        YOU WIN is impossible by construction).
+        YOU WIN is impossible by construction). 'budget_warning' (plan
+        05-14) logs the count-FREE advisory (GAME-04 hidden counts:
+        the payload's atoms_total is deliberately NOT displayed; the
+        number reappears only at completion via completion_lines).
         """
         kind = ev[0]
         if kind == 'turn_refused':
             self._log('turn refused: %s' % ev[1])
+        elif kind == 'turning':
+            self._handle_turn_event(engine)
         elif kind == 'stacked':
             self._handle_stack_event(ev[1], engine)
         elif kind == 'crashed':
@@ -555,6 +564,63 @@ class GameTab(QtWidgets.QWidget):
         elif kind == 'won':
             if engine.finished:
                 self._log('YOU WIN')
+
+    # --- Phase-5 sweep rendering (plan 05-14, GAME-10 viewer half) ---------
+
+    def _handle_turn_event(self, engine):
+        """Render ONE ('turning',) tick of the engine's rigid sweep.
+
+        The engine owns ALL sweep math/time (locked decision: engine
+        emits ('turning', frac); the GUI adds ONE rotation call per
+        tick - 05-RESEARCH-pymol-mechanics Pattern 5). Per tick:
+
+        1. delta = sweeping['angle_signed'] / sweeping['total_ticks']
+           (= +/-15 deg) while engine.sweeping is not None. The FINAL
+           sweep tick is the exception: _advance_sweep clears
+           sweeping BEFORE the event list is handled, so tick 6 comes
+           back from session['last_turn_delta'] (stored on EVERY
+           non-None path - the tick-5 value is the same +/-15 deg,
+           so the final 15-degree step still rotates).
+        2. ONE pymol_bridge.sweep_chain(delta, engine.head) call -
+           cmd.rotate('z', delta, 'srp_head or srp_seg_*', camera=0,
+           origin=[hx, hy, 0]): the WHOLE chain sweeps as a rigid body
+           about the head pivot; srp_head is INCLUDED so it spins in
+           place and its ring normal follows the chain (Pattern 2,
+           probe-verified; origin= is mandatory, pitfall P5-4).
+           Sign comes from the engine (delta > 0 = CCW, matching
+           _rotate_xy).
+        3. The PURE head mirror rotates by the SAME delta with the
+           SAME game_engine._rotate_xy primitive about
+           (head[0], head[1]); z and sym preserved exactly (the way
+           _advance_sweep treats segments) - pure truth == viewer
+           truth for the next tail frame and the clash gate.
+
+        No collision logic here (pre-checked at sweep open - engine
+        contract); no second timer (the sweep tick IS the movement
+        tick); pause mid-sweep needs nothing (timers stop, engine
+        retains sweeping, resume continues). NO info-box line per
+        tick (existing chattiness policy - the sweep is visible in
+        the viewer).
+        """
+        session = self._session
+        sweep = engine.sweeping
+        if sweep is not None:
+            delta = sweep['angle_signed'] / float(sweep['total_ticks'])
+            session['last_turn_delta'] = delta
+        else:
+            # Final sweep tick: engine cleared sweeping; reuse the
+            # stored per-tick delta (same signed 15-degree step).
+            delta = session['last_turn_delta']
+        pymol_bridge.sweep_chain(delta, engine.head)  # ONE cmd call
+        head_atoms = session['head_atoms']
+        if head_atoms is not None:
+            hx, hy = engine.head
+            cos_t = math.cos(math.radians(delta))
+            sin_t = math.sin(math.radians(delta))
+            session['head_atoms'] = [
+                (sym,) + game_engine._rotate_xy(x, y, hx, hy, cos_t, sin_t)
+                + (z,)
+                for (sym, x, y, z) in head_atoms]
 
     # --- Phase-5 capture seam (plan 05-13) -----------------------------------
 
