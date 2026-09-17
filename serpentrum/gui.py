@@ -72,6 +72,9 @@ class PluginDialog(QtWidgets.QDialog):
         # Start flow (GAME-01, HUD research Q1 model A): SetupTab emits
         # start_requested(setup); this dialog owns the tab switch.
         setup_page.start_requested.connect(self._on_start_requested)
+        # Get Spectra flow (GAME-09, plan 05-15): same model-A pattern -
+        # GameTab emits spectra_requested; this dialog owns the switch.
+        self.game_tab.spectra_requested.connect(self._on_spectra_requested)
         buttons = QtWidgets.QHBoxLayout()   # Phase 8: 6 right-aligned buttons
         buttons.addStretch(1)               # reserved row - no buttons in Phase 1
         outer = QtWidgets.QVBoxLayout(self)
@@ -89,6 +92,17 @@ class PluginDialog(QtWidgets.QDialog):
         """
         self.tabs.setCurrentIndex(1)
         self.game_tab.begin_game(setup)
+
+    def _on_spectra_requested(self):
+        """GAME-09: switch to the Spectra tab (model-A handoff per 04-06).
+
+        The dialog owns the QTabWidget - GameTab never reaches its
+        parent (locked decision 9). Page 2 is the Phase-7 placeholder
+        (Phase 7 replaces its content); the last_run anchor record is
+        already on _serpentrum for Phases 6/7, so nothing is passed
+        through the signal itself.
+        """
+        self.tabs.setCurrentIndex(2)
 
     def focusInEvent(self, event):
         """Q3 focus-stealing safety net (04-RESEARCH-input.md Q3 (b)).
