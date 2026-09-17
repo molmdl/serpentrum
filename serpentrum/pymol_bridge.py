@@ -358,6 +358,37 @@ def materialize_pickup(path, name, m16):
     return name
 
 
+def reload_head(path, m16=None):
+    """Restore srp_head's canonical pose by RELOADING its file.
+
+    ``cmd.delete`` (when the object exists) -> ``cmd.load(path,
+    object=HEAD_NAME, zoom=0)`` -> optional ONE ``cmd.transform_selection
+    (HEAD_NAME, m16)`` (the Apply-time edge-on matrix) -> ``cmd.show``
+    spheres (view parity with ``materialize``) -> ``place_head`` extent
+    re-center.
+
+    This is THE begin_game pose reset (gui_game._reset_head_viewer; the
+    live-verified perpendicular-stack fix): re-APPLYING the edge-on m16
+    to the current object is INVALID — an m16 encodes the transform of
+    the RAW SDF coords, so applying it a second time double-rotates the
+    ring plane (measured on benzene: displayed head ring normal lands at
+    exactly 90.00 degrees off the placed slab's normal — the T-shape
+    the user saw at the 05-16 checkpoint). Reloading from the record's
+    own file re-canonicalizes deterministically whether the round is a
+    first start (Apply already edge-on'd) or a Restart after sweeps
+    (sweeps rotate atomic coords; the file pose is unambiguous truth).
+    m16=None keeps the head_m16=None Apply parity (upload heads).
+    """
+    if object_exists(HEAD_NAME):
+        cmd.delete(HEAD_NAME)
+    cmd.load(path, object=HEAD_NAME, zoom=0)
+    if m16 is not None:
+        cmd.transform_selection(HEAD_NAME, m16)
+    cmd.show('spheres', HEAD_NAME)
+    place_head(HEAD_NAME)
+    return HEAD_NAME
+
+
 def delete_pickups():
     """Delete every uneaten pickup: pattern delete ``srp_pickup_*``.
 

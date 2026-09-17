@@ -407,28 +407,41 @@ class GameTab(QtWidgets.QWidget):
         return (_extent_center(atoms), record['stack_ring'])
 
     def _reset_head_viewer(self, records_by_id, setup):
-        """Restore srp_head's canonical edge-on pose, then re-center it.
+        """Restore srp_head's canonical edge-on pose by RELOADING its file.
 
-        The Restart pose reset: turn sweeps rotate the head's ATOMIC
-        coords in the viewer, so every begin_game must re-apply
-        edge_on_m16 BEFORE place_head - otherwise a restarted round
-        would keep the swept pose while the engine heads 'right'. No-op
-        when the scene has no head object; a record without stack_ring
-        (uploads) gets the bare place_head centering (the Apply path's
-        head_m16=None parity).
+        The old implementation re-applied orientation.edge_on_m16 to the
+        CURRENT object and re-centered. That was wrong for BOTH begin_game
+        cases, because an m16 encodes the transform OF THE RAW SDF COORDS:
+        on the first round Apply already canonicalized the head, so the
+        m16 double-rotated the ring plane (measured live-verified defect:
+        the displayed head's ring normal lands EXACTLY 90.00 degrees off
+        every placed slab's normal for a benzene head - the 'stacked mol
+        follows perpendicularly' T-shape - while its plane still projects
+        as an x-line, so the scene LOOKS edge-on); on Restart after
+        sweeps, re-applying likewise cannot undo 90-degree sweep rotation
+        (the matrix is not the inverse of anything). The fix is
+        pymol_bridge.reload_head: delete + cmd.load the record's file,
+        apply the m16 ONCE, show spheres, extent re-center - the exact
+        Apply-time pose, deterministic for first rounds and restarts
+        alike. No-op when the scene has no head object; a record without
+        stack_ring (uploads) reloads with m16=None (the Apply path's
+        head_m16=None parity); an unresolvable record falls back to the
+        bare place_head re-center (record=None parity with the old seam).
         """
         if not pymol_bridge.object_exists(pymol_bridge.HEAD_NAME):
             return
         record = pymol_bridge._select_head_record(
             setup, list(records_by_id.values()), [])
-        if record is not None and 'stack_ring' in record:
+        if record is None:
+            pymol_bridge.place_head(pymol_bridge.HEAD_NAME)
+            return
+        m16 = None
+        if 'stack_ring' in record:
             parsed = _read_record(record['file'])
-            pymol_bridge.apply_matrix(
-                pymol_bridge.HEAD_NAME,
-                orientation.edge_on_m16(
-                    parsed['elements'], parsed['coords'],
-                    record['stack_ring']))
-        pymol_bridge.place_head(pymol_bridge.HEAD_NAME)
+            m16 = orientation.edge_on_m16(
+                parsed['elements'], parsed['coords'],
+                record['stack_ring'])
+        pymol_bridge.reload_head(record['file'], m16)
 
     def _mirror_atoms(self, record):
         """Origin-centered (sym, x, y, z) mirror atoms for ONE record.
