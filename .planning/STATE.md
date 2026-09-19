@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
-**Current focus:** Phase 4 — Game Loop & Input (COMPLETE + VERIFIED 2026-09-14, 40/40 must-haves) — next: Phase 5 Stacking & Game Rules Complete
+**Current focus:** Phase 5 — Stacking & Game Rules (16/16 plans executed; 05-VERIFICATION passed 15/15 machine-checked; 05-16 human checkpoint MID-FLIGHT — user re-test pending after 2026-09-19 gameplay-override fixes)
 
 ## Current Position
 
-Phase: 4 of 8 (Game Loop & Input) — COMPLETE + VERIFIED
-Plan: 9 of 9 complete (04-01..04-09); 04-VERIFICATION.md status: passed (40/40 must-haves: 35/35 plan truths + 5/5 phase success criteria; verifier independently re-ran gates + re-checked wiring)
-Status: Phase 4 playable loop verified live (human 12/12 APPROVED) + structurally (gates green, wiring grep-audited); Phase 5 is next
-Last activity: 2026-09-14 — Phase 4 verified (gsd-verifier: passed, zero gaps) + ROADMAP/REQUIREMENTS finalized
+Phase: 5 of 8 (Stacking & Game Rules Complete) — executing
+Plan: 16 of 16 executed (05-01..05-16); 05-VERIFICATION.md: passed machine-checked portion (was human_needed at 15/15 plans, zero gaps, committed 8da8796); 05-16 checkpoint: Task 1 gate pass green, Task 2 human-verify in progress
+Status: machine half green (603 unittests, 7/7 required smokes); human half per-step: step 1 needs re-test after perpendicular-fix (47eaba2) + tail-follow fix (76d74b3); step 2 approved, plus rule-change confirmation pending; steps 3-8 pending
+Last activity: 2026-09-19 — gameplay-override fixes landed (train-follow tail 76d74b3, head-only wall veto cd04525, box presets 69b8fb0, debug session archived af33de9); STATE.md handoff update
 
-Progress: [████████░░] ~84% (32 of ~38 estimated plans — Phases 1-4 firm at 6+14+8+9; Phases 5-8 TBD per roadmap estimates)
+Progress: [█████████░] ~85% (53 plans executed — Phases 1-5 firm at 6+14+8+9+16; Phases 6-8 TBD per roadmap estimates, ~8-11 expected)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 32
+- Total plans completed: 53
 - Total execution time: ~640 executor min (Phase 1: 104; Phase 2: ~330; Phase 3: ~165 incl. smoke-04/fix/measure follow-up agents + verifier; Phase 4: ~41 incl. waves 1-2 + 04-06..04-09)
 
 **By Phase:**
@@ -30,6 +30,7 @@ Progress: [████████░░] ~84% (32 of ~38 estimated plans — P
 | 2. Pure Core — Game & Chemistry Logic | 14/14 | ~330 min | ~24 min |
 | 3. Molecules in the Viewer & Setup Tab | 8/8 | ~165 min | ~21 min |
 | 4. Game Loop & Input | 9/9 | ~41 min (waves 1-2 merged by orchestrator; 04-06 = 7 min, 04-07 = ~5 min finalization, 04-08 = 6 min direct on main, 04-09 = ~15 min clean gate pass + checkpoint finalization) | ~4.6 min |
+| 5. Stacking & Game Rules Complete | 16/16 | waves 1-6 via worktree protocol (batch-capped at 4 parallel) + wave 7 checkpoint still open; live-checkpoint fixes 2026-09-18/19 (perpendicular, tracer, ghost-point, owner overrides) | — not yet aggregated — |
 
 **Recent Trend:**
 - Phase 3: 03-01 (7 min), 03-02 (22), 03-03 (~15 incl. respawn after /home-symlink permission rejection), 03-04 (10), 03-05 (~8, single-plan direct on main), 03-06 (~25, Windows smokes), 03-07 (20), 03-08 (35 + 3 follow-up agents ~25)
@@ -70,11 +71,14 @@ Recent decisions affecting current work:
 - 04-06 2026-09-13: Start flow = HUD research Q1 model A — SetupTab emits `start_requested(setup)`, PluginDialog owns `setCurrentIndex(1)` (self.tabs lives there; GameTab never reaches up to its parent QTabWidget); Start applies FIRST (`_on_apply` bool contract — False on all three modal paths suppresses the emit) so GAME-01 always plays on a materialized scene; temp Start lives in the Setup-tab btn_row (Phase-3 precedent), Phase-8 bottom row byte-identical
 - 04-09 2026-09-14: Phase-4 closing APPROVED (12/12 live + gates green). Observations recorded: wall-crossing ~6 s on medium (plan estimate miscalibrated, speed correct); turn applies at the next 100 ms tick (designed; <1 s perceived latency — potential future game-feel tuning knob, NOT a defect; GAME-08 speed stays locked)
 - 2026-09-11: Agent path discipline — ALL agent work uses /mnt/c/Users/nglok/Desktop/WORKDIR/molmdl/serpentrum (the /home/lwng/... symlink view triggered permission rejections twice); single-plan waves run directly on main (no worktree)
+- **2026-09-19 (owner directives, override part of locked 2026-09-06 GAME-10 line during 05-16 live checkpoint):** (a) TRAIN-FOLLOW TAIL — engine.segments were stationary-per-tick by design (the tail stayed glued at capture points, gap grew 0.3 Å/tick; measured head↔newest 13.001 Å after capture 2 verbatim-matching the user report); now the chain translates rigidly with the head every 'moved' tick via _translate_chain + bridge move_chain_delta (srp_head or srp_seg_*, camera=0); the approved 3.60 Å spacing is unchanged — head↔Nth eaten = 3.6×N Å forever; straight-motion body-collision pins rewritten (train-follow makes head-approach-chain unreachable; crash now = already-overlapping pose tick-1 + sweep-time veto). (b) HEAD-ONLY WALL VETO — boundary leg removed from _sweep_check_safe; the CHAIN may visually swing past the box during a turn (accepted); body + pickup legs still refuse; 180° remains impossible; head-wall crash still ends the run (GAME-05 intact); refusal text updated; yesterday's ghost test rewritten so the same user state now ALLOWS the turn. (c) BOX PRESETS — small ±20 (was ±12), medium ±30 (was ±18, still default), large ±45 (was ±25); BOX_DISPLAY_Z=5.0 unchanged; straight-fit: medium now fits ~16 straight segments (cap-10 comfortable — was only 9)
+- **2026-09-18 (checkpoint fixes within 05-16):** perpendicular-stack root cause = _reset_head_viewer double-applied edge_on_m16 (displayed head ring normal 90.00° off placed slabs while looking edge-on) → pymol_bridge.reload_head (fresh load + edge-on once); SPANOFFS/PLANEPAR smoke steps pin viewer spawn-offset algebra + plane parallelism (old checks were distance-only — why the bug was invisible; tracer added: SRP_DEBUG=1 capture lines `dot=1.000000 d=3.6000` + per-event steering lines; ghost-point cascade explained = same-dir + 180° silently dropped by design + one real chain-vs-wall veto (now overridden per (b) above); gates at the time: 575 → 593 → 603 unittests
 
 ### Pending Todos
 
-- **Phase 5 (stacking):** (a) ring-plane orientation — edge-on presentation per the 03-08 decision above; pick BOX_DISPLAY_Z 5.0 (fits, no margin) vs 6.0 (+2 Å margin) using the measured diameters in 03-08-SUMMARY.md; (b) manifest ring_atoms is the FULL 2-core — extract ONE planar 6-ring in ring order before calling stacking.ring_frame (biphenyl planarity trap).
-- User remark (04-07, 2026-09-13): head currently displays the as-stored SDF orientation (ring flat on the xy board) — a pickup would contact via the hydrogen edge, not the ring face/centroid; edge-on orientation at materialization/placement must land BEFORE any stacking (already the recorded 03-08 carried-forward task).
+- **Phase 5 leftover — user re-test pending (05-16 checkpoint):** steps 3-8 untested live (crash completion, skip, refuse, win, hygiene); steps 1-2 need confirmation on the post-fix build (perpendicular fixed in 47eaba2; tail now train-follows in 76d74b3; the user's earlier "lag" concern is structurally addressed).
+- **Adjacent observation (from 05-16 fix agent, user to decide):** surviving srp_seg_* from a COMPLETED run remain visible on Restart; a new capture's set_name to srp_seg_<n> silently deletes the pre-existing old object (PyMOL behavior) → old snake visually decays from the tail during the new run; no crash; flag for the re-test.
+- Phase 5 design note (05-05-SUMMARY): at display_z 5.0, biphenyl refuses as WALL (placed z-extent 6.914 Å) — still the designed refuse path; unchanged by the head-only turn veto (that veto is the turn pre-check, the z check is the placement gate).
 - Phase 6 calibration pending: QProcess-in-conda smoke, ~100-atom `--ohess` wall time, OMP env (`[TRAIN]`) — Phase 6 can run parallel with Phases 4-5 (depends only on Phase 2).
 - Demo-data FULL DATA_SOURCES.md checklist sign-off (all molecules + attribution) remains Phase 8-gated — Set A data placement is done (03-05), not the full DATA-02/04 approval.
 - `tmp/upload_test/` holds the human-checkpoint upload test files (reject_4_rings.sdf tetracene C18H12, reject_no_h.sdf, accept_naphthalene.sdf, accept_benzene.mol2) — gitignored, disposable, regenerate per 03-08-SUMMARY if needed.
@@ -83,12 +87,13 @@ Recent decisions affecting current work:
 
 - Phase 4 spike: up/down arrow-key mechanism question RESOLVED 2026-09-13 (04-07 keys checkpoint APPROVED — wizard do_special route dispatches all four arrows live; eventFilter fallback not needed).
 - Offscreen route closed (01-05): headless dialog assertions impossible in PyMOL 2.5.0's Qt build — smoke 02 stays informational (non-blocking FAIL); GUI verdicts are human-verify only.
-- Phase 5 consumes: setloader records (incl. demo ring_atoms), stacking placement math, GAME-10 sweep machinery; watch the two pending-todo items above.
+- RESOLVED 2026-09-19: ghost-point turn-lock (key silence was same-dir/180° design + real chain-vs-wall veto; veto then owner-overridden to head-only — cd04525) and lagging tail (stationary-per-tick chain → rigid train-follow — 76d74b3). Distance question settled: 3.60 Å @ 20° is DATA-02-approved and stays; benzene-crystal-specific distance would need verified source + human re-approval (repo rule).
+- Old concern superseded: "Phase 5 consumes setloader ring_atoms / placement math / GAME-10 sweep" — landed (05-01 ring_cycle shim, 05-02/05-10 edge-on, 05-13/05-14 seams); only the 2026-09-19 owner directives in Decisions remain live for Phase 5 behavior.
 
 ## Session Continuity
 
-Last session: 2026-09-14 (execute-phase orchestrator — Phase 4 full run + verification)
-Stopped at: Phase 4 COMPLETE + VERIFIED (04-VERIFICATION.md: passed, 40/40; REQUIREMENTS GAME-01/02/03/07/08 → Complete; ROADMAP Phase-4 row updated)
-Resume file: None
-Next action: /gsd-plan-phase 5 (Stacking & Game Rules Complete — consumes setloader records incl. demo ring_atoms, stacking placement math, GAME-10 sweep machinery; edge-on ring orientation at materialization/placement is a hard prerequisite — see the Phase-5 pending todos with the 04-07 user remark)
+Last session: 2026-09-19 (execute-phase orchestrator — Phase 5 all 16 plans executed + machine verify + 05-16 checkpoint Task 1 gate pass; live-checkpoint fixes: perpendicular-stack 47eaba2, SRP_DEBUG tracer d11295b, ghost-point 0af3cde/cb02333, owner-drive gameplay overrides 76d74b3/cd04525/69b8fb0, debug-session archives 8a17a74/af33de9)
+Stopped at: phase 5 checkpoint Task 2 (checkpoint:human-verify) awaiting user re-test verdict: steps 3-8 untested live; steps 1-2 approved-in-spirit but pending confirmation on the post-fix build
+Resume file: None — resume point = user says "approved" (or lists failing steps) after the post-fix live test; then a continuation agent writes 05-16-SUMMARY.md and the verifier re-runs for the final 05-VERIFICATION
+Next action: (1) user re-tests live PyMOL (SRP_DEBUG=1 set in the Windows shell BEFORE launching PyMOL); (2) finalize 05-16 (SUMMARY with per-step verdicts); (3) verifier re-run → phase wrap-up (ROADMAP row, REQUIREMENTS GAME-04..10/STACK-01..05 → Complete); (4) next phase: /gsd-plan-phase 6 (xtb Pipeline — depends only on Phase 2; can still run parallel-track)
 Date convention: planning-doc dates are UTC (git commit dates authoritative) — the dev shell is HKT (UTC+8); never stamp from the local date.
