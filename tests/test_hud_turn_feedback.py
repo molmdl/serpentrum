@@ -6,8 +6,9 @@ SRP_DEBUG tracer) can act on:
 
   - turn_refuse_text(reason): the info-box line for a refused turn.
     Keeps the checkpoint-pinned 'turn refused: <reason>' prefix and adds
-    the one clause that dissolves the ghost - the veto checks the WHOLE
-    swinging chain, not just the head.
+    the why-clause a player can act on. (2026-09-19 owner directive: the
+    wall veto is gone — walls apply to the head only; remaining refusal
+    reasons are 'body' and 'pickup'.)
   - classify_turn_request(unit, ref_unit, pending_nonempty, in_sweep):
     the steering-outcome label the debug request trace prints for every
     arrow press; mirrors game_engine.request_direction's policies (same
@@ -39,11 +40,17 @@ DOWN = (0.0, -1.0)
 class TestTurnRefuseText(unittest.TestCase):
     """The player-visible refusal line (checkpoint prefix preserved)."""
 
-    def test_boundary_keeps_prefix_and_explains_chain_veto(self):
+    def test_boundary_explains_head_only_wall_rule(self):
+        # OWNER-APPROVED RULE CHANGE (2026-09-19 UTC): the wall leg of
+        # the sweep pre-check is gone ('only detect wall from head,
+        # ignore tail'); the chain may swing past the box during a
+        # turn. The old text claimed "the swinging chain would cross the
+        # wall" — pin the new head-only wording instead (kept defensive:
+        # the engine no longer emits this reason).
         line = hud_logic.turn_refuse_text('boundary')
         self.assertTrue(line.startswith('turn refused: boundary'))
-        self.assertIn('chain', line)
         self.assertIn('head', line)
+        self.assertNotIn('swinging chain would cross the wall', line)
 
     def test_body_explains_self_collision(self):
         line = hud_logic.turn_refuse_text('body')

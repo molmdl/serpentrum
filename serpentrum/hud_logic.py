@@ -280,18 +280,25 @@ def debug_event_trace(kind, tick=None, heading=None, head_xy=None,
 
 # --- Turn feedback (ghost-point follow-up, plan 05-16 live retest) ----------
 # The live report: 'only right works after a ghost point' turned out to be
-# the PINNED rigid-chain sweep veto (GAME-10: a turn is refused when the
-# WHOLE chain's swung pose would leave the margin box / clip the body / clip
-# a live pickup) plus the pinned silent drops for same-direction and
-# 180-degree key presses. The veto is about the SWINGING CHAIN, not the
-# head - so the head can be far from every wall while the turn is correctly
-# refused. These builders give that verdict a voice a player can act on.
+# the (then-pinned) rigid-chain sweep veto plus the pinned silent drops for
+# same-direction and 180-degree key presses.
+#
+# OWNER-APPROVED RULE CHANGE (2026-09-19 UTC, 05-16 checkpoint directive
+# "only detect wall from head, ignore tail"): the sweep pre-check no
+# longer vets the swinging chain against the walls — the chain may swing
+# past the box during a turn; walls apply to the HEAD only (the forward
+# 'crashed'/'boundary' rule is unchanged). The remaining veto legs are
+# BODY (the swung chain would clip the snake's own body) and PICKUP (the
+# swung chain would clip a floating molecule). These builders give each
+# verdict a voice a player can act on.
 
 
 # One clause per engine refusal reason: what the swung chain would hit.
+# 'boundary' is kept DEFENSIVELY (the engine can no longer emit it as a
+# sweep refusal since 2026-09-19) with truthful head-only wording.
 _TURN_REFUSE_WHY = {
-    'boundary': 'the swinging chain would cross the wall '
-                '(the veto checks the whole chain, not just the head)',
+    'boundary': 'walls only stop the head '
+                '(the chain may swing past the box during a turn)',
     'body': 'the swinging chain would clip the snake\'s own body',
     'pickup': 'the swinging chain would clip a floating molecule',
 }

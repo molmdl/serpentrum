@@ -25,9 +25,9 @@ The ROADMAP splits the engine across three plans with disjoint scope:
   02-10: collisions and rules — boundary crash, polyline-edge body
       collision, pickup capture/chain growth, counters, win/budget.
   02-13 (this extension): rigid-pivot turn sweeps — applying buffered
-      directions at the START of step() with the 3-leg refusal
-      pre-check (GAME-10). A turn rotates the WHOLE chain rigidly about
-      the head over TURN_TICKS ticks; atoms rotate WITH their segment
+      directions at the START of step() with the refusal pre-check
+      (GAME-10). A turn rotates the WHOLE chain rigidly about the head
+      over TURN_TICKS ticks; atoms rotate WITH their segment
       (x, y rotate; z and symbol preserved) so pairwise stacking
       geometry stays frozen ("stacking geometry immutable at all times").
       Rigid rotation about the head is the only turn model compatible
@@ -98,14 +98,16 @@ BODY_COLLISION_RADIUS_A = 2.0   # head-centroid vs chain-edge clearance.
 SEGMENT_SKIP_RECENT = 2         # newest chain edges exempt from self-collision
 PICKUP_RADIUS_A = 3.0           # head-vs-pickup-CENTROID capture distance
 BOUNDARY_MARGIN_A = 1.0         # = BODY_COLLISION_RADIUS_A / 2 — the ONE
-                                # margin constant name everywhere (02-13's
-                                # boundary leg reuses it)
-SWEEP_PICKUP_CLEARANCE_A = 2.5  # atom-level clearance for 02-13's sweep
+                                # margin constant name everywhere. Used by
+                                # the forward-motion head crash (02-13's
+                                # swept boundary leg was REMOVED 2026-09-19
+                                # — owner directive: walls check the head
+                                # only; the chain may swing past the box).
+SWEEP_PICKUP_CLEARANCE_A = 2.5  # atom-level clearance for the sweep
                                 # pickup leg (same rationale as 02-04
                                 # check_clash's 2.5 A inter-fragment
-                                # threshold; defined here because this plan
-                                # owns the constants block — 02-13 consumes
-                                # it)
+                                # threshold; defined here with the sweep
+                                # constants block)
 
 
 def _point_segment_distance_sq(px, py, ax, ay, bx, by):
@@ -405,17 +407,19 @@ class GameEngine(object):
 
           - Success: ``(True, [])`` and ``self.sweeping`` is set to the
             sweep-state dict with ``tick=0`` (step() advances it to
-            tick 1). The 3-leg pre-check cleared every sampled pose.
+            tick 1). The two-leg pre-check cleared every sampled pose.
           - Refusal: ``(False, [('turn_refused', reason)])`` with ZERO
             state mutation (heading, segments, sweeping, pending all
-            unchanged). `reason` is 'boundary', 'body', or 'pickup'.
+            unchanged). `reason` is 'body' or 'pickup' (the former
+            'boundary' leg was removed 2026-09-19 — owner directive:
+            walls apply to the head only).
           - 180-degree / same-as-current-heading: ``(False, [])`` — a
             no-op, NOT a refusal (mirrors request_direction; never
             reached via step() because request_direction filters these).
 
         The pre-check (_sweep_check_safe) samples K = TURN_TICKS + 1
         poses of the WHOLE chain rotated rigidly about the head and
-        refuses on the first boundary / body / pickup hit. Rigid
+        refuses on the first body / pickup hit. Rigid
         rotation about the head is the only turn model compatible with
         the frozen stacking geometry (GAME-10).
         """
@@ -457,18 +461,12 @@ class GameEngine(object):
         return (True, [])
 
     def _sweep_check_safe(self, angle_signed):
-        """Run the 3-leg swept-region pre-check; return reason or None.
+        """Run the two-leg swept-region pre-check; return reason or None.
 
         Samples K = TURN_TICKS + 1 poses (k = 0..TURN_TICKS) of the WHOLE
         chain rotated rigidly about the head by
         th_k = angle_signed * k / TURN_TICKS. At each pose, in order:
 
-          boundary leg (only if box set): any rotated segment CENTROID
-            STRICTLY beyond the BOUNDARY_MARGIN_A-adjusted box
-            [x0+M, x1-M] x [y0+M, y1-M] -> 'boundary'. (Outside means
-            strictly beyond — a centroid exactly at a margin wall is
-            inside; this is the swept pre-check model, distinct from
-            02-10's inclusive forward-velocity crash at the head.)
           body leg: head vs the rotated chain polyline edges, same edge
             set as 02-10's forward check (i in range(0, n-1-
             SEGMENT_SKIP_RECENT)); STRICT < BODY_COLLISION_RADIUS_A**2
@@ -481,19 +479,21 @@ class GameEngine(object):
         Returns the first reason found, or None if every sampled pose is
         clear. Pure float math; builds rotated poses in LOCAL variables
         and NEVER writes them into engine state.
+
+        REMOVED LEG (owner-approved rule change, 2026-09-19 UTC, 05-16
+        checkpoint directive "only detect wall from head, ignore tail"):
+        the former boundary leg refused any sample whose rotated segment
+        CENTROID left the BOUNDARY_MARGIN_A-adjusted box. That made tail
+        position veto turns even with the head far from every wall (the
+        'ghost point'). The chain may now swing past the box during a
+        turn (visual clipping of segments is owner-accepted); walls apply
+        to the HEAD only — the forward-motion 'crashed'/'boundary' rule
+        in step() is UNCHANGED.
         """
         hx, hy = self.head
         n = len(self.segments)
         radius_sq_body = BODY_COLLISION_RADIUS_A * BODY_COLLISION_RADIUS_A
         clearance_sq = SWEEP_PICKUP_CLEARANCE_A * SWEEP_PICKUP_CLEARANCE_A
-        box_set = self.box_min is not None and self.box_max is not None
-        if box_set:
-            bx0, by0 = self.box_min
-            bx1, by1 = self.box_max
-            wall_x0 = bx0 + BOUNDARY_MARGIN_A
-            wall_x1 = bx1 - BOUNDARY_MARGIN_A
-            wall_y0 = by0 + BOUNDARY_MARGIN_A
-            wall_y1 = by1 - BOUNDARY_MARGIN_A
         # Live pickup atoms (pickups don't move during the sweep).
         live_pickup_atoms = []
         for p in self.pickups:
@@ -515,12 +515,6 @@ class GameEngine(object):
                     rax, ray = _rotate_xy(atom[1], atom[2],
                                           hx, hy, cos_t, sin_t)
                     rot_chain_atoms.append((rax, ray))
-            # Boundary leg (centroid-level, sampled).
-            if box_set:
-                for rcx, rcy in rot_centroids:
-                    if (rcx < wall_x0 or rcx > wall_x1 or
-                            rcy < wall_y0 or rcy > wall_y1):
-                        return 'boundary'
             # Body leg (head vs rotated polyline edges, 02-10's model).
             if limit > 0:
                 for i in range(limit):

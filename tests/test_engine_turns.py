@@ -3,11 +3,19 @@
 Covers the rigid chain pivot: a turn rotates the WHOLE chain rigidly
 about the head over TURN_TICKS=6 ticks (15 deg/tick), REFUSED with
 ('turn_refused', reason) and zero state mutation when any of the 7
-sampled swept poses hits the boundary, the body, or swings a chain atom
-within SWEEP_PICKUP_CLEARANCE_A (2.5 A, atom-level) of a live pickup
-atom. 180-degree enforcement is judged at sweep level (against the sweep
+sampled swept poses clips the body or swings a chain atom within
+SWEEP_PICKUP_CLEARANCE_A (2.5 A, atom-level) of a live pickup atom.
+180-degree enforcement is judged at sweep level (against the sweep
 target while sweeping). Pending applies exactly once at the start of the
 step after sweep completion; reset wipes all turn state.
+
+OWNER-APPROVED RULE CHANGE (2026-09-19 UTC, 05-16 checkpoint directive
+"only detect wall from head, ignore tail"): the boundary leg of the
+sweep pre-check is REMOVED — the chain may swing past the box during a
+turn (visual clipping owner-accepted); walls apply to the HEAD only
+(the forward-motion 'crashed'/'boundary' rule is unchanged and pinned
+in tests/test_engine_rules.py). The former boundary-refusal tests were
+rewritten to pin the override (each carries a dated comment).
 
 Determinism (research sec 7): pure float math on fixed constants; tests
 set engine state directly (plain data) and use assertAlmostEqual for
@@ -109,8 +117,10 @@ class TestRotationHelper(unittest.TestCase):
 
     def test_rotate_about_non_origin_center(self):
         # (10, 0) about center (4, 0) by +90 deg: offset (6, 0) ->
-        # rotated (0, 6) -> position (4, 6). (Boundary-refusal geometry:
-        # the rotated centroid's y = 6.0 exceeds the margin wall 1.0.)
+        # rotated (0, 6) -> position (4, 6). (This used to be the
+        # boundary-refusal geometry — y = 6.0 exceeds a margin wall of
+        # 1.0; the wall leg was removed 2026-09-19 (owner directive:
+        # walls apply to the head only), pure rotation math unchanged.)
         cos_t = math.cos(math.radians(90.0))
         sin_t = math.sin(math.radians(90.0))
         rx, ry = game_engine._rotate_xy(10.0, 0.0, 4.0, 0.0, cos_t, sin_t)
@@ -135,31 +145,41 @@ class TestSweepConstants(unittest.TestCase):
         self.assertEqual(game_engine.TURN_TICKS + 1, 7)
 
 
-class TestSweepRefusalThreeLegs(unittest.TestCase):
-    """start_sweep's 7-sample 3-leg pre-check: boundary / body / pickup
+class TestSweepRefusalLegs(unittest.TestCase):
+    """start_sweep's 7-sample two-leg pre-check: body / pickup
     refusals with reason-tagged ('turn_refused', reason) events and ZERO
-    state mutation. Head excluded from the pickup leg (it is the pivot)."""
+    state mutation. Head excluded from the pickup leg (it is the pivot).
 
-    def test_boundary_refusal_centroid_leg(self):
+    OWNER-APPROVED RULE CHANGE (2026-09-19 UTC): the former third
+    (boundary) leg is removed — 'only detect wall from head, ignore
+    tail' (05-16 checkpoint directive). The old
+    test_boundary_refusal_centroid_leg pinned the opposite verdict on
+    this exact geometry; it is rewritten below as
+    test_wall_crossing_swing_now_opens."""
+
+    def test_wall_crossing_swing_now_opens(self):
         # box ((-2,-2),(20,2)); margin walls x in [-1, 19], y in [-1, 1].
         # head (4,0) heading (1,0); segs (7,0),(10,0). start_sweep('up')
         # is CCW +90. centroid (10,0) has offset (6,0) from head (4,0);
-        # rotated +90 -> offset (0,6) -> position (4,6). 6.0 > y1-M =
-        # 2.0 - 1.0 = 1.0 -> refuse 'boundary'. (n=2 -> no body leg; no
-        # pickups -> only the boundary leg can fire.)
+        # rotated +90 -> offset (0,6) -> position (4,6) — beyond the
+        # y-margin wall 1.0. OLD PIN (overridden 2026-09-19): refused
+        # 'boundary'. NEW: the sweep OPENS (n=2 -> no body leg; no
+        # pickups -> no pickup leg); visual box clipping of the swung
+        # chain is owner-accepted. The HEAD's wall crash rule (forward
+        # motion) is untouched.
         segs = [make_seg_at(7.0, 0.0, 's0'), make_seg_at(10.0, 0.0, 's1')]
         engine = GameEngine(head=(4.0, 0.0), heading='right',
                             box_min=(-2.0, -2.0), box_max=(20.0, 2.0),
                             segments=segs)
         opened, events = engine.start_sweep('up')
-        self.assertFalse(opened)
-        self.assertEqual(events, [('turn_refused', 'boundary')])
-        # ZERO state mutation: heading, centroids, sweeping, pending.
-        self.assertEqual(engine.heading, (1.0, 0.0))
+        self.assertTrue(opened)
+        self.assertEqual(events, [])
+        self.assertIsNotNone(engine.sweeping)
+        self.assertEqual(engine.sweeping['target_heading'], (0.0, 1.0))
+        # Chain untouched until the sweep ticks run (open mutates only
+        # the sweep-state dict, per the pinned contract).
         self.assertEqual(engine.segments[0]['centroid'], (7.0, 0.0))
         self.assertEqual(engine.segments[1]['centroid'], (10.0, 0.0))
-        self.assertIsNone(engine.sweeping)
-        self.assertEqual(engine.pending, [])
 
     def test_body_refusal_defensive_leg(self):
         # head (4,0) heading (1,0); segs c0=(-2,1), c1=(2.5,1),
@@ -512,18 +532,20 @@ class TestSweepLevel180AndChaining(unittest.TestCase):
         self.assertEqual(engine.sweeping['target_heading'], (1.0, 0.0))
         self.assertEqual(engine.sweeping['angle_signed'], -TURN_DEG)  # CW
 
-    def test_refused_chained_sweep_falls_through(self):
-        # Geometry where the chained turn would exit the box. head (0,0);
-        # seg (3,0); box ((-2.5,-10),(10,10)) -> margin walls x in
-        # [-1.5, 9], y in [-9, 9]. Sweep 1 'up' is SAFE: seg traces the
-        # first-quadrant arc (3cos th, 3sin th), x in [0, 3] (within
-        # [-1.5, 9]), y in [0, 3] (within [-9, 9]). After sweep 1 the seg
-        # is at (0, 3), heading (0, 1). The chained 'left' (CCW +90 from
-        # (0,1)) swings the seg into the second quadrant: at sweep-2
-        # sample k=3 the seg angle is 90+45=135 deg, x = 3*cos135 =
-        # -2.121 < wall_x0 = -1.5 -> refuse 'boundary'. The refusal
-        # consumes the request and the SAME tick falls through to forward
-        # motion; the next step emits only 'moved' (not retried).
+    def test_chained_sweep_opens_without_wall_veto(self):
+        # OWNER-APPROVED RULE CHANGE (2026-09-19 UTC): this was
+        # test_refused_chained_sweep_falls_through — the chained 'left'
+        # swung the chain past the box's -x margin wall and was refused
+        # 'boundary'. The boundary leg is gone ('only detect wall from
+        # head'), so the SAME geometry now OPENS the chained sweep.
+        #
+        # Geometry: head (0,0); seg (3,0); box ((-2.5,-10),(10,10)) ->
+        # margin walls x in [-1.5, 9], y in [-9, 9]. Sweep 1 'up' moves
+        # the seg along the first-quadrant arc to (0, 3), heading (0,1).
+        # The chained 'left' (CCW +90 from (0,1)) swings the seg into
+        # the second quadrant past wall_x0 = -1.5 (sample k=3: x =
+        # 3*cos135 = -2.121). n=1 -> no body leg; no pickups -> no
+        # pickup leg -> the sweep opens and runs to completion.
         seg = make_seg_at(3.0, 0.0, 's0')
         engine = GameEngine(head=(0.0, 0.0), heading='right', segments=[seg],
                             box_min=(-2.5, -10.0), box_max=(10.0, 10.0))
@@ -536,16 +558,24 @@ class TestSweepLevel180AndChaining(unittest.TestCase):
         self.assertAlmostEqual(engine.heading[1], 1.0, delta=DELTA)
         self.assertEqual(engine.pending, ['left'])
         self.assertIsNone(engine.sweeping)
-        # NEXT step: chained 'left' attempted -> refused -> consumed ->
-        # SAME tick falls through to forward motion.
+        # NEXT step: chained 'left' OPENS (no wall veto) at the step
+        # START; no 'moved' on that tick; pending consumed exactly once.
         evs = engine.step(0.1)
-        self.assertEqual(evs[0], ('turn_refused', 'boundary'))
-        self.assertEqual(evs[1][0], 'moved')
-        self.assertEqual(engine.pending, [])  # consumed exactly once
-        self.assertIsNone(engine.sweeping)
-        # The step AFTER emits only 'moved' (request not retried).
-        evs2 = engine.step(0.1)
-        self.assertEqual([e[0] for e in evs2], ['moved'])
+        self.assertEqual(evs[0][0], 'turning')
+        self.assertAlmostEqual(evs[0][1], 1.0 / 6.0, delta=DELTA)
+        self.assertNotIn('moved', [e[0] for e in evs])
+        self.assertEqual(engine.pending, [])
+        self.assertEqual(engine.sweeping['target_heading'], (-1.0, 0.0))
+        for _ in range(TURN_N - 1):  # finish sweep 2
+            engine.step(0.1)
+        self.assertAlmostEqual(engine.heading[0], -1.0, delta=DELTA)
+        # The swung seg ended past the -x margin wall — clipped, allowed
+        # (the head is what walls stop), and the run is alive.
+        cx, cy = engine.segments[0]['centroid']
+        self.assertAlmostEqual(cx, -3.0, delta=DELTA)
+        self.assertAlmostEqual(cy, 0.0, delta=DELTA)
+        self.assertLess(cx, -1.5)
+        self.assertFalse(engine.finished)
 
     def test_pending_applied_exactly_once_after_chained_open(self):
         # A successful chained sweep consumes pending exactly once; no

@@ -1,28 +1,28 @@
-"""Ghost-point turn-veto regression (plan 05-16 live retest follow-up).
+"""Ghost-point turn-veto regression — OWNER-OVERRIDDEN wall rule (2026-09-19 UTC).
 
-Live report (verbatim): "i wasnt at boundary yet, the head had some
-distance before the wall, i was able to turn right but all other keys
-not working lilke after hitting a 'ghost point'".
+History: the live report ("i wasnt at boundary yet ... all other keys not
+working lilke after hitting a 'ghost point'") was diagnosed as the pinned
+rigid-chain sweep veto (GAME-10: _sweep_check_safe's boundary leg refused
+a turn whose SWUNG CHAIN would leave the margin box, even with the head
+far from any wall) plus the pinned silent drops for same-direction /
+180-degree keys. The veto was geometrically CORRECT — and the product
+owner OVERRODE it at the 05-16 checkpoint (verbatim directive: "only
+detect wall from head, ignore tail"), because vetoes driven by the tail
+were unplayable.
 
-This file PINS the diagnosis: the state is the GAME-10 rigid-chain swept
-veto (game_engine._sweep_check_safe boundary leg) plus the pinned silent
-drops for same-direction / 180-degree key presses in request_direction.
-Reproduced EXACTLY: heading 'up', head mid-box far from any wall, a
-3-segment chain trailing behind; pressing:
+This file now pins the OWNER-APPROVED rule:
 
-    up    -> silent drop (same direction, by design)
-    down  -> silent drop (180 reversal, impossible by design)
-    left  -> ('turn_refused', 'boundary')  ... GEOMETRICALLY JUSTIFIED:
-             the CCW swing rotates the farthest chain centroid to
-             x = 11.40 > 11 (the margin wall) by 30 deg of the sweep;
-             the chain truly would cross the wall.
-    right -> sweep opens (the ONLY geometrically safe 90-degree swing)
+  - Turn sweeps are vetted by the BODY and PICKUP legs ONLY; the chain
+    may swing past the box during a turn (visual box clipping of the
+    segments mid-swing is explicitly owner-accepted).
+  - Walls apply to the HEAD only: the forward-motion 'crashed'/'boundary'
+    rule (GAME-05) is UNCHANGED and lives in tests/test_engine_rules.py.
+  - Same-direction / 180-degree keys still drop silently (unchanged).
 
-=> "only right works" with the head far from every wall. The veto is
-correct-by-design (a refused turn leaves the chain untouched, matching
-the 05-16 checkpoint text); after the turn the keys recover whenever the
-swung chain clears the margin box. These tests guard the pinned behavior
-and the geometric justification against regression.
+The EXACT state from the original report (heading 'up', head (6,2),
+3-segment chain trailing down, small-ish +/-12 box) is preserved as the
+fixture: the SAME state that used to refuse 'left' on walls now ALLOWS
+the turn — that flip IS the proof the override landed.
 
 PURE stdlib; python3.6 (%-formatting). Discovery:
 
@@ -41,8 +41,8 @@ from serpentrum.game_engine import (  # noqa: E402
     BOUNDARY_MARGIN_A, GameEngine, _rotate_xy)
 
 DT = 0.1
-# The user's box situation (small preset): raw walls +/-12, engine margin
-# walls +/-11 (BOUNDARY_MARGIN_A = 1.0).
+# The user's box situation (small-ish fixture): raw walls +/-12, engine
+# margin walls +/-11 (BOUNDARY_MARGIN_A = 1.0) for the HEAD crash rule.
 BOX_MIN = (-12.0, -12.0)
 BOX_MAX = (12.0, 12.0)
 MARGIN = 12.0 - BOUNDARY_MARGIN_A  # 11.0
@@ -64,9 +64,10 @@ def _seg(cx, cy):
 def _build():
     """The user's live state: heading 'up', head (6,2), 3 segments
     trailing straight down at 3.6 A spacing (the placed-stacking chain
-    spacing), oldest-first. Head is ~10 A from the wall ahead and ~5 A
-    from the right-side wall - 'not at the boundary' by any visual read.
-    """
+    spacing), built nearest-first (index 0 = nearest the head; the
+    sweep/rotation assertions are index-order-agnostic). Head is ~10 A
+    from the wall ahead and ~5 A from the right-side wall - 'not at the
+    boundary' by any visual read."""
     segments = [_seg(HEAD_XY[0], HEAD_XY[1] - 3.6 * (i + 1))
                 for i in range(3)]
     return GameEngine(head=HEAD_XY, heading='up', segments=segments,
@@ -77,9 +78,9 @@ def _first_margin_exit(direction):
     """First (k, theta_deg, x, y) sweep sample of any chain CENTROID that
     leaves the margin-adjusted box when sweeping 'direction', or None.
     direction: 'left' -> CCW +90; 'right' -> CW -90 (from heading up).
-    This is exactly the boundary leg's sampled model, recomputed openly
-    here so the justification is auditable (not re-trusted from the
-    implementation under test).
+    KEPT as open documentation of the real swing geometry: the LEFT
+    swing DOES take the tail past the wall (that is honest viewer
+    clipping, owner-accepted) — it simply no longer vetoes the turn.
     """
     angle = 90.0 if direction == 'left' else -90.0
     hx, hy = HEAD_XY
@@ -96,86 +97,95 @@ def _first_margin_exit(direction):
     return None
 
 
-class TestGhostPointOnlyRightWorks(unittest.TestCase):
-    """The exact 'only right works' state from the live report."""
+class TestGhostPointStateNowTurnsBothWays(unittest.TestCase):
+    """The exact 'only right works' state from the live report — under
+    the owner-approved head-only wall rule BOTH perpendiculars open."""
 
     def test_axis_keys_silently_dropped(self):
         """up (same direction) and down (180 reversal) are dropped at
-        request time with NO event and NO feedback (pinned design)."""
+        request time with NO event and NO feedback (pinned design,
+        unchanged)."""
         engine = _build()
         self.assertIs(engine.request_direction('up'), False)
         self.assertIs(engine.request_direction('down'), False)
         self.assertEqual(engine.pending, [])
 
-    def test_left_refused_boundary_with_zero_mutation(self):
-        """left (perpendicular) is refused 'boundary' and performs NO
-        ROTATION (the checkpoint's 'a refused turn must not move the
-        chain' — the sweep attempt itself mutates nothing).
-
-        TRAIN-FOLLOW note (2026-09-19): the refusal falls through to a
-        normal forward 'moved' tick, which now translates the chain
-        WITH the head by the same delta (the lagging-tail fix) — pinned
-        here as a rigid shift, not a rotation."""
+    def test_left_now_opens_same_state(self):
+        """OLD PIN (overridden): left was refused 'boundary' because the
+        CCW swing rotated the farthest chain centroid to x = 11.40 > 11.
+        NEW (owner directive 2026-09-19): the SAME state ALLOWS the turn
+        — the chain sweeps, no refusal event, no mutation veto."""
         engine = _build()
-        before = ([tuple(s['centroid']) for s in engine.segments],
-                  engine.heading, engine.head)
         self.assertIs(engine.request_direction('left'), True)
         events = engine.step(DT)
-        self.assertEqual(events[0], ('turn_refused', 'boundary'))
-        self.assertIn(('moved', (6.0, 2.3)), events)  # fell through forward
-        self.assertIsNone(engine.sweeping)
-        # Chain rigidly FOLLOWED the head (+0.3 in y), never rotated.
-        for i, (ox, oy) in enumerate(before[0]):
-            cx, cy = engine.segments[i]['centroid']
-            self.assertAlmostEqual(cx, ox, delta=1e-9)
-            self.assertAlmostEqual(cy, oy + 0.3, delta=1e-9)
-        self.assertEqual(engine.heading, before[1])
-        self.assertEqual(engine.pending, [])  # refused request is consumed
+        self.assertEqual(events, [('turning', 1.0 / 6.0)])
+        self.assertIsNotNone(engine.sweeping)
+        self.assertEqual(engine.heading, (0.0, 1.0))  # pre-sweep heading
 
-    def test_right_opens_the_only_safe_swing(self):
-        """right (perpendicular) opens a sweep - the ONE safe 90-degree
-        swing in this geometry - and the sweep completes cleanly."""
+    def test_left_sweep_completes_and_tail_may_clip_outside_box(self):
+        """The CCW swing runs to completion; the trailing chain ends the
+        turn past the raw +x wall (owner-accepted visual clipping — the
+        wall only stops the HEAD, and the head never moved)."""
+        engine = _build()
+        engine.request_direction('left')
+        events = engine.step(DT)
+        self.assertEqual(events, [('turning', 1.0 / 6.0)])  # sweep tick 1
+        for _ in range(5):  # ticks 2..6
+            engine.step(DT)
+        self.assertIsNone(engine.sweeping)
+        self.assertEqual(engine.heading, (-1.0, 0.0))  # up -> left (CCW)
+        self.assertEqual(engine.head, HEAD_XY)  # pivot unmoved
+        # Farthest centroid from the head (this fixture is built
+        # nearest-first: segments[-1] = (6, -8.8) at 10.8 A out):
+        # (0,-10.8) rel -> +90 -> (+10.8, 0) rel -> (16.8, 2.0):
+        # beyond the RAW wall 12.0 — clipped, allowed.
+        farthest = engine.segments[-1]['centroid']
+        self.assertAlmostEqual(farthest[0], 16.8, delta=1e-9)
+        self.assertAlmostEqual(farthest[1], 2.0, delta=1e-9)
+        self.assertGreater(farthest[0], 12.0)
+        # ...but the run is ALIVE (head never touched the wall).
+        self.assertFalse(engine.finished)
+
+    def test_right_opens_as_before(self):
+        """right was the ONLY safe swing under the old veto; it still
+        opens (perpendiculars are never wall-vetoed now)."""
         engine = _build()
         self.assertIs(engine.request_direction('right'), True)
         events = engine.step(DT)
         self.assertIn(('turning', 1.0 / 6.0), events)
-        while engine.sweeping is not None:
+        for _ in range(5):  # ticks 2..6
             engine.step(DT)
+        self.assertIsNone(engine.sweeping)
         self.assertEqual(engine.heading, (1.0, 0.0))  # up -> right (CW)
 
-    def test_refusals_are_geometrically_justified(self):
-        """The veto is NOT a ghost: the refused LEFT swing genuinely puts
-        a chain centroid outside the margin wall (x = 11.40 > 11 by the
-        30-degree sample), while the accepted RIGHT swing keeps every
-        sampled centroid inside the margin box. If this justification
-        ever flips, the engine veto itself - not the feedback - is the
-        bug and this test must fail loudly.
-        """
+    def test_swing_geometry_still_crosses_but_is_allowed(self):
+        """Audit trail: the LEFT swing's sampled poses still mathematically
+        leave the margin box (x = 11.40 > 11 by the 30-degree sample) —
+        the geometry did not change, the RULE did. Walls apply to the
+        head only."""
         left_exit = _first_margin_exit('left')
         self.assertIsNotNone(left_exit)
         _k, _theta, rcx, _rcy = left_exit
-        self.assertGreater(rcx, MARGIN)  # exits through the RIGHT wall
-        self.assertIsNone(_first_margin_exit('right'))
+        self.assertGreater(rcx, MARGIN)  # crosses the RIGHT wall: real
+        self.assertIsNone(_first_margin_exit('right'))  # right stays in
 
 
-class TestKeysRecoverAfterTheTurn(unittest.TestCase):
-    """After the right turn, the same rule set re-explains every key:
-    same-dir/180 drop silently, the swing into the wall is refused
-    (again geometrically justified), the swing into free space opens.
-    Proves the state is never 'stuck' - every verdict tracks geometry.
-    """
+class TestAfterTheTurn(unittest.TestCase):
+    """After the right turn, same-dir/180 still drop silently and BOTH
+    perpendiculars open (no wall can veto the swinging chain)."""
 
     def _turned(self):
         engine = _build()
         engine.request_direction('right')
-        while True:
+        events = engine.step(DT)
+        self.assertEqual(events, [('turning', 1.0 / 6.0)])  # tick 1 opens
+        for _ in range(5):  # ticks 2..6
             engine.step(DT)
-            if engine.sweeping is None:
-                break
+        self.assertIsNone(engine.sweeping)
         self.assertEqual(engine.heading, (1.0, 0.0))
         return engine
 
-    def test_heading_and_chain_after_right_turn(self):
+    def test_chain_after_right_turn(self):
         engine = self._turned()
         # Chain rotated rigidly CW about the head: now trails -x.
         expected = [(2.4, 2.0), (-1.2, 2.0), (-4.8, 2.0)]
@@ -183,7 +193,10 @@ class TestKeysRecoverAfterTheTurn(unittest.TestCase):
             self.assertAlmostEqual(seg['centroid'][0], want[0], delta=1e-9)
             self.assertAlmostEqual(seg['centroid'][1], want[1], delta=1e-9)
 
-    def test_down_refused_up_opens_after_turn(self):
+    def test_down_and_up_both_open_after_turn(self):
+        """OLD PIN (overridden): 'down' was refused 'boundary' (the CW
+        swing of the -x trailing chain arced over the RIGHT margin
+        wall). NEW: both perpendiculars open."""
         engine = self._turned()
 
         def fresh():
@@ -195,19 +208,57 @@ class TestKeysRecoverAfterTheTurn(unittest.TestCase):
         # same-direction and 180 still drop silently
         self.assertIs(fresh().request_direction('right'), False)
         self.assertIs(fresh().request_direction('left'), False)
-        # down: CW swing of the -x trailing chain arcs over the RIGHT
-        # margin wall -> refused, justified
+        # down: USED to refuse 'boundary' — now opens (CW swing, chain
+        # may arc over the wall; the head is what walls stop).
         eng = fresh()
         self.assertIs(eng.request_direction('down'), True)
         events = eng.step(DT)
-        self.assertEqual(events[0], ('turn_refused', 'boundary'))
-        self.assertIsNone(eng.sweeping)
-        # up: CCW swing clears everything -> opens
+        self.assertEqual(events, [('turning', 1.0 / 6.0)])
+        self.assertIsNotNone(eng.sweeping)
+        # up: opens as before.
         eng = fresh()
         self.assertIs(eng.request_direction('up'), True)
         events = eng.step(DT)
-        self.assertIn(('turning', 1.0 / 6.0), events)
+        self.assertEqual(events, [('turning', 1.0 / 6.0)])
         self.assertIsNotNone(eng.sweeping)
+
+
+class TestBodyAndPickupLegsStillVeto(unittest.TestCase):
+    """The wall leg is gone; the BODY and PICKUP legs are NOT — rigid
+    sweeps still refuse to clip the snake's own body or a live pickup.
+    (Fixtures transplanted from tests/test_engine_turns.py, plan 02-13 —
+    those legs were never in dispute.)"""
+
+    def test_body_veto_still_refuses(self):
+        def seg_at(x, y):
+            return {'molecule_id': 'm', 'centroid': (x, y),
+                    'atoms': [('C', x, y, 0.0)], 'atoms_n': 1}
+        # head (4,0); checked edge (c0,c1) = y=1 from x=-2..2.5; head's
+        # distance to the CURRENT pose (sample k=0) is already < 2.0
+        # (clamped endpoint (2.5, 1.0), dist^2 = 3.25) -> 'body'.
+        segs = [seg_at(-2.0, 1.0), seg_at(2.5, 1.0),
+                seg_at(3.5, 0.0), seg_at(4.0, -0.5)]
+        engine = GameEngine(head=(4.0, 0.0), heading='right',
+                            segments=segs)
+        opened, events = engine.start_sweep('up')
+        self.assertFalse(opened)
+        self.assertEqual(events, [('turn_refused', 'body')])
+        self.assertIsNone(engine.sweeping)
+
+    def test_pickup_veto_still_refuses(self):
+        # chain atom (3,0) arcs within 2.5 A of the live pickup atom
+        # (0,3) at the 45-degree sample -> 'pickup'.
+        seg = {'molecule_id': 'm', 'centroid': (3.0, 0.0),
+               'atoms': [('C', 3.0, 0.0, 0.0)], 'atoms_n': 1}
+        pickup = {'id': 'p1', 'centroid': (0.0, 3.0),
+                  'atoms': [('O', 0.0, 3.0, 0.0)], 'atoms_n': 1}
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            segments=[seg], pickups=[pickup])
+        opened, events = engine.start_sweep('up')
+        self.assertFalse(opened)
+        self.assertEqual(events, [('turn_refused', 'pickup')])
+        self.assertIsNone(engine.sweeping)
+        self.assertIn('p1', engine.live_pickup_ids)
 
 
 if __name__ == '__main__':

@@ -640,10 +640,12 @@ class GameTab(QtWidgets.QWidget):
         """
         kind = ev[0]
         if kind == 'turn_refused':
-            # Ghost-point follow-up (05-16 retest): the veto is about the
-            # SWINGING CHAIN, not the head - say so in the log line so a
-            # correct refusal never reads as dead keys (hud_logic keeps
-            # the checkpoint's 'turn refused: <reason>' prefix).
+            # Ghost-point follow-up (05-16 retest): the remaining veto
+            # legs (body/pickup) are about the SWINGING CHAIN, not the
+            # head - say so in the log line so a correct refusal never
+            # reads as dead keys (hud_logic keeps the checkpoint's
+            # 'turn refused: <reason>' prefix; the wall leg was removed
+            # 2026-09-19 - walls stop the HEAD only).
             self._log(hud_logic.turn_refuse_text(ev[1]))
             self._dbg_event(engine, 'turn_refused', result=ev[1])
         elif kind == 'turning':
