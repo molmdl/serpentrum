@@ -188,54 +188,82 @@ class TestBodyCollision(unittest.TestCase):
     BODY_COLLISION_RADIUS_A ** 2 (= 4.0).
     """
 
-    def test_body_crash_exact_tick(self):
+    def test_body_crash_only_from_already_overlapping_pose(self):
+        # TRAIN-FOLLOW RECONCILIATION (owner-directed gameplay change,
+        # 2026-09-19 UTC): the chain now translates WITH the head on
+        # every 'moved' tick, so head<->chain relative geometry is
+        # CONSTANT during straight motion — the old exact-tick proof
+        # (head approaches a seeded edge over 14 ticks, crashes on the
+        # 15th) is unreachable by construction. The forward body check
+        # survives as the same-pose GUARD: a state that STARTS already
+        # overlapping crashes on the FIRST tick.
+        #
+        # Reuse the old edge-0 geometry as the overlapping pose:
         # n=4 segments -> checked edges = edge 0 only: (c0,c1), the
-        # horizontal line y=1.0 for x in [6, 10]. Head travels y=0 at
-        # +0.3/step.
-        #   Step 14: head (4.2, 0.0). Nearest edge point is the clamped
-        #     endpoint (6.0, 1.0). dist^2 = 1.8^2 + 1.0^2 = 3.24 + 1.0
-        #     = 4.24. 4.24 < 4.0? NO -> alive.
-        #   Step 15: head (4.5, 0.0). dist^2 = 1.5^2 + 1.0^2 = 2.25 +
-        #     1.0 = 3.25. 3.25 < 4.0? YES -> ('crashed', 'body').
+        # horizontal line y=1.0 for x in [6, 10]. Seed the head at
+        # (4.5, 0.0) — the old step-15 crash position: dist^2 from
+        # clamped endpoint (6.0, 1.0) = 1.5^2 + 1.0^2 = 3.25 < 4.0 ->
+        # 'moved' then ('crashed', 'body') on step 1.
         segs = [make_seg_at(6.0, 1.0, 'c0'), make_seg_at(10.0, 1.0, 'c1'),
                 make_seg_at(14.0, 5.0, 'c2'), make_seg_at(18.0, 9.0, 'c3')]
-        engine = GameEngine(head=(0.0, 0.0), heading='right', segments=segs)
-        for k in range(1, 15):  # steps 1..14: all alive
-            events = engine.step(DT)
-            self.assertFalse(engine.finished,
-                             'crashed early at step %d' % k)
-            self.assertEqual(events[-1][0], 'moved')
-        # After step 14: head at (4.2, 0.0).
-        self.assertAlmostEqual(engine.head[0], 4.2, delta=DELTA)
-        # Step 15: crash.
+        engine = GameEngine(head=(4.5, 0.0), heading='right', segments=segs)
         events = engine.step(DT)
-        self.assertAlmostEqual(engine.head[0], 4.5, delta=DELTA)
+        self.assertEqual(events[0][0], 'moved')
         self.assertEqual(events[-1], ('crashed', 'body'))
         self.assertTrue(engine.finished)
         self.assertEqual(engine.result, 'crashed')
 
-    def test_neck_exemption_skip_proof(self):
-        # Same c0/c1, but c2=(3.0, 0.0), c3=(9.0, 0.0). Edges (c1,c2)
-        # and (c2,c3) are the exempt newest 2. Edge (c2,c3) is the
-        # horizontal line y=0.0 from x=3..9 — the head's OWN PATH
-        # (distance 0.0 at every tick while head.x is in [3, 9]) — yet
-        # NO crash comes from it (skipped). The crash still arrives from
-        # edge 0 at step 15 exactly as above. This proves the skip
-        # window, not luck.
+    def test_forward_motion_never_approaches_the_chain(self):
+        # The same seed, head 4.2 further back at (0.0, 0.0) (the old
+        # alive-for-14-steps geometry): under train-follow the chain
+        # moves WITH the head, so the old step-15 approach NEVER
+        # happens — 30 steps (head would have been at 9.0, deep inside
+        # the old collision window) stay alive, and the head<->edge
+        # distance is bit-identical at every tick.
         segs = [make_seg_at(6.0, 1.0, 'c0'), make_seg_at(10.0, 1.0, 'c1'),
-                make_seg_at(3.0, 0.0, 'c2'), make_seg_at(9.0, 0.0, 'c3')]
+                make_seg_at(14.0, 5.0, 'c2'), make_seg_at(18.0, 9.0, 'c3')]
         engine = GameEngine(head=(0.0, 0.0), heading='right', segments=segs)
-        # Steps 10..30 put the head on edge (c2,c3) at distance 0.0 —
-        # but that edge is exempt. No crash from it.
-        for k in range(1, 15):
+        initial = game_engine._point_segment_distance_sq(
+            0.0, 0.0, 6.0, 1.0, 10.0, 1.0)
+        for k in range(1, 31):
             events = engine.step(DT)
             self.assertFalse(engine.finished,
-                             'crashed early at step %d (neck not exempt?)' % k)
-        # Step 15: crash from edge 0 (c0,c1), NOT from the exempt edge.
+                             'crashed at step %d' % k)
+            self.assertEqual(events[-1][0], 'moved')
+            c0 = engine.segments[0]['centroid']
+            c1 = engine.segments[1]['centroid']
+            self.assertAlmostEqual(
+                game_engine._point_segment_distance_sq(
+                    engine.head[0], engine.head[1],
+                    c0[0], c0[1], c1[0], c1[1]),
+                initial, delta=DELTA)
+
+    def test_neck_exemption_skip_proof(self):
+        # Same c0/c1 as the guard test above, but c2=(3.0, 0.0),
+        # c3=(9.0, 0.0) with the head seeded at (4.5, 0.0): the exempt
+        # edge (c2,c3) is the horizontal line y=0.0 from x=3..9 — the
+        # head sits ON it at distance 0.0 — yet NO crash comes from it
+        # (skipped). The crash still arrives from checked edge 0. This
+        # proves the skip window, not luck. (Train-follow reconciliation
+        # 2026-09-19: the seed is already-overlapping wrt edge 0 so the
+        # guard fires on step 1; the exempt edge would have crashed
+        # immediately if the skip ever leaked.)
+        segs = [make_seg_at(6.0, 1.0, 'c0'), make_seg_at(10.0, 1.0, 'c1'),
+                make_seg_at(3.0, 0.0, 'c2'), make_seg_at(9.0, 0.0, 'c3')]
+        engine = GameEngine(head=(4.5, 0.0), heading='right', segments=segs)
         events = engine.step(DT)
-        self.assertAlmostEqual(engine.head[0], 4.5, delta=DELTA)
         self.assertEqual(events[-1], ('crashed', 'body'))
         self.assertTrue(engine.finished)
+        # Negative control: REMOVE edge 0 from relevance by moving c0/c1
+        # far away — the head sits on the exempt edge forever and never
+        # crashes (the exemption alone shields it).
+        segs2 = [make_seg_at(60.0, 1.0, 'c0'), make_seg_at(64.0, 1.0, 'c1'),
+                 make_seg_at(3.0, 0.0, 'c2'), make_seg_at(9.0, 0.0, 'c3')]
+        engine2 = GameEngine(head=(4.5, 0.0), heading='right', segments=segs2)
+        for _ in range(10):
+            events = engine2.step(DT)
+            self.assertFalse(engine2.finished)
+            self.assertEqual(events[-1][0], 'moved')
 
     def test_strict_comparison_exactly_radius_no_crash(self):
         # Edge (0,2)-(4,2): horizontal at y=2.0, x in [0, 4]. Pre-step

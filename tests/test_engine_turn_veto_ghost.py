@@ -108,9 +108,14 @@ class TestGhostPointOnlyRightWorks(unittest.TestCase):
         self.assertEqual(engine.pending, [])
 
     def test_left_refused_boundary_with_zero_mutation(self):
-        """left (perpendicular) is refused 'boundary' and leaves heading,
-        head, segments, sweeping and pending UNTOUCHED (the checkpoint's
-        'a refused turn must not move the chain')."""
+        """left (perpendicular) is refused 'boundary' and performs NO
+        ROTATION (the checkpoint's 'a refused turn must not move the
+        chain' — the sweep attempt itself mutates nothing).
+
+        TRAIN-FOLLOW note (2026-09-19): the refusal falls through to a
+        normal forward 'moved' tick, which now translates the chain
+        WITH the head by the same delta (the lagging-tail fix) — pinned
+        here as a rigid shift, not a rotation."""
         engine = _build()
         before = ([tuple(s['centroid']) for s in engine.segments],
                   engine.heading, engine.head)
@@ -119,8 +124,11 @@ class TestGhostPointOnlyRightWorks(unittest.TestCase):
         self.assertEqual(events[0], ('turn_refused', 'boundary'))
         self.assertIn(('moved', (6.0, 2.3)), events)  # fell through forward
         self.assertIsNone(engine.sweeping)
-        self.assertEqual([tuple(s['centroid']) for s in engine.segments],
-                         before[0])
+        # Chain rigidly FOLLOWED the head (+0.3 in y), never rotated.
+        for i, (ox, oy) in enumerate(before[0]):
+            cx, cy = engine.segments[i]['centroid']
+            self.assertAlmostEqual(cx, ox, delta=1e-9)
+            self.assertAlmostEqual(cy, oy + 0.3, delta=1e-9)
         self.assertEqual(engine.heading, before[1])
         self.assertEqual(engine.pending, [])  # refused request is consumed
 

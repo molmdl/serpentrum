@@ -2,7 +2,9 @@
 
 GameTab(QWidget) is the GAME-01/GAME-07/GAME-08 engine-and-display core:
 the epoch-guarded 3-2-1-GO! countdown, the 100 ms movement tick that
-drives engine.step + pymol_bridge.move_head_delta, the 1 Hz
+drives engine.step + pymol_bridge.move_chain_delta (the 2026-09-19
+train-follow rule: head + srp_seg_* translate together per 'moved'
+tick), the 1 Hz
 wall-clock-delta elapsed label, the molecules-remaining label, the
 read-only rolling info box, pause/resume with the Pitfall 9.3 time
 rebase, and the deterministic restart. Plan 04-08 wired the play
@@ -601,7 +603,12 @@ class GameTab(QtWidgets.QWidget):
             nx, ny = engine.head
             dx = nx - old[0]
             dy = ny - old[1]
-            pymol_bridge.move_head_delta(dx, dy, 0.0)
+            # Train-follow viewer half (2026-09-19 owner directive): the
+            # engine translated its segment records by this SAME delta
+            # this tick; translate head + srp_seg_* identically so the
+            # eaten chain follows the head in the viewer (the lagging-
+            # tail fix — the chain no longer trails at capture points).
+            pymol_bridge.move_chain_delta(dx, dy, 0.0)
             # Keep the PURE head mirror exactly equal to the viewer's
             # srp_head coordinates (plan 05-11): the SAME delta, applied
             # in pure math - no readback, no drift.

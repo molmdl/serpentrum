@@ -321,16 +321,24 @@ class TestPhase5IntegrationChain(unittest.TestCase):
 
     def test_s3_body_crash_hits_real_placement_chain_geometry(self):
         """GAME-05 body path, segment-based: four REAL placement-produced
-        segments (scripted captures, head +x, chain trailing -x over the
-        medium box), then the head driven into the checked polyline edge in
-        a re-seeded engine. The scripted two-90-degree loop-back is
-        unreachable here (a sweep about the far head would drag the
-        trailing chain outside the medium box and the boundary pre-check
-        rightly refuses it), so the constructor test-seam re-seeds the
-        real chain exactly as test_engine_rules does: THIS test proves the
-        placement-produced chain geometry reaches the collision model
-        intact -- the collision model itself stays pinned by
-        tests/test_engine_rules.py."""
+        segments (scripted captures, head +x, chain following the head per
+        the 2026-09-19 train-follow rule), then a re-seeded engine whose
+        head STARTS already overlapping the checked polyline edge -- the
+        guard fires on the first tick.
+
+        TRAIN-FOLLOW RECONCILIATION (owner-directed gameplay change,
+        2026-09-19 UTC): this test previously seeded the head 2.5 A
+        OUTSIDE the checked edge and drove it in over a few ticks. The
+        chain now translates WITH the head, so head<->chain geometry is
+        constant during straight motion and that approach is unreachable
+        by construction — see test_engine_rules.py for the pinned guard
+        semantics. (The "scripted two-90-degree loop-back refused by the
+        boundary pre-check" observation from the old docstring is ALSO
+        stale: the chain-vs-wall sweep veto was removed by the same
+        owner directive — walls apply to the head only.) THIS test still
+        proves the placement-produced chain geometry reaches the
+        collision model intact -- the collision model itself stays
+        pinned by tests/test_engine_rules.py."""
         state = self.state
         picks = [pickup_seed(state, molecule_id, 'pick_%04d' % (i + 1), pos)
                  for i, (molecule_id, pos) in enumerate([
@@ -354,34 +362,44 @@ class TestPhase5IntegrationChain(unittest.TestCase):
                       for seg in engine.segments]
         # Body-collision model: with n = 4 segments the engine checks
         # edges i in range(0, n-1-SEGMENT_SKIP_RECENT[2]) == edge (0, 1)
-        # only -- the polyline edge between the two OLDEST segments. Place
-        # the head 2.5 A to the old-segment-end's -x side on the edge's
-        # starting-y line and drive right; the head's path crosses the
-        # edge's oldest endpoint (distance falls STRICTLY below
-        # BODY_COLLISION_RADIUS_A = 2.0 within a few ticks).
+        # only -- the polyline edge between the two OLDEST segments.
+        # Seed the head ON edge 0 so the state STARTS overlapping
+        # (distance 0.0 < BODY_COLLISION_RADIUS_A = 2.0): the midpoint
+        # of (c0, c1). The guard must fire on the FIRST tick.
         c0 = real_chain[0]['centroid']
-        crash_engine = GameEngine(head=(c0[0] - 2.5, c0[1]),
+        c1 = real_chain[1]['centroid']
+        mid = ((c0[0] + c1[0]) / 2.0, (c0[1] + c1[1]) / 2.0)
+        crash_engine = GameEngine(head=mid,
                                   heading='right',
                                   box_min=state['box_min'],
                                   box_max=state['box_max'],
                                   segments=real_chain)
-        crashed = False
-        for _tick in range(100):
-            events = crash_engine.step(DT)
-            if ('crashed', 'body') in events:
-                crashed = True
-                break
-        self.assertTrue(crashed)
+        events = crash_engine.step(DT)
+        self.assertEqual(events[0][0], 'moved')
+        self.assertIn(('crashed', 'body'), events)
         self.assertTrue(crash_engine.finished)
         self.assertEqual(crash_engine.result, 'crashed')
-        # The chain stays complete after the body crash: same segments,
-        # same centroids, same atom payloads.
+        # The chain stays complete after the body crash and MOVED WITH
+        # the head by exactly one tick delta (train-follow rigidity):
+        # every centroid/atom shifted by the SAME (+0.3, 0.0) the head
+        # took. STEP_A = 3.0 * 0.1.
+        step_a = 3.0 * DT
         self.assertEqual(len(crash_engine.segments), 4)
         for i in range(4):
-            self.assertEqual(tuple(crash_engine.segments[i]['centroid']),
-                             tuple(real_chain[i]['centroid']))
-            self.assertEqual(list(crash_engine.segments[i]['atoms']),
-                             list(real_chain[i]['atoms']))
+            seg = crash_engine.segments[i]
+            self.assertAlmostEqual(seg['centroid'][0],
+                                   real_chain[i]['centroid'][0] + step_a,
+                                   delta=1e-9)
+            self.assertAlmostEqual(seg['centroid'][1],
+                                   real_chain[i]['centroid'][1],
+                                   delta=1e-9)
+            for j, atom in enumerate(seg['atoms']):
+                ref = real_chain[i]['atoms'][j]
+                self.assertEqual(atom[0], ref[0])
+                self.assertAlmostEqual(atom[1], ref[1] + step_a,
+                                       delta=1e-9)
+                self.assertAlmostEqual(atom[2], ref[2], delta=1e-9)
+                self.assertEqual(atom[3], ref[3])
         self.assertEqual(crash_engine.step(DT), [])
 
     # ---- SCENARIO 4 --------------------------------------------------------
@@ -582,6 +600,11 @@ class TestPhase5IntegrationChain(unittest.TestCase):
             _xyz(seg['atoms']),
             self._record(seg['molecule_id'])['stack_ring'])
         self.assertEqual(len(rot_frame), 3)
+        # Train-follow note (2026-09-19): rot_frame is a SNAPSHOT — the
+        # segment (and its ring frame) follows the head on every later
+        # forward tick, so capture-time tail comparisons must add the
+        # head's travel since this snapshot.
+        head_at_snapshot = engine.head
         # Mid-run spawn seam (the same pattern plan 05-13 uses on every
         # resolution: the engine has no spawn API -- the controller extends
         # the seeded pickups list / live id set / remaining counter).
@@ -600,9 +623,16 @@ class TestPhase5IntegrationChain(unittest.TestCase):
         self.assertIsNotNone(second)
         tail2_3d, out2 = second
         self.assertEqual(out2['status'], 'placed')
-        # The tail for the second capture IS the swept segment's rotated
-        # frame (identical to the explicitly recomputed one).
-        self.assertAlmostEqual(_dist3(tail2_3d, rot_frame[0]),
+        # The tail for the second capture IS the swept segment's
+        # rotated frame, translated by the head's travel since the
+        # snapshot (train-follow: segment atoms follow the head, and the
+        # tail frame is recomputed from the CURRENT atoms at capture
+        # time — identical relative geometry, same rigid chain).
+        expected_tail = (
+            rot_frame[0][0] + (engine.head[0] - head_at_snapshot[0]),
+            rot_frame[0][1] + (engine.head[1] - head_at_snapshot[1]),
+            rot_frame[0][2])
+        self.assertAlmostEqual(_dist3(tail2_3d, expected_tail),
                                0.0, delta=1e-9)
         c2 = ring_centroid_3d(out2['placed_atoms'],
                               self._record('benzene')['stack_ring'])

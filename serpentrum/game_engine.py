@@ -6,6 +6,22 @@ The ROADMAP splits the engine across three plans with disjoint scope:
       the current heading and emits ('moved', pos); the direction queue
       only BUFFERS (a pending direction is inert until turns are
       applied); pause/resume/reset (GAME-07).
+
+  Owner-directed Phase-5 gameplay changes (2026-09-19 UTC, live 05-16
+  checkpoint directives — the pinned Phase-2 geometry/rules below are
+  deliberately overridden in exactly these two points):
+
+    1. TRAIN-FOLLOW: every 'moved' tick ALSO translates the whole chain
+       (centroids + atom x/y) by the SAME delta the head took (z/sym
+       preserved exactly). The chain is a rigid molecular assembly: it
+       translates on straight travel and pivots on turns (GAME-10
+       sweeps unchanged), so the approved 3.60 A stacking spacing is
+       frozen at all times and the eaten molecules follow the head
+       instead of trailing stationary at their capture points.
+    2. HEAD-ONLY WALLS (turn sweeps): _sweep_check_safe no longer vets
+       the swung chain against the box walls — wall rules apply to the
+       HEAD only (the forward 'crashed'/'boundary' rule in step() is
+       UNCHANGED). The body and pickup legs remain two-leg vetoes.
   02-10: collisions and rules — boundary crash, polyline-edge body
       collision, pickup capture/chain growth, counters, win/budget.
   02-13 (this extension): rigid-pivot turn sweeps — applying buffered
@@ -172,6 +188,10 @@ class GameEngine(object):
                 and the engine copies it, never sharing or mutating
                 caller data. During a sweep the centroids + atom x/y
                 are rotated rigidly about the head; z and sym preserved.
+                During forward motion (every 'moved' tick) the centroids
+                + atom x/y are translated by the SAME delta the head
+                took (the train-follow rule, 2026-09-19) — the chain is
+                a rigid body that never lags the head.
       sweeping: None, or the in-progress sweep-state dict (plan 02-13):
                 {'start_heading', 'target_heading', 'angle_signed',
                  'total_ticks', 'tick',
@@ -570,6 +590,34 @@ class GameEngine(object):
             self.sweeping = None
         return events
 
+    def _translate_chain(self, dx, dy):
+        """Translate the WHOLE chain by (dx, dy) — the train-follow rule.
+
+        Owner-directed gameplay change (2026-09-19 UTC, live checkpoint
+        directive): every 'moved' tick shifts every segment centroid and
+        every segment atom's x/y by the SAME delta the head took, so the
+        chain follows the head as one rigid molecular assembly (the
+        lagging-tail defect: segments used to stay at their capture
+        points while the head ran on, growing the perceived gap
+        unboundedly). z and symbols are preserved exactly (same rule as
+        _advance_sweep). Built like _advance_sweep: fresh record dicts
+        with fresh 'atoms' lists every tick (no in-place mutation of a
+        record a caller could be reading). Pairwise geometry is frozen
+        by construction — a common translation preserves every distance
+        (the approved 3.60 A stacking spacing included), exactly like
+        the rigid sweep preserves it under rotation.
+        """
+        new_segments = []
+        for seg in self.segments:
+            cx, cy = seg['centroid']
+            new_atoms = [(atom[0], atom[1] + dx, atom[2] + dy, atom[3])
+                         for atom in seg['atoms']]
+            new_seg = dict(seg)
+            new_seg['centroid'] = (cx + dx, cy + dy)
+            new_seg['atoms'] = new_atoms
+            new_segments.append(new_seg)
+        self.segments = new_segments
+
     def step(self, dt):
         """Advance the simulation by dt seconds; return the event list.
 
@@ -594,10 +642,13 @@ class GameEngine(object):
         forward branch, so a successful turn tick never also moves the
         head.
 
-        Movement branch (02-06): head += heading * SPEED_A_PER_S * dt,
-        and emit ('moved', (x, y)) carrying the NEW position. At
-        SPEED_A_PER_S = 3.0 a dt of 0.1 s advances the head exactly 0.3 A
-        along the current heading.
+        Movement branch (02-06 + the 2026-09-19 train-follow rule):
+        head += heading * SPEED_A_PER_S * dt, the WHOLE CHAIN is
+        translated by the SAME delta (_translate_chain — the chain
+        follows the head rigidly, z/sym preserved), and emit
+        ('moved', (x, y)) carrying the NEW position. At SPEED_A_PER_S =
+        3.0 a dt of 0.1 s advances head and chain exactly 0.3 A along
+        the current heading.
 
         Boundary crash (plan 02-10, GAME-05): after the move, if a box is
         set and the head enters the BOUNDARY_MARGIN_A margin of the AABB
@@ -616,6 +667,16 @@ class GameEngine(object):
         ** 2, emit ('crashed', 'body') and end the run the same way as a
         boundary crash. Boundary check runs first; a crash stops all
         later event processing for the tick.
+
+        Guard semantics under the 2026-09-19 train-follow rule: a common
+        translation preserves head<->chain geometry, so during straight
+        motion this check NEVER approaches anything new — the contested
+        pose was already present on the PREVIOUS tick (or admitted by
+        placement / the sweep pre-check's body leg, which screen it in
+        real play). It is kept as the cheap same-pose guard (a state
+        already overlapping crashes on the first tick), NOT deleted —
+        turn-time body screening still belongs to the sweep pre-check's
+        body leg, which is untouched.
 
         Pickup capture (plan 02-10, STACK-05 seam): after the body check,
         scan pickups in list order; the FIRST live pickup whose squared
@@ -661,6 +722,12 @@ class GameEngine(object):
         ny = hy + uy * SPEED_A_PER_S * dt
         self.head = (nx, ny)
         events.append(('moved', (nx, ny)))
+        # Train-follow (2026-09-19 owner directive): the chain is one
+        # rigid body with the head — translate it by the SAME delta.
+        # Relative head<->chain geometry is unchanged by this, so the
+        # boundary/body checks below see the same relative pose as the
+        # pre-move state (they stay valid and cheap).
+        self._translate_chain(nx - hx, ny - hy)
         # Boundary crash: AABB + BOUNDARY_MARGIN_A, inclusive at the
         # margin-adjusted walls. A crash stops event processing, ends
         # the run, and clears the pending queue (turn-state hygiene —

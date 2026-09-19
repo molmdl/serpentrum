@@ -176,6 +176,23 @@ def move_head_delta(dx, dy, dz=0.0):
     cmd.translate([float(dx), float(dy), float(dz)], HEAD_NAME, camera=0)
 
 
+def move_chain_delta(dx, dy, dz=0.0, selection='srp_head or srp_seg_*'):
+    """Translate the WHOLE chain (head + srp_seg_*) by (dx, dy, dz).
+
+    The viewer half of the engine's 2026-09-19 train-follow rule: the
+    game-loop tick consumes ('moved',) with ONE call here instead of
+    move_head_delta, so the eaten-molecule chain follows the head in
+    the viewer by the SAME delta the engine applied to its segment
+    records (viewer truth == engine truth; the head mirror in gui_game
+    still shifts by the same delta in pure math). Same mechanics as
+    sweep_chain's multi-object selection + move_head_delta's camera=0
+    model-axes translate; CGO members of the pattern (srp_box) are
+    untouched (CGOs are not transformed — pitfall P5-7). dz stays 0.0
+    (2D plane contract). Called once per ('moved',) tick.
+    """
+    cmd.translate([float(dx), float(dy), float(dz)], selection, camera=0)
+
+
 def lock_camera():
     """Lock the camera to a 2D ortho view of the box (GAME-02).
 
