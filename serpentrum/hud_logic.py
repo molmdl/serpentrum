@@ -276,3 +276,91 @@ def debug_event_trace(kind, tick=None, heading=None, head_xy=None,
     if pickups_remaining is not None:
         line += ' pickups=%d' % pickups_remaining
     return line
+
+
+# --- Turn feedback (ghost-point follow-up, plan 05-16 live retest) ----------
+# The live report: 'only right works after a ghost point' turned out to be
+# the PINNED rigid-chain sweep veto (GAME-10: a turn is refused when the
+# WHOLE chain's swung pose would leave the margin box / clip the body / clip
+# a live pickup) plus the pinned silent drops for same-direction and
+# 180-degree key presses. The veto is about the SWINGING CHAIN, not the
+# head - so the head can be far from every wall while the turn is correctly
+# refused. These builders give that verdict a voice a player can act on.
+
+
+# One clause per engine refusal reason: what the swung chain would hit.
+_TURN_REFUSE_WHY = {
+    'boundary': 'the swinging chain would cross the wall '
+                '(the veto checks the whole chain, not just the head)',
+    'body': 'the swinging chain would clip the snake\'s own body',
+    'pickup': 'the swinging chain would clip a floating molecule',
+}
+
+
+def turn_refuse_text(reason):
+    """Player-readable turn-refusal line for the info box.
+
+    Keeps the checkpoint-pinned 'turn refused: <reason>' prefix (the
+    05-16 human-verify text reads it literally) and appends the WHY in
+    one clause - the missing piece that made a correct chain veto feel
+    like a ghost point. Unknown reasons fall back to a generic clause
+    (never raises on a future engine reason).
+    """
+    why = _TURN_REFUSE_WHY.get(
+        reason, 'the swinging chain is blocked at this position')
+    return 'turn refused: %s (%s)' % (reason, why)
+
+
+def classify_turn_request(unit, ref_unit, pending_nonempty, in_sweep):
+    """Steering-outcome label for ONE arrow press (SRP_DEBUG trace ONLY).
+
+    Mirrors game_engine.request_direction's policies against the given
+    reference (the CURRENT heading, or the sweep TARGET while sweeping):
+    axis dot products are exactly 1.0 (same), 0.0 (perpendicular) or
+    -1.0 (reversal), so the 0.5 thresholds reproduce the engine's
+    verdicts without touching it:
+
+      dot > 0.5  -> dropped: same direction (checked first, as in the
+                    engine; buffer state never matters)
+      dot < -0.5 -> dropped: 180 reversal (impossible by design)
+      in-sweep   -> queued (in-sweep, newest-wins) - the intentional
+                    in-sweep override of the static first-kept rule
+      buffer full-> dropped (a request is already waiting)
+      otherwise  -> queued
+
+    unit: the requested direction's unit vector; ref_unit: the
+    reference unit vector; pending_nonempty: engine.pending non-empty;
+    in_sweep: engine.sweeping is not None.
+    """
+    dot = unit[0] * ref_unit[0] + unit[1] * ref_unit[1]
+    if dot > 0.5:
+        return 'dropped: same direction'
+    if dot < -0.5:
+        return 'dropped: 180 reversal'
+    if in_sweep:
+        return 'queued (in-sweep, newest-wins)'
+    if pending_nonempty:
+        return 'dropped: buffer full (another key is already queued)'
+    return 'queued'
+
+
+def debug_turn_request(name, outcome, tick=None, heading=None,
+                       head_xy=None, ref=None):
+    """One debug line per steering key press (SRP_DEBUG=1 only).
+
+    name: the arrow's direction name. outcome: the
+    classify_turn_request label. tick / heading / head_xy: the
+    controller state AT the key press (heading is the pre-sweep heading
+    during sweeps); ref: the sweep target name when sweeping (the
+    direction the request is judged against) or None.
+    """
+    line = 'DBG turn request %s -> %s' % (name, outcome)
+    if tick is not None:
+        line += ' tick=%d' % tick
+    if heading is not None:
+        line += ' heading=%s' % heading
+    if head_xy is not None:
+        line += ' head=(%.2f,%.2f)' % head_xy
+    if ref is not None:
+        line += ' ref=%s' % ref
+    return line

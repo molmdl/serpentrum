@@ -198,9 +198,15 @@ class GameTab(QtWidgets.QWidget):
     decomposed into plane gap + lateral shift at 4 decimals, plus the
     gate box and engine counters), one 'DBG event turning' line per
     sweep (first tick only: logical tick, heading, head xy, signed
-    sweep delta), and 'DBG event crashed' / 'won' / 'end_run' lines
-    with the engine counters. Every number is PURE (hud_logic builders
-    over engine state; NO viewer reads are added anywhere).
+    sweep delta), and 'DBG event crashed' / 'won' / 'turn_refused' /
+    'end_run' lines with the engine counters. Ghost-point follow-up:
+    steering gains TWO trace points - one 'DBG turn request' line per
+    arrow press via the _make_debug_steer adapter (queued / dropped and
+    WHY, with tick + heading + head + sweep target), and the
+    'turn_refused' event line prints the veto reason with the same
+    context, so every seemingly-dead key has an auditable verdict.
+    Every number is PURE (hud_logic builders over engine state; NO
+    viewer reads are added anywhere).
     """
 
     # Model-A handoff (locked decision 9, the 04-06 start_requested
@@ -554,8 +560,16 @@ class GameTab(QtWidgets.QWidget):
         session['start_time'] = time.time()
         session['status'] = 'playing'
         session['saved_cam'] = pymol_bridge.lock_camera()  # GAME-02 lock
-        self._input_handle = game_input.install(
-            session['engine'].request_direction)           # GAME-03 steering
+        # GAME-03 steering. SRP_DEBUG=1 binds a trace adapter instead of
+        # the raw engine method: every arrow press gets ONE DBG line
+        # (queued / dropped-and-why), so a ghost-point retest can read
+        # exactly what each key did. Default-off binds the engine method
+        # directly - byte-identical play, zero per-press cost.
+        if session.get('debug'):
+            steer = self._make_debug_steer(session)
+        else:
+            steer = session['engine'].request_direction
+        self._input_handle = game_input.install(steer)
         self._tick_timer.start()
         self._elapsed_timer.start()
         self._update_remaining()
@@ -619,7 +633,12 @@ class GameTab(QtWidgets.QWidget):
         """
         kind = ev[0]
         if kind == 'turn_refused':
-            self._log('turn refused: %s' % ev[1])
+            # Ghost-point follow-up (05-16 retest): the veto is about the
+            # SWINGING CHAIN, not the head - say so in the log line so a
+            # correct refusal never reads as dead keys (hud_logic keeps
+            # the checkpoint's 'turn refused: <reason>' prefix).
+            self._log(hud_logic.turn_refuse_text(ev[1]))
+            self._dbg_event(engine, 'turn_refused', result=ev[1])
         elif kind == 'turning':
             self._handle_turn_event(engine)
         elif kind == 'stacked':
@@ -652,6 +671,40 @@ class GameTab(QtWidgets.QWidget):
             kind, tick=session.get('tick_n'),
             heading=_heading_name(engine.heading), head_xy=engine.head,
             **kwargs))
+
+    def _make_debug_steer(self, session):
+        """SRP_DEBUG=1 steering adapter (ghost-point follow-up).
+
+        Wraps engine.request_direction so EVERY arrow press logs one
+        'DBG turn request' line: the direction pressed and what the
+        engine did with it (queued / dropped: same direction / dropped:
+        180 reversal / dropped: buffer full / in-sweep newest-wins), with
+        the tick, heading, head position and - during a sweep - the
+        sweep TARGET the request is judged against. The classification
+        runs BEFORE the call (buffer state is reset by the call itself)
+        and mirrors request_direction's policies via
+        hud_logic.classify_turn_request (the return value is still the
+        engine's - the wizard ignores it anyway). Captures the session's
+        engine ONCE at install time (per-round binding, epoch-fresh on
+        every begin_game). Installed ONLY when session['debug'] is on;
+        default play binds the raw engine method.
+        """
+        engine = session['engine']
+
+        def steer(name):
+            unit = game_engine.DIRS[name]
+            sweep = engine.sweeping
+            ref = sweep['target_heading'] if sweep is not None \
+                else engine.heading
+            outcome = hud_logic.classify_turn_request(
+                unit, ref, bool(engine.pending), sweep is not None)
+            engine.request_direction(name)
+            self._log(hud_logic.debug_turn_request(
+                name, outcome, tick=session.get('tick_n'),
+                heading=_heading_name(engine.heading),
+                head_xy=engine.head,
+                ref=(None if sweep is None else _heading_name(ref))))
+        return steer
 
     # --- Phase-5 sweep rendering (plan 05-14, GAME-10 viewer half) ---------
 
