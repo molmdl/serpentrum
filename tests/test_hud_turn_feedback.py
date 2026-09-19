@@ -68,9 +68,10 @@ class TestClassifyTurnRequest(unittest.TestCase):
         self.assertEqual(
             hud_logic.classify_turn_request(RIGHT, RIGHT, False, False),
             'dropped: same direction')
+        # same-direction is checked BEFORE buffer-full (engine order)
         self.assertEqual(
-            hud_logic.classify_turn_request(UP, RIGHT, True, False),
-            'dropped: same direction')  # checked before buffer-full
+            hud_logic.classify_turn_request(RIGHT, RIGHT, True, False),
+            'dropped: same direction')
 
     def test_reversal_drops(self):
         self.assertEqual(
