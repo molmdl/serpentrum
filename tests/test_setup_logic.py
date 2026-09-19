@@ -80,10 +80,14 @@ class TestDefaults(unittest.TestCase):
         self.assertEqual(SCHEMA_VERSION, 1)
         self.assertEqual(KNOWN_SETS, ('set_a',))
         # Box presets: exact xy extents (Angstrom); z-depth is display-only.
+        # OWNER-APPROVED CONFIG CHANGE (2026-09-19 UTC, 05-16 checkpoint):
+        # all presets enlarged from the research-R7 values (small +/-12,
+        # medium +/-18, large +/-25) — see setup_logic.BOX_PRESETS comment
+        # for the straight-fit derivation.
         self.assertEqual(BOX_PRESETS, {
-            'small': ((-12.0, -12.0), (12.0, 12.0)),
-            'medium': ((-18.0, -18.0), (18.0, 18.0)),
-            'large': ((-25.0, -25.0), (25.0, 25.0)),
+            'small': ((-20.0, -20.0), (20.0, 20.0)),
+            'medium': ((-30.0, -30.0), (30.0, 30.0)),
+            'large': ((-45.0, -45.0), (45.0, 45.0)),
         })
         self.assertEqual(
             HESSIAN_WARNING,

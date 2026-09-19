@@ -104,8 +104,10 @@ def build_fixture():
         'records_by_id': dict((record['id'], record) for record in records),
         'atoms_by_id': atoms_by_id,
         'stacking_data': stacking_data,
-        'box_min': setup_logic.BOX_PRESETS['medium'][0],  # (-18.0, -18.0)
-        'box_max': setup_logic.BOX_PRESETS['medium'][1],  # ( 18.0,  18.0)
+        'box_min': setup_logic.BOX_PRESETS['medium'][0],  # (-30.0, -30.0)
+        'box_max': setup_logic.BOX_PRESETS['medium'][1],  # ( 30.0,  30.0)
+        # (values follow BOX_PRESETS live; comments restated for the
+        # 2026-09-19 owner-approved enlargement from +/-18)
         'display_z': DISPLAY_Z,
         'head_id': 'benzene',
     }
@@ -286,14 +288,15 @@ class TestPhase5IntegrationChain(unittest.TestCase):
     # ---- SCENARIO 2 --------------------------------------------------------
 
     def test_s2_boundary_crash_keeps_chain_complete(self):
-        """GAME-05 boundary path: small preset (+/-12), one placed segment,
+        """GAME-05 boundary path: small preset (+/-20 since the owner-
+        approved 2026-09-19 enlargement, was +/-12), one placed segment,
         head steered straight into the wall. The crash sets finished/result
         but the chain stays complete; step() is a no-op afterwards."""
         state = self.state
         picks = [pickup_seed(state, 'benzene', 'pick_0001', (4.0, 0.0))]
         small_min, small_max = setup_logic.BOX_PRESETS['small']
         self.assertEqual((small_min, small_max),
-                         ((-12.0, -12.0), (12.0, 12.0)))
+                         ((-20.0, -20.0), (20.0, 20.0)))
         engine = GameEngine(head=(0.0, 0.0), heading='right',
                             box_min=small_min, box_max=small_max,
                             pickups=picks)

@@ -39,8 +39,12 @@ DT = 0.1
 STEP_A = game_engine.SPEED_A_PER_S * DT  # 0.3 A per tick at 3.0 A/s
 DELTA = 1e-9
 
-# Medium box preset (research §8): (-18, -18) to (18, 18); the margin
-# walls (BOUNDARY_MARGIN_A = 1.0) sit at +-17.0.
+# Boundary-math fixture box (research §8 values, NOT a live preset read):
+# (-18, -18) to (18, 18); the margin walls (BOUNDARY_MARGIN_A = 1.0) sit
+# at +-17.0. (This suite tests the engine's box-argument math with an
+# arbitrary box; the presets themselves were enlarged 2026-09-19 —
+# small +/-20, medium +/-30, large +/-45 — and are pinned in
+# tests/test_setup_logic.py.)
 BOX_MIN = (-18.0, -18.0)
 BOX_MAX = (18.0, 18.0)
 MARGIN_WALL = 17.0  # = 18.0 - BOUNDARY_MARGIN_A

@@ -61,10 +61,21 @@ DEFAULTS = {
 # Box xy-extents in Angstrom (research R7). Consumed by
 # GameEngine(box_min, box_max) in Phase 4. z-depth is display-only and
 # is the bridge's concern (Phase 4/5) — NOT encoded here.
+#
+# OWNER-APPROVED CONFIG CHANGE (2026-09-19 UTC, 05-16 checkpoint
+# directive "increase box size of all size level, this is already medium
+# cant play at all with 1-2 eaten mol!"): every preset enlarged from the
+# research-R7 values (small +/-12, medium +/-18, large +/-25) because a
+# cap-10 straight chain needs 36.0 A of stacking span plus the 1.0 A
+# crash margin — it could never fit straight in the OLD medium (36 A
+# wide). New capacities (max straight chain N with 3.6*N <= 2H - 1.0):
+# small N<=10 (cap-10 fits, tight), medium N<=16 (cap-10 comfortable),
+# large N<=24 (headroom above the engine cap max 20). Default stays
+# 'medium'. BOX_DISPLAY_Z (5.0) is UNCHANGED (display-only).
 BOX_PRESETS = {
-    'small': ((-12.0, -12.0), (12.0, 12.0)),
-    'medium': ((-18.0, -18.0), (18.0, 18.0)),
-    'large': ((-25.0, -25.0), (25.0, 25.0)),
+    'small': ((-20.0, -20.0), (20.0, 20.0)),
+    'medium': ((-30.0, -30.0), (30.0, 30.0)),
+    'large': ((-45.0, -45.0), (45.0, 45.0)),
 }
 
 # Exact N-cubed hessian-cost warning (SETUP-06 / SPECTRA-06 pure half).
