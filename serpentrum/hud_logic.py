@@ -131,6 +131,31 @@ def budget_text():
     return 'atom budget exceeded - spectra on this snake may be slow'
 
 
+def stack_mode_note(records):
+    """The C1 begin_game zero-stackable explanation
+    (upload-endless debug session, resolved 2026-09-21).
+
+    A set whose EVERY record carries ``has_stack_entry`` False can never
+    stack: the STACK-03 skip policy guarantees a SKIP_NO_ENTRY outcome
+    on every capture, so the run has no reachable win condition and ends
+    only on a crash. Returns ONE info-box line explaining WHY (no
+    stacking entries) and HOW the run ends; the GUI logs it once per
+    begin_game (once per run -- Start or Restart).
+
+    None when at least one record can stack, or when the list is empty
+    (no records at all is a different state with its own begin_game
+    line, 'no records anchored - play without pickups'). A record
+    missing the key counts as not stackable -- the capture-time skip
+    policy reads the same key.
+    """
+    if not records:
+        return None
+    if any(record.get('has_stack_entry') for record in records):
+        return None
+    return ('this set has no stacking entries - demonstration mode: '
+            'practice steering; only a crash ends the run')
+
+
 def completion_lines(result, molecules, snake_molecules, atoms_total):
     """The four completion summary lines (GAME-09 / SPECTRA-06).
 

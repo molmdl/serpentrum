@@ -358,9 +358,11 @@ class GameTab(QtWidgets.QWidget):
         the first spawn-mod pickup (plan 05-11), anchors the session
         with the pure head mirror + spawn state, materializes the
         pickup object edge-on as sticks, frames ONCE (the 03-06
-        one-shot contract - NEVER per-tick), then runs the
-        epoch-guarded countdown. The movement tick starts at
-        _begin_play (after GO!).
+        one-shot contract - NEVER per-tick), logs the C1 zero-stackable
+        demonstration-mode note ONCE per run when the active set has no
+        stacking entries (upload-endless debug session, 2026-09-21),
+        then runs the epoch-guarded countdown. The movement tick starts
+        at _begin_play (after GO!).
         """
         self._teardown_round()  # timers, epoch, input, camera (ONE helper)
         self.info_box.clear()
@@ -409,6 +411,13 @@ class GameTab(QtWidgets.QWidget):
                 self._pickup_m16(record, seed['centroid']))
             self._session['live_pickup_names'].append(name)
         pymol_bridge.frame_scene()  # ONE-SHOT framing (03-06 contract)
+        # C1 (upload-endless debug session, 2026-09-21): a set with ZERO
+        # stackable records can never win (STACK-03 skips every capture);
+        # say so ONCE per run, up front, or the run is silently endless.
+        # Empty records take the 'no records anchored' branch instead.
+        note = hud_logic.stack_mode_note(records)
+        if note is not None:
+            self._log(note)
         self._log('Get ready...')
         self.restart_btn.setEnabled(True)
         self._run_countdown(3)

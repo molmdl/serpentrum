@@ -26,6 +26,10 @@ it never writes chemistry:
       by (outcome, name) — SKIP_* codes counted 'skipped Nx', REFUSE_*
       codes 'refused Nx' (C4 taxonomy, upload-endless debug 2026-09-21);
       first-appearance order; empty history -> [].
+  hud_logic.stack_mode_note(records) -> the C1 once-per-run begin_game
+      explanation when the active set has ZERO stackable species (every
+      record has_stack_entry=False -> no reachable win condition); None
+      when at least one record can stack or there are no records.
   hud_logic.idle_tip(explanations, index) -> round-robin 'tip: ...'
       from VERBATIM dataset explanations (newline-collapsed); None on
       an empty list.
@@ -495,6 +499,86 @@ class TestReasonCoalescer(unittest.TestCase):
         mode, _line = c.note(None)
         self.assertEqual(mode, 'append')
         self.assertEqual(c.note(self.LINE), ('append', self.LINE))
+
+
+class TestStackModeNote(unittest.TestCase):
+    """stack_mode_note: the C1 begin_game zero-stackable explanation
+    (upload-endless debug session, 2026-09-21).
+
+    A set whose EVERY record carries has_stack_entry=False can never
+    stack (STACK-03 skip policy at capture time), so the run has no
+    reachable win condition. begin_game logs this builder's line ONCE
+    (one call site, one begin_game per run - Start or Restart) so the
+    user knows WHY nothing will stack and HOW the run ends. None when
+    at least one record can stack.
+    """
+
+    NOTE = ('this set has no stacking entries - demonstration mode: '
+            'practice steering; only a crash ends the run')
+
+    def test_zero_stackable_records_returns_note(self):
+        records = [{'id': 'upload_0', 'has_stack_entry': False},
+                   {'id': 'upload_1', 'has_stack_entry': False}]
+        self.assertEqual(hud_logic.stack_mode_note(records), self.NOTE)
+
+    def test_exact_wording(self):
+        # Exact-format pin: one-line explanation of WHY (no stacking
+        # entries) and the end condition (only a crash).
+        records = [{'id': 'upload_0', 'has_stack_entry': False}]
+        line = hud_logic.stack_mode_note(records)
+        self.assertEqual(line, self.NOTE)
+        self.assertNotIn('\n', line)
+
+    def test_stackable_record_suppresses_note(self):
+        records = [{'id': 'benzene', 'has_stack_entry': True},
+                   {'id': 'upload_0', 'has_stack_entry': False}]
+        self.assertIs(hud_logic.stack_mode_note(records), None)
+
+    def test_empty_records_returns_none(self):
+        # No records at all is a different state with its own begin_game
+        # line ('no records anchored - play without pickups') - not the
+        # zero-stackable-note case.
+        self.assertIs(hud_logic.stack_mode_note([]), None)
+
+    def test_missing_key_counts_as_not_stackable(self):
+        # A record without 'has_stack_entry' can never stack (the skip
+        # policy reads the same key); the note must still fire.
+        records = [{'id': 'upload_0'}]
+        self.assertEqual(hud_logic.stack_mode_note(records), self.NOTE)
+
+    def test_real_demo_set_suppresses_note(self):
+        # Real-data integration pin: the shipped set_a loads with
+        # has_stack_entry=True (pi_stack_pd is APPROVED) -> None.
+        records, errors = setloader.load_demo_set(
+            set_id='set_a',
+            stacking_path=setloader.default_stacking_path())
+        self.assertEqual(errors, [])
+        self.assertTrue(records)
+        self.assertIs(hud_logic.stack_mode_note(records), None)
+
+    def test_real_upload_records_return_note(self):
+        # Real-data integration pin: an uploaded SDF (reusing the demo
+        # naphthalene file as an upload) carries has_stack_entry=False
+        # via the '__upload__' keying -> the note fires.
+        path = os.path.join(setloader.package_data_dir(), 'naphthalene.sdf')
+        records, errors = setloader.load_upload(
+            path, stacking_path=setloader.default_stacking_path())
+        self.assertEqual(errors, [])
+        self.assertTrue(records)
+        self.assertEqual(hud_logic.stack_mode_note(records), self.NOTE)
+
+    def test_begin_game_has_exactly_one_call_site(self):
+        # One-shot-ness pin: the note is logged by begin_game EXACTLY
+        # ONCE per run (never per tick, never per capture). A second
+        # call site would duplicate the line; none would drop the fix.
+        source_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'serpentrum', 'gui_game.py')
+        with open(source_path) as handle:
+            source = handle.read()
+        self.assertEqual(source.count('stack_mode_note('), 1,
+                         'exactly one stack_mode_note call site '
+                         '(begin_game, once per run)')
 
 
 class TestDebugSpawnCooldown(unittest.TestCase):
