@@ -1,11 +1,16 @@
 """setup_logic contract tests: defaults, validation matrix, save/load
-round-trip, seeded head randomize (plan 02-07).
+round-trip, seeded head randomize (plan 02-07), speed tiers +
+defaults-merge backcompat (plan 5.1-02).
 
 Covers the pure half of SETUP-03/04/05/06 and SPECTRA-06's pre-xtb
 warning. validate() produces per-key errors and the single exact N-cubed
 hessian-cost warning; save/load round-trips the setup dict identically;
 randomize_head is seed-deterministic via private random.Random instances
-(never the global random module).
+(never the global random module). Plan 5.1-02 adds the SPEED_TIERS exact
+tuple pin, the merge_defaults absent-key backcompat matrix, speed_tier_for
+exact-match resolution, the custom-speed accept-as-is pin, and a
+non-default-speed save/load round-trip. EXPECTED_DEFAULTS is UNCHANGED
+(speed 3.0 was already the documented default).
 
 Discovery command (verified on python3.6.9 — NOTE: `-t .` FAILS on
 python3.6 with a non-package start dir; do not add it):
@@ -29,7 +34,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import serpentrum.setup_logic as setup_logic  # noqa: E402
 from serpentrum.setup_logic import (  # noqa: E402
     BOX_PRESETS, DEFAULTS, HESSIAN_WARNING, KNOWN_SETS, SCHEMA_VERSION,
-    SetupError, load_setup, new_setup, randomize_head, save_setup, validate,
+    SPEED_TIERS, SetupError, load_setup, merge_defaults, new_setup,
+    randomize_head, save_setup, speed_tier_for, validate,
 )
 import serpentrum.xtbenv as xtbenv  # noqa: E402
 
@@ -296,6 +302,13 @@ class TestSaveLoadRoundTrip(unittest.TestCase):
         text = save_setup(s)          # must NOT raise
         self.assertEqual(load_setup(text), s)
 
+    def test_round_trip_identical_non_default_speed(self):
+        # Plan 5.1-02: extend the round-trip pin to a non-default tier
+        # value — a chosen tier serializes and reloads byte-identically.
+        s = new_setup()
+        s['speed'] = 4.5
+        self.assertEqual(load_setup(save_setup(s)), s)
+
 
 class TestLoadSetupErrors(unittest.TestCase):
     """load_setup raises SetupError on corrupt JSON, foreign schema, and
@@ -330,6 +343,93 @@ class TestLoadSetupErrors(unittest.TestCase):
         text = save_setup(new_setup())
         loaded = load_setup(text)
         self.assertEqual(loaded, new_setup())
+
+
+class TestSpeedTierTable(unittest.TestCase):
+    """SPEED_TIERS is the ONE ordered name -> A/s table (plan 5.1-02).
+    Draft values; owner-finalized at the 5.1 feel-check — this EXACT
+    tuple pin is the visible reviewable diff for those value tweaks.
+    Insertion order is pinned because it drives the GUI combo order."""
+
+    def test_speed_tiers_exact_ordered_table(self):
+        self.assertEqual(
+            SPEED_TIERS,
+            (('relaxed', 2.0), ('normal', 3.0), ('fast', 4.5),
+             ('expert', 6.0)))
+
+    def test_default_speed_is_a_tier_value(self):
+        # The numeric default (3.0) IS one of the tier values, so a
+        # fresh setup resolves to a named tier ('normal'), not 'custom'.
+        tier_values = [aps for _name, aps in SPEED_TIERS]
+        self.assertIn(DEFAULTS['speed'], tier_values)
+
+
+class TestMergeDefaults(unittest.TestCase):
+    """merge_defaults(loaded): absent keys fall back to DEFAULTS — the
+    backcompat seam for setup files written before a key existed
+    (plan 5.1-02, speed; Phase 5.2 reuses it for its consent key).
+    DEFAULTS and the input dict are NEVER mutated; unknown extra keys
+    from the loaded dict are preserved (tolerated everywhere today)."""
+
+    def test_empty_dict_merges_to_full_defaults(self):
+        self.assertEqual(merge_defaults({}), dict(DEFAULTS))
+
+    def test_partial_dict_keeps_loaded_values(self):
+        merged = merge_defaults({'schema_version': 1, 'speed': 4.5})
+        self.assertEqual(merged['speed'], 4.5)
+        expected = dict(DEFAULTS)
+        expected['speed'] = 4.5
+        self.assertEqual(merged, expected)
+
+    def test_absent_speed_merges_to_default_and_validates_clean(self):
+        # The backcompat scenario: a dict missing 'speed' merges to the
+        # default tier (3.0) instead of failing validation.
+        merged = merge_defaults({'schema_version': 1})
+        self.assertEqual(merged['speed'], 3.0)
+        self.assertEqual(validate(merged), ([], []))
+
+    def test_input_dict_not_mutated(self):
+        loaded = {'schema_version': 1, 'speed': 4.5}
+        merge_defaults(loaded)
+        self.assertEqual(loaded, {'schema_version': 1, 'speed': 4.5})
+
+    def test_defaults_not_mutated(self):
+        before = dict(DEFAULTS)
+        merge_defaults({'schema_version': 1, 'speed': 99.0})
+        self.assertEqual(DEFAULTS, before)
+
+    def test_unknown_extra_keys_preserved(self):
+        merged = merge_defaults({'schema_version': 1, 'note': 'x'})
+        self.assertEqual(merged['note'], 'x')
+
+
+class TestSpeedTierFor(unittest.TestCase):
+    """speed_tier_for: exact-match tier resolution with a 'custom'
+    fallback (plan 5.1-02). Feeds the HUD speed note; deliberately NOT
+    used to tighten validate() — no nearest-match guessing."""
+
+    def test_exact_tier_values_resolve_to_names(self):
+        self.assertEqual(speed_tier_for(2.0), 'relaxed')
+        self.assertEqual(speed_tier_for(3.0), 'normal')
+        self.assertEqual(speed_tier_for(4.5), 'fast')
+        self.assertEqual(speed_tier_for(6.0), 'expert')
+
+    def test_off_tier_speed_is_custom(self):
+        self.assertEqual(speed_tier_for(3.1), 'custom')
+
+    def test_non_number_inputs_are_custom(self):
+        self.assertEqual(speed_tier_for(None), 'custom')
+        self.assertEqual(speed_tier_for('fast'), 'custom')
+
+
+class TestCustomSpeedAccepted(unittest.TestCase):
+    """Accept-as-is pin (plan 5.1-02): any speed > 0 validates — the
+    tier combo is the UI constraint, NOT the schema. Custom hand-tuned
+    speeds in a file stay legal."""
+
+    def test_custom_speed_validates_with_no_speed_error(self):
+        errors, _warnings = validate(_mutated(speed=50.0))
+        self.assertEqual([e for e in errors if 'speed' in e], [])
 
 
 class TestRandomizeHead(unittest.TestCase):
