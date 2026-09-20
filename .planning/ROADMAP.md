@@ -20,7 +20,7 @@ A PyMOL plugin game: steer a molecular head around a bounded box, stack real sma
 - [x] **Phase 2: Pure Core — Game & Chemistry Logic** - All game/chemistry rules as stdlib-only WSL-tested modules; spectra parser fixture-first; demo-data approval track starts *(research B)*
 - [x] **Phase 3: Molecules in the Viewer & Setup Tab** - Configure a game in the Setup tab; box + head molecule materialize in the viewer; uploads gated *(research C)*
 - [x] **Phase 4: Game Loop & Input** - Arrow-key steered movement on a 2D locked-camera plane with countdown, HUD, pause/restart *(research D — input spike)*
-- [ ] **Phase 5: Stacking & Game Rules Complete** - Pickups stack at cited geometry; rigid-pivot turns; collisions end runs; win/crash both reach spectra *(research E)*
+- [x] **Phase 5: Stacking & Game Rules Complete** - Pickups stack at cited geometry; rigid-pivot turns; collisions end runs; win/crash both reach spectra *(research E)*
 - [ ] **Phase 5.1: Game Speed / Difficulty (INSERTED 2026-09-20)** - Setup-selectable constant speed tier (difficulty), persisted; baseline 3.0 Å/s unchanged *(owner insertion — playtesting feedback)*
 - [ ] **Phase 6: xtb Pipeline** - Async cancellable `xtb --ohess` with verified success contract and calibrated atom-budget guard *(research F — parallel track)*
 - [ ] **Phase 7: Spectra UI** - Broadened IR plot, clickable frequency table → static mode vectors, streaming log, saveable plot *(research G)*
@@ -146,22 +146,22 @@ Notes: **Spike scheduled here (the one open mechanism question):** up/down `set_
 **Plans**: 16 plans (7 waves)
 
 Plans:
-- [ ] 05-01-PLAN.md — TDD ring_cycle: canonical planar 6-ring extractor in molfile (Wave 1, parallel)
-- [ ] 05-02-PLAN.md — TDD orientation.py: verified TTT matrix layout + edge-on canonicalization (Wave 1, parallel)
-- [ ] 05-03-PLAN.md — TDD spawn.py: deterministic seeded pickup spawn policy (Wave 1, parallel)
-- [ ] 05-04-PLAN.md — TDD engine additive fix: reject-after-won un-finish (win-vs-clash desync) (Wave 1, parallel)
-- [ ] 05-05-PLAN.md — TDD placement.py: pure controller seam — skip taxonomy, tail/growth policy, clash gate (Wave 1, parallel)
-- [ ] 05-06-PLAN.md — Anchors: records/stacking_data/last_run on _serpentrum + gui_setup stacking_path wiring (Wave 1, parallel)
-- [ ] 05-07-PLAN.md — Bridge primitives (apply_matrix/sweep_chain/completion) + REQUIRED smoke 07 (Wave 1, parallel)
-- [ ] 05-08-PLAN.md — setloader stack_ring carry on demo records (Wave 2)
-- [ ] 05-09-PLAN.md — TDD-style hud_logic STACK-04 content builders (Wave 2, parallel)
-- [ ] 05-10-PLAN.md — Edge-on materialization (head + pickups as sticks) + REQUIRED smoke 08 real-data placement (Wave 2, parallel)
-- [ ] 05-11-PLAN.md — GameTab begin_game: head mirror, spawn/seed/materialize, teardown pickup cleanup (Wave 3)
-- [ ] 05-12-PLAN.md — Pure integration chain test: win/crash/refuse/skip/un-finish scenarios (Wave 3, parallel)
-- [ ] 05-13-PLAN.md — GameTab 'stacked' capture seam + 'won' guard (Wave 4)
-- [ ] 05-14-PLAN.md — GameTab 'turning' rigid sweep rendering + head mirror + budget line (Wave 5)
-- [ ] 05-15-PLAN.md — Completion presenter + Get Spectra button/model-A signal (Wave 6)
-- [ ] 05-16-PLAN.md — Phase-closing gates + consolidated human-verify checkpoint (Wave 7)
+- [x] 05-01-PLAN.md — TDD ring_cycle: canonical planar 6-ring extractor in molfile (Wave 1, parallel)
+- [x] 05-02-PLAN.md — TDD orientation.py: verified TTT matrix layout + edge-on canonicalization (Wave 1, parallel)
+- [x] 05-03-PLAN.md — TDD spawn.py: deterministic seeded pickup spawn policy (Wave 1, parallel)
+- [x] 05-04-PLAN.md — TDD engine additive fix: reject-after-won un-finish (win-vs-clash desync) (Wave 1, parallel)
+- [x] 05-05-PLAN.md — TDD placement.py: pure controller seam — skip taxonomy, tail/growth policy, clash gate (Wave 1, parallel)
+- [x] 05-06-PLAN.md — Anchors: records/stacking_data/last_run on _serpentrum + gui_setup stacking_path wiring (Wave 1, parallel)
+- [x] 05-07-PLAN.md — Bridge primitives (apply_matrix/sweep_chain/completion) + REQUIRED smoke 07 (Wave 1, parallel)
+- [x] 05-08-PLAN.md — setloader stack_ring carry on demo records (Wave 2)
+- [x] 05-09-PLAN.md — TDD-style hud_logic STACK-04 content builders (Wave 2, parallel)
+- [x] 05-10-PLAN.md — Edge-on materialization (head + pickups as sticks) + REQUIRED smoke 08 real-data placement (Wave 2, parallel)
+- [x] 05-11-PLAN.md — GameTab begin_game: head mirror, spawn/seed/materialize, teardown pickup cleanup (Wave 3)
+- [x] 05-12-PLAN.md — Pure integration chain test: win/crash/refuse/skip/un-finish scenarios (Wave 3, parallel)
+- [x] 05-13-PLAN.md — GameTab 'stacked' capture seam + 'won' guard (Wave 4)
+- [x] 05-14-PLAN.md — GameTab 'turning' rigid sweep rendering + head mirror + budget line (Wave 5)
+- [x] 05-15-PLAN.md — Completion presenter + Get Spectra button/model-A signal (Wave 6)
+- [x] 05-16-PLAN.md — Phase-closing gates + consolidated human-verify checkpoint (Wave 7)
 
 Notes: The clash gate is a game rule, not a spectra afterthought (a clashing append makes xtb infer covalent bonds → garbage hessian; π-stack at 3.4 Å verified safe `[RUN]`). `transform_selection` matrix layout + one-call rigid sweep + placement exactness are researcher-VERIFIED (05-RESEARCH-pymol-mechanics.md) — plans wire them as-is, smokes replicate the probes as regression. Biphenyl ships with rings at 90° → every biphenyl stack clashes → it is the designed refuse-path demonstrator (data observation recorded, not fixed). Edge-on orientation lands at materialization BEFORE any stacking (locked 03-08 + 04-07). Avoids Pitfalls 9, 10, 4-restore, 11-aggregation.
 
@@ -268,7 +268,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. Pure Core — Game & Chemistry Logic | 14/14 | Complete (verified 4/4 must-haves) | 2026-09-10 |
 | 3. Molecules in the Viewer & Setup Tab | 8/8 | Complete (verified 5/5 must-haves) | 2026-09-12 |
 | 4. Game Loop & Input | 9/9 | Complete (verified 5/5 must-haves) | 2026-09-14 |
-| 5. Stacking & Game Rules Complete | 0/16 | Executing — 16/16 plans executed, checkpoint 05-16 final pass (1 design item in debug) | - |
+| 5. Stacking & Game Rules Complete | 16/16 | Complete (verified 48/48 plan truths, 3 owner-amended; 5/5 criteria; 9/9 reqs; 7-round human checkpoint) | 2026-09-20 |
 | 5.1. Game Speed / Difficulty (INSERTED 2026-09-20) | 0/TBD | Not started (plan after Phase 5 wrap) | - |
 | 6. xtb Pipeline | 0/TBD | Not started | - |
 | 7. Spectra UI | 0/TBD | Not started | - |

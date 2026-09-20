@@ -27,22 +27,22 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **GAME-01**: Clicking Start switches to the Game tab, counts down 3-2-1, then starts movement
 - [x] **GAME-02**: Gameplay runs on a 2D plane inside the 3D viewer with a locked camera; the box boundary is clearly displayed at all times
 - [x] **GAME-03**: The head renders as spheres and pickups as sticks; the snake moves forward continuously and the 4 arrow keys steer it (cannot stop)
-- [ ] **GAME-04**: Picking up a molecule stacks it onto the snake; molecule count and atom count are tracked (hidden, used for the pre-xtb atom-budget check)
-- [ ] **GAME-05**: Hitting the boundary or the snake's own body (segment-based collision: head-centroid vs chain segments) ends the run, but the snake is still "complete"
-- [ ] **GAME-06**: The player wins when snake length exceeds the configured cap
+- [x] **GAME-04**: Picking up a molecule stacks it onto the snake; molecule count and atom count are tracked (hidden, used for the pre-xtb atom-budget check)
+- [x] **GAME-05**: Hitting the boundary or the snake's own body (segment-based collision: head-centroid vs chain segments) ends the run, but the snake is still "complete"
+- [x] **GAME-06**: The player wins when snake length exceeds the configured cap
 - [x] **GAME-07**: Game tab shows a rolling info box, elapsed timer, molecules-remaining-before-win, a pause/resume toggle, and a restart button that resets to the initial state
 - [x] **GAME-08**: Snake speed is constant for v1
-- [ ] **GAME-09**: On completion (win or crash): viewer clears, camera focuses the completed snake, info box shows snake length + total score (molecule count), and "Get Spectra" activates
-- [ ] **GAME-10**: Turning rotates the entire chain as a rigid body (stacking geometry immutable at all times); a turn whose sweep would collide with the boundary or body is refused; 180° reversal is forbidden
+- [x] **GAME-09**: On completion (win or crash): viewer clears, camera focuses the completed snake, info box shows snake length + total score (molecule count), and "Get Spectra" activates
+- [x] **GAME-10**: Turning rotates the entire chain as a rigid body (stacking geometry immutable at all times); a turn whose sweep would collide with the boundary or body is refused; 180° reversal is forbidden *(shipped owner-amended 2026-09-20: rigid sweep + train-follow tail, immutable 3.60 Å spacing; turn pre-check refuses 180° only)*
 - [ ] **GAME-11**: Setup tab offers a game speed/difficulty selector with named tiers (speed constant within a run per GAME-08); the choice persists via Save/Load Setup; default = the v1 baseline speed (3.0 Å/s) *(inserted 2026-09-20 with Phase 5.1 — owner playtesting feedback)*
 
 ### Molecular Stacking
 
-- [ ] **STACK-01**: Each pickup is placed deterministically at the dataset-stored geometry (translate/rotate onto the stack position) — placed geometry equals the cited distance
+- [x] **STACK-01**: Each pickup is placed deterministically at the dataset-stored geometry (translate/rotate onto the stack position) — placed geometry equals the cited distance
 - [x] **STACK-02**: Stacking data is a data file (not code): interaction mode + distance + citation per molecule pair; v1 dataset = π-stack, parallel-displaced (Set A)
-- [ ] **STACK-03**: A pickup without a verified dataset entry is skipped (not placed), with the info box stating why — no invented chemistry
-- [ ] **STACK-04**: Info box shows per-pickup structured content (interaction name, distance, one-line explanation, citation short-code), plus idle chemistry tips, early controls hints, and an end-of-run interaction breakdown
-- [ ] **STACK-05**: A clash gate rejects stacking placements that would collide (protecting xtb from inferring spurious covalent bonds)
+- [x] **STACK-03**: A pickup without a verified dataset entry is skipped (not placed), with the info box stating why — no invented chemistry
+- [x] **STACK-04**: Info box shows per-pickup structured content (interaction name, distance, one-line explanation, citation short-code), plus idle chemistry tips, early controls hints, and an end-of-run interaction breakdown
+- [x] **STACK-05**: A clash gate rejects stacking placements that would collide (protecting xtb from inferring spurious covalent bonds)
 
 ### Spectra
 
@@ -134,19 +134,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GAME-01 | Phase 4 | Complete |
 | GAME-02 | Phase 4 | Complete |
 | GAME-03 | Phase 4 | Complete |
-| GAME-04 | Phase 5 | Pending |
-| GAME-05 | Phase 5 | Pending |
-| GAME-06 | Phase 5 | Pending |
+| GAME-04 | Phase 5 | Complete |
+| GAME-05 | Phase 5 | Complete |
+| GAME-06 | Phase 5 | Complete |
 | GAME-07 | Phase 4 | Complete |
 | GAME-08 | Phase 4 | Complete |
-| GAME-09 | Phase 5 | Pending |
-| GAME-10 | Phase 5 | Pending |
+| GAME-09 | Phase 5 | Complete |
+| GAME-10 | Phase 5 | Complete (owner-amended contract — see note) |
 | GAME-11 | Phase 5.1 | Pending |
-| STACK-01 | Phase 5 | Pending |
+| STACK-01 | Phase 5 | Complete |
 | STACK-02 | Phase 2 | Complete |
-| STACK-03 | Phase 5 | Pending |
-| STACK-04 | Phase 5 | Pending |
-| STACK-05 | Phase 5 | Pending |
+| STACK-03 | Phase 5 | Complete |
+| STACK-04 | Phase 5 | Complete |
+| STACK-05 | Phase 5 | Complete |
 | SPECTRA-01 | Phase 7 | Pending |
 | SPECTRA-02 | Phase 6 | Pending |
 | SPECTRA-03 | Phase 7 | Pending |
@@ -180,3 +180,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 *Requirements defined: 2026-09-06*
 *Last updated: 2026-09-14 — Phase 4 complete (verified 40/40 must-haves): GAME-01, GAME-02, GAME-03, GAME-07, GAME-08 marked Complete*
 *2026-09-20 — GAME-11 added (Phase 5.1 inserted): Setup-selectable game speed/difficulty, constant per run (GAME-08 intact), persisted, default = baseline 3.0 Å/s. Coverage 44 → 45. GAME-10 behavior note: 05-16 checkpoint owner overrides amended the in-run turn model (turn pre-check refuses 180° only; REFUSE_WALL placement gate removed; chain may extend outside the box — only the head is box-bound) — statuses to be finalized at Phase 5 completion.*
+*2026-09-20b — **Phase 5 COMPLETE** (05-VERIFICATION: passed — 48/48 plan must-have truths, 3 verified-as-owner-amended; 5/5 success criteria; 7-round human checkpoint 2026-09-18..20): GAME-04, GAME-05, GAME-06, GAME-09, GAME-10, STACK-01, STACK-03, STACK-04, STACK-05 → Complete. GAME-10 shipped contract = owner-amended: rigid chain sweep with train-follow tail (immutable 3.60 Å spacing), turn pre-check refuses 180° only, REFUSE_WALL removed (chain may extend outside box; only head box-bound), REFUSE_ATOM clash gate intact (STACK-05).*

@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
-**Current focus:** Phase 5 — Stacking & Game Rules (16/16 plans executed; 05-VERIFICATION passed 15/15 machine-checked; 05-16 checkpoint FINAL PASS — all gameplay verified across rounds 1-6; open: upload-only-endless debug item → Phase 5.1 → one confirmation game; queue in HANDOFF-2026-09-20-phase5-resume.md)
+**Current focus:** Phase 5 COMPLETE (verified 2026-09-20) — next: Phase 5.1 Game Speed / Difficulty (GAME-11, inserted); owner question on generic upload stacking pending decision (possible Phase 5.2 insertion)
 
 ## Current Position
 
-Phase: 5 of 8 (Stacking & Game Rules Complete) — executing
-Plan: 16 of 16 executed (05-01..05-16); 05-VERIFICATION.md: passed machine-checked portion (was human_needed at 15/15 plans, zero gaps, committed 8da8796); 05-16 checkpoint: Task 1 gate pass green, Task 2 human-verify in progress
-Status: machine half green (640 unittests, 7/7 required smokes); human half: ALL gameplay items functionally verified across rounds 1-6; upload-endless debug session RESOLVED 2026-09-20 (C1 demo-mode begin_game note 64882c3 + C4 skip/refuse recap taxonomy e0b2814; C2 soft Start-warning left as owner opt-in, seam documented in resolved debug file); checkpoint closed pending: Phase 5.1 + one confirmation game
-Last activity: 2026-09-20 — debug session resolved (64882c3/e0b2814/2bff573, archived to .planning/debug/resolved/); next: /gsd-plan-phase 5.1 (GAME-11 speed tiers)
+Phase: 5 of 8 (Stacking & Game Rules Complete) — COMPLETE + VERIFIED
+Plan: 16 of 16 complete (05-01..05-16); 05-VERIFICATION.md: **passed** (48/48 plan must-have truths, 3 verified-as-owner-amended; 5/5 success criteria; 9/9 requirements; 7-round human checkpoint 2026-09-18..20)
+Status: Phase 5 shipped contract = owner-amended (180-only turn veto, REFUSE_WALL removed, train-follow tail @3.60 A immutable, cooldown spawn, restart hygiene, upload skip parity + demo-mode note, recap taxonomy); gates at wrap: 640 unittests, 7/7 required smokes; REQUIREMENTS GAME-04/05/06/09/10 + STACK-01/03/04/05 -> Complete
+Last activity: 2026-09-20 — 05-16 checkpoint approved by evidence (2 final-pass tests) -> SUMMARY b0ed958 -> gsd-verifier passed -> wrap-up commit (Phase 5 complete)
 
-Progress: [█████████░] ~85% (53 plans executed — Phases 1-5 firm at 6+14+8+9+16; Phases 6-8 TBD per roadmap estimates, ~8-11 expected)
+Progress: [█████████░] ~85% (53 plans executed — Phases 1-5 COMPLETE at 6+14+8+9+16; Phase 5.1 inserted (TBD ~2-3); Phases 6-8 TBD ~8-11; possible Phase 5.2 pending owner decision on generic upload stacking)
 
 ## Performance Metrics
 
@@ -84,7 +84,9 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- **Phase 5 leftover (05-16 checkpoint, owner-paused 2026-09-20):** all gameplay items verified across rounds 1-6; only the upload-only endless-run design gap remains (debug session); close-out sequence per HANDOFF-2026-09-20-phase5-resume.md: debug fix -> Phase 5.1 -> one confirmation game -> SUMMARY -> verifier -> wrap-up.
+- ~~Phase 5 leftover (05-16 checkpoint)~~ DONE 2026-09-20 — Phase 5 COMPLETE + VERIFIED (wrap-up commit; upload-endless debug resolved; all close-out steps executed).
+- **Owner decision pending:** generic upload stacking — user asked "possible to have user accept a pre-defined stacking in a popup and allow play as usual?" (v2 STACK-06 concept promoting to v1); candidate = inserted Phase 5.2, design sketch in conversation 2026-09-20 (consent via Setup checkbox — modeless rule bans .exec_() popups until a child-dialog allowlist exists; generic entry = already-approved idealized 3.60 A @ 20 pi-stack for planar-6-ring uploads, labeled illustrative in-game); DEFAULT = close v1 without it (current demo-mode note + skip path already honest).
+- C2 soft Apply-time stacking warning (debug session left it as owner opt-in; seam documented in .planning/debug/resolved/05-upload-only-endless-run.md) — ABSORB into Phase 5.2 planning if 5.2 happens, else skip.
 - ~~Adjacent observation (old srp_seg_* decay on Restart)~~ RESOLVED 2026-09-20 in 56dd68b (begin_game hard-cleans all srp_* before materializing).
 - ~~Phase 5 design note (biphenyl WALL refuse at display_z 5.0)~~ SUPERSEDED 2026-09-20 by d33f74c: REFUSE_WALL placement gate removed entirely; biphenyl's refuse path is now REFUSE_ATOM clash (1.87 Å — the STACK-05 demonstrator); placed z-extent is no longer gated.
 - Phase 6 calibration pending: QProcess-in-conda smoke, ~100-atom `--ohess` wall time, OMP env (`[TRAIN]`) — Phase 6 can run parallel with Phases 4-5 (depends only on Phase 2).
@@ -100,8 +102,8 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-09-20 (debug orchestrator — upload-only-endless-run RESOLVED: C1 demo-mode note 64882c3 + C4 recap taxonomy e0b2814 + archive 2bff573; C2 soft Start-warning documented as owner opt-in; 640 tests, 7/7 smokes)
-Stopped at: Phase 5 checkpoint Task 2 final pass — all gameplay items verified; design gap closed; awaiting Phase 5.1 then one confirmation game
-Resume file: .planning/HANDOFF-2026-09-20-phase5-resume.md (step 1 complete — continue from step 2)
-Next action: (1) /gsd-plan-phase 5.1 + execute (GAME-11 speed tiers, owner feel-check); (2) fresh session: resume checkpoint (set SRP_DEBUG=1 first), one confirmation game; (3) on approval: finalize 05-16 (SUMMARY + verifier + wrap-up commit: ROADMAP row, REQUIREMENTS GAME-04/05/06/09/10 + STACK-01/03/04/05 -> Complete, noting the GAME-10 owner-override contract); (4) then Phase 6 (xtb Pipeline) or Phase 7
+Last session: 2026-09-20 (execute-phase orchestrator — 05-16 checkpoint APPROVED BY EVIDENCE (final-pass test 1: small-box cap-10 win with correct refused-clash recap; test 2: upload demo-mode note + skipped-Nx recap); 05-16-SUMMARY b0ed958; gsd-verifier FINAL 05-VERIFICATION passed (48/48 truths, 3 owner-amended; 5/5 criteria; 9/9 reqs); Phase 5 wrap-up committed)
+Stopped at: Phase 5 COMPLETE + VERIFIED. Awaiting owner decision: insert Phase 5.2 (generic upload stacking consent) or not — then Phase 5.1 planning.
+Resume file: None needed (Phase 5 closed); HANDOFF-2026-09-20-phase5-resume.md is historical (all steps complete)
+Next action: (1) owner answers 5.2 question; (2) /gsd-plan-phase 5.1 (+ 5.2 if approved — plan 5.2 first, hot context; execute sequentially to avoid gui_setup/hud_logic collisions); (3) then Phase 6 (xtb Pipeline — QProcess smoke gates it) or Phase 7
 Date convention: planning-doc dates are UTC (git commit dates authoritative) — the dev shell is HKT (UTC+8); never stamp from the local date.
