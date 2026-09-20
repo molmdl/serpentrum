@@ -80,11 +80,17 @@ from . import stacking
 # ``from . import gui_input as game_input`` (nothing else changes).
 from . import input as game_input
 
-# Movement tick: 100 ms with dt=0.1 s passed to engine.step -> exactly
-# 0.3 A/tick at SPEED_A_PER_S=3.0, matching the engine's tested
-# parameter (test_engine_core.py DELTA=0.1; 04-RESEARCH-gameloop.md
-# S2). Fixed dt keeps engine determinism; cadence jitter is eaten by
-# QTimer, not by the simulation. Playtesting-tunable.
+# Movement tick CADENCE: the 100 ms QTimer with dt=0.1 s passed to
+# engine.step is the timer's job ONLY - fixed dt keeps engine
+# determinism; cadence jitter is eaten by QTimer, not by the
+# simulation (test_engine_core.py DELTA=0.1; 04-RESEARCH-gameloop.md
+# S2). The per-tick DISTANCE is a separate knob: speed_a_per_s * dt,
+# where speed_a_per_s comes from the setup-selected tier injected at
+# _build_engine (Phase 5.1 GAME-11); at the default 'normal' tier
+# (3.0 A/s) that is still 0.3 A/tick, matching the engine's tested
+# parameter. Playtesting-tunable via SPEED_TIERS in setup_logic
+# (data-only edits) - the cadence constants themselves are not a
+# speed knob.
 TICK_DT = 0.1
 TICK_INTERVAL_MS = 100
 
