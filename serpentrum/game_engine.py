@@ -72,9 +72,10 @@ tools/check_purity.py); zero sys.modules stubs.
 import math
 
 # Constant speed in Angstroms per second (GAME-08: constant speed, no
-# acceleration). The VALUE is a tunable placeholder pinned at 3.0 for
-# Phase-2 testing (0.3 A per 0.1 s tick); the final feel is decided by
-# Phase-4 playtesting (setup_logic mirrors it as its 'speed' default).
+# acceleration). v1 default tier + test pin; the per-run tier is injected
+# via the speed_a_per_s kwarg (Phase 5.1 GAME-11) — this module constant
+# is the kwarg DEFAULT and is NEVER mutated at runtime (setup_logic
+# mirrors it as its 'speed' default).
 SPEED_A_PER_S = 3.0
 
 # --- Rigid-pivot sweep constants (plan 02-13, GAME-10). This plan owns
@@ -215,6 +216,10 @@ class GameEngine(object):
                 same-direction -> dropped. While sweeping,
                 request_direction buffers against the sweep TARGET
                 (newest-wins, max 1).
+      speed_a_per_s: float A/s — the per-instance forward speed for the
+                movement branch (Phase 5.1 GAME-11; set once at
+                construction/reset, NEVER mutated mid-run — GAME-08 by
+                construction; default SPEED_A_PER_S = 3.0).
       paused:   bool — True makes step() an immediate no-op [].
       box_min:  (x0, y0) float tuple or None — axis-aligned box lower
                 corner (from setup_logic's preset). None disables
@@ -246,7 +251,8 @@ class GameEngine(object):
 
     def __init__(self, head=(0.0, 0.0), heading='right', segments=None,
                  box_min=None, box_max=None,
-                 pickups=None, cap=None, atom_budget=None):
+                 pickups=None, cap=None, atom_budget=None,
+                 speed_a_per_s=SPEED_A_PER_S):
         """Seed the engine state (see reset for the parameter contract).
 
         Kept keyword-friendly: plan 02-10 extends this signature with
@@ -255,11 +261,13 @@ class GameEngine(object):
         """
         self.reset(head=head, heading=heading, segments=segments,
                    box_min=box_min, box_max=box_max,
-                   pickups=pickups, cap=cap, atom_budget=atom_budget)
+                   pickups=pickups, cap=cap, atom_budget=atom_budget,
+                   speed_a_per_s=speed_a_per_s)
 
     def reset(self, head=(0.0, 0.0), heading='right', segments=None,
               box_min=None, box_max=None,
-              pickups=None, cap=None, atom_budget=None):
+              pickups=None, cap=None, atom_budget=None,
+              speed_a_per_s=SPEED_A_PER_S):
         """Rebuild ALL engine state from the given seeds.
 
         Same parameters as __init__ (GAME-07 deterministic restart):
@@ -269,13 +277,21 @@ class GameEngine(object):
         disables boundary checking — 02-06's default), pickups the list
         of pickup records (copied — see _copy_pickups; None/empty = no
         pickups), cap the win-cap molecule count (None = no win check),
-        atom_budget the warning threshold (None = no budget check).
-        Unknown heading names raise ValueError, the same loud contract
-        as request_direction.
+        atom_budget the warning threshold (None = no budget check),
+        speed_a_per_s the per-instance forward speed in A/s (Phase 5.1
+        GAME-11; default SPEED_A_PER_S = 3.0 preserves the v1 baseline;
+        set once here and NEVER mutated mid-run — GAME-08 by
+        construction). Unknown heading names raise ValueError, the same
+        loud contract as request_direction; speed_a_per_s <= 0 raises
+        ValueError (the single validation point).
         """
         if heading not in DIRS:
             raise ValueError('unknown heading: %r (valid: %s)'
                              % (heading, ', '.join(sorted(DIRS))))
+        if speed_a_per_s <= 0:
+            raise ValueError('speed_a_per_s %r must be > 0'
+                             % (speed_a_per_s,))
+        self.speed_a_per_s = speed_a_per_s
         self.head = (float(head[0]), float(head[1]))
         self.heading = DIRS[heading]
         self.segments = self._copy_segments(segments)
@@ -561,12 +577,13 @@ class GameEngine(object):
         turn tick never also moves the head.
 
         Movement branch (02-06 + the 2026-09-19 train-follow rule):
-        head += heading * SPEED_A_PER_S * dt, the WHOLE CHAIN is
+        head += heading * speed_a_per_s * dt (the per-instance speed,
+        Phase 5.1 GAME-11), the WHOLE CHAIN is
         translated by the SAME delta (_translate_chain — the chain
         follows the head rigidly, z/sym preserved), and emit
-        ('moved', (x, y)) carrying the NEW position. At SPEED_A_PER_S =
-        3.0 a dt of 0.1 s advances head and chain exactly 0.3 A along
-        the current heading.
+        ('moved', (x, y)) carrying the NEW position. At speed_a_per_s =
+        3.0 movement is speed_a_per_s * dt = 0.3 A per tick for a dt of
+        0.1 s, advancing head and chain along the current heading.
 
         Boundary crash (plan 02-10, GAME-05): after the move, if a box is
         set and the head enters the BOUNDARY_MARGIN_A margin of the AABB
@@ -637,8 +654,8 @@ class GameEngine(object):
             # fall through to forward motion.
         hx, hy = self.head
         ux, uy = self.heading
-        nx = hx + ux * SPEED_A_PER_S * dt
-        ny = hy + uy * SPEED_A_PER_S * dt
+        nx = hx + ux * self.speed_a_per_s * dt
+        ny = hy + uy * self.speed_a_per_s * dt
         self.head = (nx, ny)
         events.append(('moved', (nx, ny)))
         # Train-follow (2026-09-19 owner directive): the chain is one

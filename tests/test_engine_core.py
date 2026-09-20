@@ -1,7 +1,10 @@
 """GameEngine movement core tests (plan 02-06, TDD RED first).
 
 Covers the movement-core contract: continuous-2D constant-speed forward
-stepping (SPEED_A_PER_S = 3.0 A/s -> exactly 0.3 A per 0.1 s tick), the
+stepping (SPEED_A_PER_S = 3.0 A/s -> exactly 0.3 A per 0.1 s tick; since
+Phase 5.1 GAME-11 that value is the DEFAULT tier of the per-instance
+speed_a_per_s selector — see tests/test_engine_speed.py for per-tier
+coverage), the
 max-1 direction queue with 180-degree and same-direction rejection,
 pending-inert behavior (the queue only buffers in this plan), pause and
 resume, deterministic reset (GAME-07), the segments test seam, and
