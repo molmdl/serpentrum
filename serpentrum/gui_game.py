@@ -145,6 +145,50 @@ def _heading_name(heading):
     raise ValueError('heading %r is not an axis direction' % (heading,))
 
 
+def rebuild_scene(setup, records_by_id):
+    """Hard-clean then rebuild the play scene (05-16 re-test fix C).
+
+    ORDER IS LOAD-BEARING: pymol_bridge.cleanup_srp() deletes EVERY
+    srp_* object FIRST - the previous run's chain (srp_head / srp_seg_*),
+    leftover pickups, and the box - THEN the fresh boundary box and the
+    head materialize. Root cause of the re-test restart defect: old
+    eaten molecules from a crashed run stayed visible because begin_game
+    only pattern-deleted srp_pickup_*; worse, the move_chain_delta
+    wildcard selection 'srp_head or srp_seg_*' then grabbed the stale
+    srp_seg_* objects and translated them WITH the new head. The purge
+    also fixes the completion-screen Restart case: the completed-snake
+    view persistence is ONLY for the completion -> Get Spectra flow -
+    starting a new run forfeits it (the completion presenter itself is
+    untouched).
+
+    The head is rebuilt by pymol_bridge.reload_head (delete + load +
+    ONE edge-on m16 + spheres + extent recenter): the canonical
+    Apply-time pose, deterministic for first rounds and restarts alike
+    (re-applying an m16 to an already-canonicalized object double-
+    rotates the ring plane - the live-verified perpendicular-stack
+    defect; the m16 encodes the transform OF THE RAW SDF COORDS).
+    Upload heads (no stack_ring) reload with m16=None, matching the
+    Apply path's head_m16=None parity. No resolvable head record ->
+    box-only scene (record=None parity with the old box-only seam).
+
+    Module-level (not a GameTab method) so smoke/08 can pin the
+    cleanup-before-materialize ordering without constructing widgets
+    (headless PyMOL C-aborts on QWidget).
+    """
+    pymol_bridge.cleanup_srp()
+    pymol_bridge.load_box(setup['box_preset'])
+    record = pymol_bridge._select_head_record(
+        setup, list(records_by_id.values()), [])
+    if record is None:
+        return  # box-only scene (no head molecule resolvable)
+    m16 = None
+    if 'stack_ring' in record:
+        parsed = _read_record(record['file'])
+        m16 = orientation.edge_on_m16(
+            parsed['elements'], parsed['coords'], record['stack_ring'])
+    pymol_bridge.reload_head(record['file'], m16)
+
+
 class GameTab(QtWidgets.QWidget):
     """The Game tab HUD.
 
@@ -302,11 +346,12 @@ class GameTab(QtWidgets.QWidget):
 
         Called by PluginDialog (plan 04-06) and by Restart. Tears down
         any live session FIRST (restart-mid-game and reload-mid-game
-        paths, research Pitfall A/12), restores the head's canonical
-        edge-on pose + origin centering when the scene has one (turn
-        sweeps rotate the head's atomic coords; Restart must return
-        pose AND center so the object matches the engine's fresh
-        (0,0)/'right' state), builds a deterministic engine seeded with
+        paths, research Pitfall A/12), then HARD-CLEANS the whole scene
+        via rebuild_scene (05-16 re-test fix C: cleanup_srp BEFORE
+        materializing - the old run's chain/pickups must not ride the
+        move_chain_delta wildcard or stay visible; the completion-view
+        persistence is completion->Get-Spectra-ONLY), builds a
+        deterministic engine seeded with
         the first spawn-mod pickup (plan 05-11), anchors the session
         with the pure head mirror + spawn state, materializes the
         pickup object edge-on as sticks, frames ONCE (the 03-06
@@ -320,7 +365,7 @@ class GameTab(QtWidgets.QWidget):
         if self._anchor is not None:
             records = getattr(self._anchor, 'records', None) or []
         records_by_id = dict((r['id'], r) for r in records)
-        self._reset_head_viewer(records_by_id, setup)
+        rebuild_scene(setup, records_by_id)  # fix C: purge, then rebuild
         engine, extras = self._build_engine(setup)
         self._session = {
             'engine': engine,
@@ -442,43 +487,6 @@ class GameTab(QtWidgets.QWidget):
         atoms = orientation.edge_on_atoms(
             parsed['elements'], parsed['coords'], record['stack_ring'])
         return (_extent_center(atoms), record['stack_ring'])
-
-    def _reset_head_viewer(self, records_by_id, setup):
-        """Restore srp_head's canonical edge-on pose by RELOADING its file.
-
-        The old implementation re-applied orientation.edge_on_m16 to the
-        CURRENT object and re-centered. That was wrong for BOTH begin_game
-        cases, because an m16 encodes the transform OF THE RAW SDF COORDS:
-        on the first round Apply already canonicalized the head, so the
-        m16 double-rotated the ring plane (measured live-verified defect:
-        the displayed head's ring normal lands EXACTLY 90.00 degrees off
-        every placed slab's normal for a benzene head - the 'stacked mol
-        follows perpendicularly' T-shape - while its plane still projects
-        as an x-line, so the scene LOOKS edge-on); on Restart after
-        sweeps, re-applying likewise cannot undo 90-degree sweep rotation
-        (the matrix is not the inverse of anything). The fix is
-        pymol_bridge.reload_head: delete + cmd.load the record's file,
-        apply the m16 ONCE, show spheres, extent re-center - the exact
-        Apply-time pose, deterministic for first rounds and restarts
-        alike. No-op when the scene has no head object; a record without
-        stack_ring (uploads) reloads with m16=None (the Apply path's
-        head_m16=None parity); an unresolvable record falls back to the
-        bare place_head re-center (record=None parity with the old seam).
-        """
-        if not pymol_bridge.object_exists(pymol_bridge.HEAD_NAME):
-            return
-        record = pymol_bridge._select_head_record(
-            setup, list(records_by_id.values()), [])
-        if record is None:
-            pymol_bridge.place_head(pymol_bridge.HEAD_NAME)
-            return
-        m16 = None
-        if 'stack_ring' in record:
-            parsed = _read_record(record['file'])
-            m16 = orientation.edge_on_m16(
-                parsed['elements'], parsed['coords'],
-                record['stack_ring'])
-        pymol_bridge.reload_head(record['file'], m16)
 
     def _mirror_atoms(self, record):
         """Origin-centered (sym, x, y, z) mirror atoms for ONE record.

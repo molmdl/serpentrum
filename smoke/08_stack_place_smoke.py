@@ -25,6 +25,10 @@ verdicts are flushed sentinels grepped by tests/run_gates.py --smoke:
     SMOKE-OK PICKUPS     materialize_pickup: sticks-show ran without error;
                          object exists; ring centroid lands at the composed
                          spawn centroid
+    SMOKE-OK SCENECLR    begin_game scene hygiene (05-16 re-test fix C):
+                         cleanup_srp BEFORE materialize on Restart --
+                         stale chain/pickup leftovers purged, fresh
+                         box + canonical edge-on head rebuilt
     SMOKE-FAIL <step>    a step failed (traceback follows, sentinel withheld)
     SMOKE-08 DONE        the script reached the end (any state)
 
@@ -390,6 +394,52 @@ def s_sticks():
         'spawn centroid miss: %r, expected %r' % (centroid, spawn)
 
 
+def s_sceneclr():
+    """SCENECLR: begin_game scene hygiene ordering (05-16 re-test fix C).
+
+    Stage the crashed-run scene the user reported: box + head, PLUS
+    leftovers -- a stale 'srp_seg_99' eaten molecule displaced to
+    x = -29 (where the old run crashed) and a floating
+    'srp_pickup_stale'. Then call gui_game.rebuild_scene EXACTLY as
+    begin_game does on Restart and pin the ordering contract:
+    cleanup_srp runs BEFORE the new run materializes, so every leftover
+    srp_* name is GONE (nothing stale survives to ride the
+    move_chain_delta wildcard 'srp_head or srp_seg_*'), and the fresh
+    scene holds exactly the box + a canonical edge-on head (ring normal
+    (1, 0, 0), centroid at the origin). Module-level import of gui_game
+    is safe headless (no QWidget constructed).
+    """
+    from serpentrum import gui_game  # noqa: E402 (headless-safe import)
+    pymol_bridge.cleanup_srp()
+    record = molfile.read_sdf(BENZENE)[0]
+    ring = molfile.ring_cycle(record)
+    # The crashed-run leftovers the user saw floating at ~x=-29.
+    pymol_bridge.load_box('small')
+    pymol_bridge.load_molecule(BENZENE, pymol_bridge.HEAD_NAME)
+    pymol_bridge.load_molecule(BENZENE, 'srp_seg_99')
+    cmd.translate([-29.0, 2.0, 0.0], 'srp_seg_99', camera=0)
+    pymol_bridge.load_molecule(BENZENE, 'srp_pickup_stale')
+    setup = {'box_preset': 'small', 'head_molecule': 'benzene'}
+    records_by_id = {'benzene': {'id': 'benzene', 'file': BENZENE,
+                                 'stack_ring': list(ring),
+                                 'has_stack_entry': True}}
+    gui_game.rebuild_scene(setup, records_by_id)
+    names = set(cmd.get_names('public_objects'))
+    leftovers = [n for n in names
+                 if n.startswith('srp_seg') or n.startswith('srp_pickup')]
+    assert not leftovers, \
+        'restart leftovers survived the purge: %r' % (leftovers,)
+    assert pymol_bridge.BOX_NAME in names, 'fresh box missing'
+    assert pymol_bridge.HEAD_NAME in names, 'fresh head missing'
+    n1 = _ring_normal_viewer(pymol_bridge.HEAD_NAME, ring)
+    assert abs(n1[0] - 1.0) <= 1e-3 and abs(n1[1]) <= 1e-3 \
+        and abs(n1[2]) <= 1e-3, \
+        'rebuilt head ring normal %r != (1, 0, 0)' % (n1,)
+    c1 = _ring_centroid_viewer(pymol_bridge.HEAD_NAME, ring)
+    assert _dist(c1, (0.0, 0.0, 0.0)) <= 1e-3, \
+        'rebuilt head ring centroid %r != origin' % (c1,)
+
+
 for _name, _fn in [
     ('EDGEON', s_edgeon),
     ('PLACE360', s_place360),
@@ -397,6 +447,7 @@ for _name, _fn in [
     ('SPAWNOFFS', s_spawnoffs),
     ('HEADRESET', s_headreset),
     ('PICKUPS', s_sticks),
+    ('SCENECLR', s_sceneclr),
 ]:
     check(_name, _fn)
 
