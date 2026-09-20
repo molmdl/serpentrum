@@ -416,6 +416,18 @@ def delete_pickups():
     cmd.delete('srp_pickup_*')
 
 
+def delete_object(name):
+    """Delete ONE named PyMOL object iff it exists (idempotent).
+
+    Used by the 05-16 re-test refuse-cascade fix: on any skip/refuse
+    capture resolution the eaten-then-rejected pickup object is
+    DESPAWNED (it must not stay floating as an obstacle). Guarded
+    because cmd.delete on a missing name raises a Selector error.
+    """
+    if object_exists(name):
+        cmd.delete(name)
+
+
 def rename_pickup(old, new):
     """Rename a pickup object to its captured ``srp_seg_<n>`` name.
 

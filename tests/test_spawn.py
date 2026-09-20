@@ -24,6 +24,9 @@ Nine pin groups mirror the plan's behavior cases:
      sweep pickup leg).
   9. Exhaustion   -- no legal position -> None, never an exception, and NO
      state advance (same record + same pid offered on the next call).
+ 10. Demote       -- demote-after-refuse (2026-09-20, 05-16 cascade fix):
+     a refused molecule is not re-served next (never permanently
+     excluded either); every-candidate-refused latches pool exhaustion.
 
 Spawners are built from the REAL demo records (setloader.load_demo_set
 with the shipped stacking dataset) and origin-centered synthetic atoms (6
@@ -280,6 +283,99 @@ class TestPickupSeedShape(SpawnTestBase):
         # atoms copied: a fresh list, caller data untouched.
         self.assertIsNot(seed['atoms'], atoms)
         self.assertEqual(atoms, _dummy_atoms('C'))
+
+
+class TestDemoteAfterRefuse(SpawnTestBase):
+    """Case 10: demote-after-refuse (05-16 re-test refuse-cascade fix,
+    2026-09-20) — a refused molecule is NOT re-served immediately;
+    every-candidate-refused latches pool exhaustion for the run."""
+
+    def test_refused_molecule_not_reserved_next(self):
+        # Serve the first pickup, refuse its molecule, then the NEXT
+        # spawn must be a DIFFERENT molecule (the refused record moved
+        # to the back of the serve order).
+        spawner = self.make_spawner(1234)
+        record, _pid, centroid = spawner.first((0.0, 0.0), 'right')
+        spawner.note_resolution(record['id'], refused=True)
+        result = spawner.next_after((0.0, 0.0), 'right', [], [centroid])
+        self.assertIsNotNone(result)
+        self.assertNotEqual(result[0]['id'], record['id'])
+
+    def test_single_refuse_is_not_permanent_exclusion(self):
+        # One transient refuse must NOT permanently exclude a molecule
+        # (pool of 5, cap 10 REQUIRES repeats): after the rest of the
+        # pool cycles once, the refused molecule is served again.
+        spawner = self.make_spawner(1234)
+        record, _pid, centroid = spawner.first((0.0, 0.0), 'right')
+        refused_id = record['id']
+        spawner.note_resolution(refused_id, refused=True)
+        live = [centroid]
+        served = []
+        for _ in range(len(self.records)):
+            result = spawner.next_after((0.0, 0.0), 'right', [], live)
+            self.assertIsNotNone(result)
+            served.append(result[0]['id'])
+            live.append(result[2])
+        # The refused id re-entered exactly once, LAST in the rotation.
+        self.assertEqual(served.count(refused_id), 1)
+        self.assertEqual(served[-1], refused_id)
+
+    def test_pool_exhaustion_latches_and_stops_spawning(self):
+        # Every pool candidate refuses consecutively: reach the latch
+        # exactly at the pool size; afterwards _spawn returns None
+        # FOREVER (the rest of the run), even with a clear board.
+        spawner = self.make_spawner(1234)
+        self.assertFalse(spawner.pool_exhausted)
+        ids = [r['id'] for r in self.records]
+        # Drive one issue per refusal: each refused spawn rotates the
+        # order; after len(pool) consecutive refuses the latch fires.
+        result = spawner.first((0.0, 0.0), 'right')
+        self.assertIsNotNone(result)
+        live = [result[2]]
+        spawner.note_resolution(result[0]['id'], refused=True)
+        self.assertFalse(spawner.pool_exhausted)
+        for _ in range(len(ids) - 1):
+            result = spawner.next_after((0.0, 0.0), 'right', [], live)
+            self.assertIsNotNone(result)
+            live.append(result[2])
+            spawner.note_resolution(result[0]['id'], refused=True)
+        # len(ids) consecutive refuses have now been recorded.
+        self.assertTrue(spawner.pool_exhausted)
+        # Latched: no spawn ever again, cleared board or not.
+        self.assertIsNone(spawner.next_after((0.0, 0.0), 'right', [], []))
+        self.assertIsNone(spawner.next_after((0.0, 0.0), 'right', [], []))
+
+    def test_placed_resolution_resets_consecutive_counter(self):
+        # A placed capture between refuses keeps the pool alive: the
+        # consecutive counter resets, so 2N-1 total refuses (alternating
+        # with one placement per cycle) never latch.
+        spawner = self.make_spawner(1234)
+        result = spawner.first((0.0, 0.0), 'right')
+        self.assertIsNotNone(result)
+        live = [result[2]]
+        spawner.note_resolution(result[0]['id'], refused=True)
+        for cycle in range(3):
+            # Place one (reset), then refuse every OTHER pool record.
+            result = spawner.next_after((0.0, 0.0), 'right', [], live)
+            self.assertIsNotNone(result)
+            live.append(result[2])
+            spawner.note_resolution(result[0]['id'], refused=False)
+            self.assertFalse(spawner.pool_exhausted)
+            for _ in range(len(self.records) - 1):
+                result = spawner.next_after((0.0, 0.0), 'right', [], live)
+                self.assertIsNotNone(result)
+                live.append(result[2])
+                spawner.note_resolution(result[0]['id'], refused=True)
+            # Only len-1 consecutive refuses: below the latch.
+            self.assertFalse(spawner.pool_exhausted)
+
+    def test_unknown_molecule_id_is_ignored(self):
+        spawner = self.make_spawner(1234)
+        spawner.note_resolution('no_such_molecule', refused=True)
+        self.assertEqual(spawner.pool_size, len(self.records))
+        result = spawner.first((0.0, 0.0), 'right')
+        self.assertIsNotNone(result)
+        self.assertEqual(result[0]['id'], self.records[0]['id'])
 
 
 class TestExhaustion(SpawnTestBase):

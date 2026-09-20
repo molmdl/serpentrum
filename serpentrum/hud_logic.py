@@ -188,6 +188,50 @@ def resume_note(name):
     return 'placement refused - run continues (cap not reached yet)'
 
 
+class ReasonCoalescer(object):
+    """Coalesce consecutive identical skip/refuse info lines into '(xN)'.
+
+    2026-09-20 (05-16 re-test fix B): a placement refuse used to print
+    the SAME 'skipped <name>: <reason>' line on every capture of the
+    re-armed pickup (a biphenyl cascade printed it 18 times). The
+    coalescer is the PURE state for the GUI's anti-spam policy:
+
+      note(text) -> ('append', text)   the first of a run: display NOW
+                                       (the FIRST refuse must always
+                                       show — the STACK-05 refuse
+                                       demonstrator lives on this)
+      note(text) -> ('replace', ...)   an immediate repeat of the last
+                                       text: the GUI REWRITES its last
+                                       info-box line to carry the
+                                       '(xN)' suffix (count includes
+                                       the first occurrence)
+      break_run()                      any other message breaks the run;
+                                       the next repeat appends fresh
+
+    Only CONSECUTIVE identical texts coalesce; interleaved messages
+    always append. Pure data — no Qt, no viewer (GUI-testable policy).
+    """
+
+    def __init__(self):
+        self._last = None
+        self._count = 0
+
+    def note(self, text):
+        """Register one skip/refuse line -> (mode, line). mode in
+        {'append', 'replace'}; count suffix '(xN)' from N=2 up."""
+        if text is not None and text == self._last:
+            self._count += 1
+            return ('replace', '%s (x%d)' % (text, self._count))
+        self._last = text
+        self._count = 1
+        return ('append', text)
+
+    def break_run(self):
+        """Reset: the NEXT note() of the same text appends fresh."""
+        self._last = None
+        self._count = 0
+
+
 # ---------------------------------------------------------------------------
 # SRP_DEBUG=1 live-debug trace builders (05-16 checkpoint follow-up).
 # Env-gated in gui_game (read ONCE per begin_game); these PURE builders
@@ -246,6 +290,17 @@ def debug_capture_trace(pickup_id, name, code, detail=None,
         line += ' stacked=%d pickups=%d' % (molecules_stacked,
                                             pickups_remaining)
     return line
+
+
+def debug_spawn_exhausted(pool_size):
+    """One DBG line when the spawn pool LATCHES exhausted (SRP_DEBUG=1).
+
+    The demote-after-refuse terminal state (2026-09-20): every pool
+    candidate refused consecutively -> no more pickups spawn for the
+    rest of the run. Logged ONCE per run by the controller.
+    """
+    return ('DBG spawn pool exhausted (%d molecule(s) refused in a row)'
+            ' - no more pickups this run' % pool_size)
 
 
 def debug_event_trace(kind, tick=None, heading=None, head_xy=None,

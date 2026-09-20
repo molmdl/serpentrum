@@ -18,6 +18,16 @@ PINNED POLICY (stated explicitly per the planning mandate):
     forever (set_a has 5 species; cap default 10 requires species
     reuse -- chemically valid, probe-verified 6-segment same-molecule
     chains are clash-safe).
+  - DEMOTE-AFTER-REFUSE (2026-09-20, 05-16 re-test fix): the controller
+    calls ``note_resolution(molecule_id, refused)`` after EVERY capture
+    resolution. A refused/skipped molecule is moved to the BACK of the
+    round-robin serve order (never permanently excluded -- the 5-mol
+    pool + cap 10 REQUIRES repeats), so the NEXT spawn is a DIFFERENT
+    molecule; a placed capture resets the consecutive-refuse counter.
+    If refuses in a row reach the pool size (every candidate refused
+    consecutively), the spawner LATCHES ``pool_exhausted`` for the rest
+    of the run and ``_spawn`` returns None (the controller documents
+    that state once, in DBG).
   - POSITION: LOOKAHEAD_A = 8.0 along the current heading plus a seeded
     lateral offset in [-6.0, +6.0] quantized to 0.1 A, validated
     against: wall margin 3.5 A (shrunk box), head-centroid clearance
@@ -144,10 +154,14 @@ class PickupSpawner(object):
                    (sym, x, y, z) tuples. Every record id MUST be
                    present (KeyError is the loud caller-bug signal).
 
-    State: cycle index over records + a spawn counter (pids
-    'pick_0001', 'pick_0002', ...). Both advance ONLY on a returned
-    spawn -- an exhausted (None) call replays the same record and the
-    same pid on the next call.
+    State: a round-robin serve ORDER over records + a spawn counter
+    (pids 'pick_0001', 'pick_0002', ...). Both advance ONLY on a
+    returned spawn -- an exhausted (None) call replays the same record
+    and the same pid on the next call. The order rotates on every
+    issued spawn (front record moves to the back -- equivalent to the
+    original cyclic index) and additionally on demote-after-refuse
+    (the refused record moves to the back EARLY); pid assignment is
+    untouched by demotions.
     """
 
     def __init__(self, records, box_min, box_max, seed, atoms_by_id):
@@ -156,14 +170,58 @@ class PickupSpawner(object):
         self._box_max = (float(box_max[0]), float(box_max[1]))
         self._rng = random.Random(seed)
         self._atoms_by_id = atoms_by_id
-        self._cycle = 0
+        self._order = list(records)  # round-robin serve order (front first)
         self._issued = 0
+        # Demote-after-refuse state (2026-09-20): consecutive refused
+        # resolutions; reaching the pool size latches pool_exhausted
+        # for the rest of the run (see note_resolution).
+        self._consecutive_refuses = 0
+        self._pool_exhausted = False
 
     # --- public API -------------------------------------------------
 
     def can_spawn(self, live_count):
         """MAX_LIVE gate: True while live_count < MAX_LIVE_PICKUPS (4)."""
         return live_count < MAX_LIVE_PICKUPS
+
+    @property
+    def pool_exhausted(self):
+        """True once EVERY pool record refused consecutively (latched for
+        the rest of the run; ``_spawn`` returns None). Read-only."""
+        return self._pool_exhausted
+
+    @property
+    def pool_size(self):
+        """The number of pool records (for the GUI's exhaust DBG line)."""
+        return len(self._order)
+
+    def note_resolution(self, molecule_id, refused):
+        """Record one capture resolution for demote-after-refuse (05-16
+        cascade fix, 2026-09-20).
+
+        refused=True (a REFUSE_* or SKIP_* outcome): move the record to
+        the BACK of the serve order so the next spawn serves a
+        DIFFERENT molecule (never a permanent exclusion -- cap 10
+        requires repeats), and count consecutive refuses; refuses in a
+        row >= pool size LATCH pool_exhausted (stop spawning for the
+        rest of the run).
+
+        refused=False (a 'placed' capture): reset the consecutive
+        counter. A molecule already at the back of the order needs no
+        rotation (the just-served front already advanced), so demotion
+        is a no-op in the common "served then immediately refused"
+        case. Unknown molecule ids are ignored (defensive).
+        """
+        if not refused:
+            self._consecutive_refuses = 0
+            return
+        self._consecutive_refuses += 1
+        if self._consecutive_refuses >= len(self._order):
+            self._pool_exhausted = True
+        for i, record in enumerate(self._order):
+            if record['id'] == molecule_id:
+                self._order.append(self._order.pop(i))
+                break
 
     def first(self, head_xy, heading):
         """Spawn the initial pickup (begin_game): no chain, no live."""
@@ -185,7 +243,11 @@ class PickupSpawner(object):
     # --- internals --------------------------------------------------
 
     def _spawn(self, head_xy, heading, chain_atoms, live_centroids):
-        if not self._records:
+        if not self._order:
+            return None
+        if self._pool_exhausted:
+            # Demote-after-refuse latch: every pool record refused in a
+            # row -- stop spawning for the rest of the run (05-16).
             return None
         if heading not in _DIRS:
             raise ValueError('unknown heading: %r (valid: %s)'
@@ -195,7 +257,7 @@ class PickupSpawner(object):
         # (0, 1): laterals run along +y. One fixed convention, captured
         # in the seed stream, is all determinism needs.
         px, py = -uy, ux
-        record = self._records[self._cycle % len(self._records)]
+        record = self._order[0]
         atoms = self._atoms_by_id[record['id']]
         base_x = head_xy[0] + ux * LOOKAHEAD_A
         base_y = head_xy[1] + uy * LOOKAHEAD_A
@@ -274,8 +336,13 @@ class PickupSpawner(object):
         return True
 
     def _issue(self, record, cx, cy):
-        """Accept a validated candidate: advance state, return the tuple."""
-        self._cycle += 1
+        """Accept a validated candidate: advance state, return the tuple.
+
+        Rotates the serve order (front record to the back -- the
+        round-robin advance) and consumes one pid serial. Runs ONLY on
+        a returned spawn: a None result leaves order and pid untouched.
+        """
+        self._order.append(self._order.pop(0))
         self._issued += 1
         pid = 'pick_%04d' % self._issued
         return (record, pid, (cx, cy))

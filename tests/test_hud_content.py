@@ -30,6 +30,11 @@ it never writes chemistry:
   hud_logic.resume_note(name) -> the G2 un-finish info line.
   hud_logic.reason_text(code, detail, name) -> placement.py outcome
       code -> educator-readable reason, rendered through skip_text.
+  hud_logic.ReasonCoalescer -> the 05-16 anti-spam state (2026-09-20):
+      consecutive identical skip/refuse lines coalesce into a '(xN)'
+      suffix rewrite; the first of a run always appends.
+  hud_logic.debug_spawn_exhausted(pool_size) -> one DBG line when the
+      demote-after-refuse latch stops spawning for the run.
 
 The real shipped dataset is used (molecule_data.load_stacking over
 setloader.default_stacking_path()) so the pins track real data changes.
@@ -411,6 +416,61 @@ class TestDebugEventTrace(unittest.TestCase):
         self.assertEqual(line, 'DBG event won')
         self.assertNotIn('tick=', line)
         self.assertNotIn('heading=', line)
+
+
+class TestReasonCoalescer(unittest.TestCase):
+    """ReasonCoalescer: the 05-16 anti-spam state (2026-09-20 fix B).
+
+    Consecutive identical skip/refuse lines coalesce into a '(xN)'
+    suffix REWRITE of the displayed line; the first of a run APPENDS
+    (the STACK-05 refuse demonstrator must always show); any other
+    message breaks the run.
+    """
+
+    LINE = 'skipped Biphenyl: placement would leave the play box'
+
+    def test_first_occurrence_appends(self):
+        c = hud_logic.ReasonCoalescer()
+        self.assertEqual(c.note(self.LINE), ('append', self.LINE))
+
+    def test_consecutive_repeats_replace_with_count(self):
+        c = hud_logic.ReasonCoalescer()
+        self.assertEqual(c.note(self.LINE), ('append', self.LINE))
+        self.assertEqual(c.note(self.LINE),
+                         ('replace', self.LINE + ' (x2)'))
+        self.assertEqual(c.note(self.LINE),
+                         ('replace', self.LINE + ' (x3)'))
+
+    def test_interleaved_message_breaks_run(self):
+        c = hud_logic.ReasonCoalescer()
+        self.assertEqual(c.note(self.LINE), ('append', self.LINE))
+        other = 'skipped Naphthalene: placement clashes (1.23 A)'
+        self.assertEqual(c.note(other), ('append', other))
+        # A repeat of the ORIGINAL text now appends fresh (run broken).
+        self.assertEqual(c.note(self.LINE), ('append', self.LINE))
+
+    def test_break_run_method(self):
+        c = hud_logic.ReasonCoalescer()
+        c.note(self.LINE)
+        c.break_run()
+        self.assertEqual(c.note(self.LINE), ('append', self.LINE))
+
+    def test_fresh_instance_state(self):
+        c = hud_logic.ReasonCoalescer()
+        # None text never coalesces into a run (defensive).
+        mode, _line = c.note(None)
+        self.assertEqual(mode, 'append')
+        self.assertEqual(c.note(self.LINE), ('append', self.LINE))
+
+
+class TestDebugSpawnExhausted(unittest.TestCase):
+    """debug_spawn_exhausted: one DBG line for the latched pool state."""
+
+    def test_line_shape(self):
+        line = hud_logic.debug_spawn_exhausted(5)
+        self.assertEqual(line,
+                         'DBG spawn pool exhausted (5 molecule(s) '
+                         'refused in a row) - no more pickups this run')
 
 
 if __name__ == '__main__':

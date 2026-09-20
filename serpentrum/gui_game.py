@@ -56,7 +56,7 @@ import math
 import os
 import time
 
-from pymol.Qt import QtWidgets, QtCore
+from pymol.Qt import QtWidgets, QtCore, QtGui
 
 from . import game_engine
 from . import hud_logic
@@ -344,6 +344,9 @@ class GameTab(QtWidgets.QWidget):
             # counter printed by the event trace.
             'debug': os.environ.get('SRP_DEBUG') == '1',
             'tick_n': 0,
+            # 05-16 re-test fix B: coalescer state for consecutive
+            # identical skip/refuse info lines ('(xN)' rewrite).
+            'coalescer': hud_logic.ReasonCoalescer(),
         }
         if self._anchor is not None:
             self._anchor.game_session = self._session
@@ -802,10 +805,17 @@ class GameTab(QtWidgets.QWidget):
                      decision 13 - the capture already incremented
                      the counters, and the un-finish fix from plan
                      05-04 lives on this path, so counters can never
-                     desync), then the educator-readable reason line.
-                     A refused pickup's viewer object stays VISIBLE
-                     (reject re-arms it), and hud_logic.resume_note
-                     records the G2 un-finish for the player.
+                     desync), then the eater DESPAWNS the rejected
+                     pickup (05-16 re-test fix B: engine live-set /
+                     remaining / record list AND the viewer object +
+                     its name tracking - a floating refused pickup
+                     re-captures in a loop and blocks sweeps), the
+                     educator-readable reason line goes through the
+                     ReasonCoalescer ('(xN)' rewrite), and the
+                     hud_logic.resume_note G2 line logs ONLY when the
+                     reject actually un-finished a cap-reaching 'won'
+                     (it alternated with the reason line during the
+                     cascade and broke coalescing).
 
         After EVERY resolution (success or refusal, plan 05-03 spawn
         policy) the respawn gate runs: at most ONE new spawn per
@@ -899,11 +909,33 @@ class GameTab(QtWidgets.QWidget):
                         engine))
             else:
                 code = outcome['code']
+                # Detect a cap-reaching 'won' BEFORE the reject rolls it
+                # back (the G2 resume_note logs ONLY in this case).
+                unfinishes_won = (engine.finished and
+                                  engine.result == 'won')
                 # reject_pickup on EVERY non-placed outcome (locked
-                # decision 13): capture counters roll back, pickup
-                # re-arms, a cap-reaching 'won' un-finishes (05-04).
+                # decision 13): capture counters roll back, the pickup
+                # (transiently) re-arms, a cap-reaching 'won'
+                # un-finishes (05-04).
                 engine.reject_pickup(pickup_rec['id'], code)
-                self._log(hud_logic.reason_text(
+                # 05-16 re-test fix B (refuse cascade): the eaten-then-
+                # rejected pickup DESPAWNS - it may not stay floating
+                # (re-capture loop, sweep obstacles, restart leftovers).
+                # Engine state, viewer object, AND name tracking.
+                pid = pickup_rec['id']
+                if pid in engine.live_pickup_ids:
+                    engine.live_pickup_ids.discard(pid)
+                    engine.pickups_remaining -= 1
+                engine.pickups = [p for p in engine.pickups
+                                  if p['id'] != pid]
+                obj_name = 'srp_pickup_%s' % pid
+                pymol_bridge.delete_object(obj_name)
+                if obj_name in session['live_pickup_names']:
+                    session['live_pickup_names'].remove(obj_name)
+                # Coalesced reason line: the FIRST refusal always shows
+                # (STACK-05 demonstrator); immediate repeats collapse
+                # to a '(xN)' suffix rewrite.
+                self._log_reason(hud_logic.reason_text(
                     code, outcome.get('detail'), name))
                 session['stacked_history'].append({
                     'name': name, 'outcome': code})
@@ -913,10 +945,17 @@ class GameTab(QtWidgets.QWidget):
                         detail=outcome.get('detail'),
                         molecules_stacked=engine.molecules_stacked,
                         pickups_remaining=engine.pickups_remaining))
-                if outcome['status'] == 'refused':
-                    # The viewer object stays VISIBLE (re-armed) and
-                    # the run continues - the G2 un-finish line.
+                if unfinishes_won and outcome['status'] == 'refused':
+                    # Rare: the reject un-froze a false 'won' - say so.
                     self._log(hud_logic.resume_note(name))
+            # Demote-after-refuse: feed the resolution back to the
+            # spawner so the NEXT spawn serves a different molecule;
+            # every-candidate-refused latches pool exhaustion (05-16).
+            spawner = session['spawner']
+            if spawner is not None:
+                spawner.note_resolution(
+                    pickup_rec['molecule_id'],
+                    refused=(outcome['status'] != 'placed'))
             self._respawn_pickup(session, engine)
         except Exception as exc:
             self._log('placement error: %s' % exc)
@@ -990,6 +1029,15 @@ class GameTab(QtWidgets.QWidget):
             engine.head, _heading_name(engine.heading),
             chain_atoms, live_centroids)
         if result is None:
+            # 05-16 fix B: when the cause is the demote-after-refuse
+            # latch (every pool molecule refused in a row), document it
+            # ONCE in DBG (the designed terminal state for this run).
+            if (spawner.pool_exhausted and not
+                    session.get('_spawn_exhaust_noted')):
+                session['_spawn_exhaust_noted'] = True
+                if session.get('debug'):
+                    self._log(hud_logic.debug_spawn_exhausted(
+                        spawner.pool_size))
             return  # no legal position: NO state advance (05-03)
         record, pid, centroid = result
         seed = spawn_mod.build_pickup_seed(
@@ -1245,8 +1293,39 @@ class GameTab(QtWidgets.QWidget):
     # --- misc ---------------------------------------------------------------
 
     def _log(self, msg):
-        """Append one line to the read-only rolling info box."""
+        """Append one line to the read-only rolling info box.
+
+        Any NON-reason message breaks an in-flight coalesced reason run
+        (05-16 fix B): _log_reason appends directly to the widget, so
+        only outside messages reach this break.
+        """
+        session = self._session
+        if session is not None and session.get('coalescer') is not None:
+            session['coalescer'].break_run()
         self.info_box.append(str(msg))
+
+    def _log_reason(self, line):
+        """Log one skip/refuse line through the ReasonCoalescer (05-16
+        fix B): the first of a run APPENDS (the STACK-05 refuse
+        demonstrator always shows); an immediate consecutive repeat
+        REWRITES the last info-box line with a '(xN)' suffix instead of
+        spamming a new paragraph."""
+        session = self._session
+        coalescer = None
+        if session is not None:
+            coalescer = session.get('coalescer')
+        if coalescer is None:
+            self.info_box.append(str(line))
+            return
+        mode, text = coalescer.note(line)
+        if mode == 'append':
+            self.info_box.append(text)
+            return
+        # Replace the last info-box block (the same text, older count).
+        cursor = self.info_box.textCursor()
+        cursor.movePosition(QtGui.QTextCursor.End)
+        cursor.select(QtGui.QTextCursor.BlockUnderCursor)
+        cursor.insertText(text)
 
     def _set_idle_state(self):
         """Idle HUD: nothing to pause or restart until a game begins."""
