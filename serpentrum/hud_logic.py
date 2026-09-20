@@ -150,6 +150,13 @@ def breakdown_lines(history):
     where outcome is 'stacked' or a placement code. Stacked entries are
     grouped by name; refusals/skips by (outcome, name). Groups render in
     FIRST-APPEARANCE order. Empty history -> [].
+
+    2026-09-21 (upload-endless debug session, C4): the group label
+    carries the placement taxonomy -- SKIP_* codes count as 'skipped Nx'
+    (informational skips: no dataset entry / not approved / mode / ring;
+    an upload-only run is ALL skips) while REFUSE_* codes count as
+    'refused Nx' (placement clashes). Keyed on the outcome-code prefix
+    -- placement.py: 'the names are the contract.'
     """
     groups = []
     index = {}
@@ -166,8 +173,10 @@ def breakdown_lines(history):
                          % (count, entry['name'], entry['distance_a'],
                             entry['citation_short']))
         else:
-            lines.append('refused %dx %s: %s'
-                         % (count, entry['name'],
+            label = ('skipped' if entry['outcome'].startswith('SKIP_')
+                     else 'refused')
+            lines.append('%s %dx %s: %s'
+                         % (label, count, entry['name'],
                             _reason(entry['outcome'], None)))
     return lines
 

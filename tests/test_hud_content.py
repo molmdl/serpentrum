@@ -22,8 +22,10 @@ it never writes chemistry:
       atoms_total) -> four summary lines; counts REVEALED at completion
       (GAME-09 / SPECTRA-06).
   hud_logic.breakdown_lines(history) -> end-of-run grouping of the
-      session stacked_history: stacked entries by name, refusals by
-      (outcome, name); first-appearance order; empty history -> [].
+      session stacked_history: stacked entries by name, refusals/skips
+      by (outcome, name) — SKIP_* codes counted 'skipped Nx', REFUSE_*
+      codes 'refused Nx' (C4 taxonomy, upload-endless debug 2026-09-21);
+      first-appearance order; empty history -> [].
   hud_logic.idle_tip(explanations, index) -> round-robin 'tip: ...'
       from VERBATIM dataset explanations (newline-collapsed); None on
       an empty list.
@@ -190,7 +192,9 @@ class TestBreakdownLines(unittest.TestCase):
                          ['stacked 2x naphthalene at 3.38 A plane gap '
                           '[Janiak 2000]'])
 
-    def test_refusals_grouped_by_outcome_and_name(self):
+    def test_skips_grouped_by_outcome_and_name(self):
+        # C4 taxonomy (upload-endless debug session, 2026-09-21): SKIP_*
+        # outcomes render 'skipped', never 'refused'.
         history = [
             {'name': 'biphenyl', 'outcome': 'SKIP_NO_ENTRY',
              'distance_a': None, 'citation_short': None},
@@ -198,7 +202,7 @@ class TestBreakdownLines(unittest.TestCase):
              'distance_a': None, 'citation_short': None},
         ]
         self.assertEqual(hud_logic.breakdown_lines(history),
-                         ['refused 2x biphenyl: no verified stacking '
+                         ['skipped 2x biphenyl: no verified stacking '
                           'entry for this molecule (no invented '
                           'chemistry)'])
 
@@ -217,7 +221,7 @@ class TestBreakdownLines(unittest.TestCase):
             hud_logic.breakdown_lines(history),
             ['stacked 2x naphthalene at 3.38 A plane gap [Janiak 2000]',
              'stacked 1x benzene at 3.38 A plane gap [Janiak 2000]',
-             'refused 1x aniline: no planar aromatic 6-ring found'])
+             'skipped 1x aniline: no planar aromatic 6-ring found'])
 
     def test_distinct_outcome_codes_group_separately(self):
         history = [
@@ -229,11 +233,37 @@ class TestBreakdownLines(unittest.TestCase):
         lines = hud_logic.breakdown_lines(history)
         self.assertEqual(len(lines), 2)
         self.assertEqual(lines[0],
-                         'refused 1x biphenyl: no verified stacking '
+                         'skipped 1x biphenyl: no verified stacking '
                          'entry for this molecule (no invented '
                          'chemistry)')
         self.assertEqual(lines[1],
                          'refused 1x biphenyl: placement clashes')
+
+    def test_refuse_codes_keep_refused_label(self):
+        # C4 taxonomy: a REFUSE_* code is counted 'refused' (SKIP_* vs
+        # REFUSE_* is keyed on the outcome code prefix — placement.py:
+        # 'the names are the contract').
+        history = [
+            {'name': 'biphenyl', 'outcome': placement.REFUSE_ATOM,
+             'distance_a': None, 'citation_short': None},
+            {'name': 'biphenyl', 'outcome': placement.REFUSE_ATOM,
+             'distance_a': None, 'citation_short': None},
+        ]
+        self.assertEqual(hud_logic.breakdown_lines(history),
+                         ['refused 2x biphenyl: placement clashes'])
+
+    def test_every_skip_code_renders_skipped_label(self):
+        history = [
+            {'name': 'm', 'outcome': code,
+             'distance_a': None, 'citation_short': None}
+            for code in (placement.SKIP_NO_ENTRY,
+                         placement.SKIP_NOT_APPROVED,
+                         placement.SKIP_MODE,
+                         placement.SKIP_NO_RING,
+                         placement.SKIP_NONPLANAR)
+        ]
+        for line in hud_logic.breakdown_lines(history):
+            self.assertTrue(line.startswith('skipped 1x m: '), line)
 
 
 class TestIdleTip(unittest.TestCase):
