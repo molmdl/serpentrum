@@ -82,9 +82,11 @@ DEFAULTS = {
 #     small  +/-35 -> 68 A usable -> 18 segments
 #     medium +/-55 -> 108 A usable -> 30 segments
 #     large  +/-85 -> 168 A usable -> 46 segments
-# Default stays 'medium'. BOX_DISPLAY_Z (5.0) is UNCHANGED
-# (display-only; the biphenyl z-overshoot REFUSE_WALL at placement is
-# the designed refuse demonstrator and stays).
+# Default stays 'medium'. BOX_DISPLAY_Z (5.0) is UNCHANGED (display-only;
+# 2026-09-20c owner directive: the placement wall gate is gone — the
+# chain may stack past the box in any axis; only the head is box-bound
+# via GAME-05, and biphenyl's genuine atom clash stays the designed
+# refuse demonstrator).
 BOX_PRESETS = {
     'small': ((-35.0, -35.0), (35.0, 35.0)),
     'medium': ((-55.0, -55.0), (55.0, 55.0)),

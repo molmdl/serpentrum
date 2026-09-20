@@ -65,8 +65,9 @@ _REASON_TEXT = {
         'no planar aromatic 6-ring found',
     placement.SKIP_NONPLANAR:
         'ring geometry not planar',
-    placement.REFUSE_WALL:
-        'placement would leave the play box',
+    # REFUSE_WALL retired 2026-09-20c (owner directive: placements may
+    # leave the play box; only the head is box-bound). REFUSE_ATOM is the
+    # only remaining refuse code.
     placement.REFUSE_ATOM:
         'placement clashes',
 }

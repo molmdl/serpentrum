@@ -46,8 +46,10 @@ Policy pins (mirroring placement.py's docstring, decided in plan 05-05):
    -(heading) promoted to 3D; non-empty -> NEWEST segment's ring frame
    recomputed from its current atoms + records_by_id stack_ring, whose
    computed normal IS the growth continuation (linear staircase).
-3. Clash gate over head + all segments + OTHER live pickups' atoms inside
-   the 3D box ((x0, y0, -display_z) .. (x1, y1, +display_z)).
+3. Clash gate over head + all segments + OTHER live pickups' atoms.
+   2026-09-20c owner directive: atom clashes only — placement refusals
+   for leaving the play box are retired (only the head is box-bound via
+   GAME-05); the display_z box survives as signature compatibility only.
 4. Outcome contract: placed | skipped(code) | refused(code, detail) —
    resolve() never mutates engine state, so the GUI ALWAYS calls
    engine.reject_pickup on skip/refuse (capture already counted; the
@@ -93,9 +95,9 @@ _CANONICAL_RINGS = {
 _HEADING_EAST = (1.0, 0.0)
 _MINUS_HEADING_EAST = (-1.0, 0.0, 0.0)
 _BOX_SMALL = ((-12.0, -12.0), (12.0, 12.0))
-_DISPLAY_Z = 5.0  # pymol_bridge.BOX_DISPLAY_Z (the displayed box constant)
-_WIDE_DISPLAY_Z = 7.0  # exceeds biphenyl's max |z| (6.914 A, probe) so the
-# biphenyl refusal lands on the ATOM check, as the plan pins
+_DISPLAY_Z = 5.0  # pymol_bridge.BOX_DISPLAY_Z (the displayed box constant);
+# retained on the gate/resolve signatures only — the wall leg is retired
+# (2026-09-20c owner directive), so no display_z value routes outcomes.
 
 
 def _load_atoms4(path):
@@ -223,8 +225,15 @@ class TestSkipTaxonomy(_FixtureBase):
         # hud_logic (plan 05-09) imports these constants to map codes to text.
         for name in ('SKIP_NO_ENTRY', 'SKIP_NOT_APPROVED', 'SKIP_MODE',
                      'SKIP_NO_RING', 'SKIP_NONPLANAR',
-                     'REFUSE_WALL', 'REFUSE_ATOM'):
+                     'REFUSE_ATOM'):
             self.assertIsInstance(getattr(placement, name), str, name)
+
+    def test_refuse_wall_constant_is_retired(self):
+        # 2026-09-20c owner directive ("remove the refuse (let it stack
+        # out of box since we only bound the head in box)"): the wall
+        # placement gate is gone — the taxonomy is placed / clash-refuse
+        # / skip. No REFUSE_WALL member may survive anywhere.
+        self.assertFalse(hasattr(placement, 'REFUSE_WALL'))
 
 
 class TestTailFrameGrowthPolicy(_FixtureBase):
@@ -388,9 +397,15 @@ class TestPlacementExactness(_FixtureBase):
 
 
 class TestClashGateAssembly(_FixtureBase):
-    """Task 2 pin 5 (STACK-05): gate() is a THIN 3D-box wrapper over
+    """Task 2 pin 5 (STACK-05): gate() is a THIN wrapper over
     stacking.check_clash; the existing set = head + segments + other live
-    pickups; a clean 3.6 A stack passes."""
+    pickups; a clean 3.6 A stack passes.
+
+    2026-09-20c owner directive: the WALL leg of the gate is retired —
+    gate() feeds check_clash an unbounded box, so out-of-box placements
+    are NEVER violations and only atom clashes refuse (REFUSE_ATOM). The
+    wall-box parameters remain on the signature for call-site stability.
+    """
 
     def _placed_on_head(self):
         placed, _R, _t, _rc = placement.attempt_place(
@@ -398,15 +413,18 @@ class TestClashGateAssembly(_FixtureBase):
             self.head_c, _MINUS_HEADING_EAST, self.head_r, self.interaction)
         return placed
 
-    def test_thin_wrapper_matches_check_clash_on_3d_box(self):
+    def test_thin_wrapper_matches_check_clash_on_unbounded_box(self):
+        # Post-2026-09-20c: gate() IS check_clash over an effectively
+        # unbounded box (the wall leg can never fire); the atom leg
+        # still flows through verbatim.
         placed = self._placed_on_head()
         existing = _xyz(self.head) + _xyz(self.biphenyl_raw)
         wrapped = placement.gate(placed, existing,
                                  _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
+        _inf = float('inf')
         direct = stacking.check_clash(
             _xyz(placed), _xyz(existing),
-            (_BOX_SMALL[0][0], _BOX_SMALL[0][1], -_DISPLAY_Z),
-            (_BOX_SMALL[1][0], _BOX_SMALL[1][1], _DISPLAY_Z))
+            (-_inf, -_inf, -_inf), (_inf, _inf, _inf))
         self.assertEqual(wrapped, direct)
 
     def test_clean_3_6_a_stack_passes_over_full_existing_set(self):
@@ -439,27 +457,46 @@ class TestClashGateAssembly(_FixtureBase):
         self.assertIsNotNone(violation)
         self.assertEqual(violation['kind'], 'atom')
 
-    def test_placement_past_the_display_z_face_is_a_wall_violation(self):
+    def test_placement_past_the_display_z_face_is_no_violation(self):
+        # Owner directive 2026-09-20c: a z-overshoot (the old biphenyl
+        # REFUSE_WALL demonstrator geometry) is NOT a violation when
+        # nothing clashes — the chain may stack out of the box in any
+        # axis; only the head is box-bound (GAME-05).
         placed = [('C', 0.0, 0.0, _DISPLAY_Z + 0.5)]
         violation = placement.gate(placed, [],
                                    _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
-        self.assertIsNotNone(violation)
-        self.assertEqual(violation['kind'], 'wall')
-        self.assertAlmostEqual(violation['distance'], 0.5, places=9)
+        self.assertIsNone(violation)
 
-    def test_placement_past_the_xy_face_is_a_wall_violation(self):
+    def test_placement_past_the_xy_face_is_no_violation(self):
         placed = [('C', _BOX_SMALL[1][0] + 0.25, 0.0, 0.0)]
         violation = placement.gate(placed, [],
                                    _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
-        self.assertEqual(violation['kind'], 'wall')
-        self.assertAlmostEqual(violation['distance'], 0.25, places=9)
+        self.assertIsNone(violation)
 
-    def test_z_bounds_are_symmetric_about_zero(self):
+    def test_z_overshoot_is_symmetric_about_zero(self):
         high = placement.gate([('C', 0.0, 0.0, 5.5)], [],
                               _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
         low = placement.gate([('C', 0.0, 0.0, -5.5)], [],
                              _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
+        self.assertIsNone(high)
         self.assertEqual(high, low)
+
+    def test_biphenyl_z_overshoot_alone_does_not_refuse(self):
+        # The exact old REFUSE_WALL demonstrator: biphenyl stacked at
+        # the dataset geometry extends to |z| = 6.914 A (probe) — past
+        # the shipped display_z 5.0 face. With NO clashing atoms in the
+        # existing set that overshoot now PASSES the gate (the owner
+        # directive retires wall refusals entirely); biphenyl's live
+        # refusal survives only as the genuine ATOM clash pinned in
+        # TestBiphenylRefusal.
+        placed, _R, _t, _rc = placement.attempt_place(
+            self.biphenyl_raw, _BIPHENYL_RING_A,
+            self.head_c, _MINUS_HEADING_EAST, self.head_r,
+            self.interaction)
+        max_abs_z = max(abs(a[3]) for a in placed)
+        self.assertGreater(max_abs_z, _DISPLAY_Z)  # fixture honesty
+        self.assertIsNone(placement.gate(
+            placed, [], _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z))
 
 
 class TestBiphenylRefusal(_FixtureBase):
@@ -470,9 +507,12 @@ class TestBiphenylRefusal(_FixtureBase):
     resolve() must route it to ('refused', REFUSE_ATOM) with the measured
     distance, never to 'placed' and never by fudging the data.
 
-    display_z=7.0 in this test only lifts the DISPLAY box above biphenyl's
-    z-extent (probe: max |z| 6.914 A) so the ATOM check is what refuses —
-    the plan pins the atom refusal specifically."""
+    2026-09-20c owner directive: the wall leg is retired, so no display_z
+    widening is needed anymore — at the SHIPPED display_z 5.0 (below
+    biphenyl's 6.914 A z-extent, the old REFUSE_WALL cascade geometry)
+    the same clash still refuses REFUSE_ATOM, while the overshoot alone
+    would place (pinned in TestClashGateAssembly). display_z is passed
+    for signature stability; its value no longer routes outcomes."""
 
     def _biphenyl_pickup(self):
         record = self.records_by_id['biphenyl']
@@ -491,7 +531,7 @@ class TestBiphenylRefusal(_FixtureBase):
             self._biphenyl_pickup(), self.records_by_id, self.stacking_data,
             self.head, _BENZENE_RING, _HEADING_EAST,
             [], _xyz(self.head),
-            _BOX_SMALL[0], _BOX_SMALL[1], _WIDE_DISPLAY_Z)
+            _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
         self.assertEqual(outcome['status'], 'refused')
         self.assertEqual(outcome['code'], placement.REFUSE_ATOM)
         self.assertEqual(set(outcome), {'status', 'code', 'detail'})
@@ -561,17 +601,22 @@ class TestResolveOrchestrator(_FixtureBase):
         self.assertEqual(outcome, {'status': 'skipped',
                                    'code': placement.SKIP_NO_ENTRY})
 
-    def test_wall_placement_refuses_with_wall_code(self):
-        # Head parked 10 A west: the 3.6 A stack lands past the -x face.
+    def test_out_of_box_placement_now_places(self):
+        # 2026-09-20c owner directive: head parked 10 A west — the 3.6 A
+        # stack lands past the -x face (the old REFUSE_WALL case). With
+        # the wall leg retired this PLACES (only the head is box-bound via
+        # GAME-05; the chain may stack out of the box in any axis).
         head_w = _translated(self.head, -10.0, 0.0)
         outcome = placement.resolve(
             self._benzene_pickup(), self.records_by_id, self.stacking_data,
             head_w, _BENZENE_RING, _HEADING_EAST,
             [], _xyz(head_w),
             _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
-        self.assertEqual(outcome['status'], 'refused')
-        self.assertEqual(outcome['code'], placement.REFUSE_WALL)
-        self.assertTrue(outcome['detail'].endswith(' A'))
+        self.assertEqual(outcome['status'], 'placed')
+        # The placement genuinely overshoots the box face (fixture
+        # honesty: this same geometry used to refuse REFUSE_WALL).
+        min_x = min(a[1] for a in outcome['placed_atoms'])
+        self.assertLess(min_x, _BOX_SMALL[0][0])
 
 
 if __name__ == '__main__':

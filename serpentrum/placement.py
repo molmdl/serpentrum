@@ -45,18 +45,23 @@ every placement decision of Phase 5 is WSL-unit-testable here
 3. **Clash-gate existing set (research open Q7 — decided):** head atoms +
    ALL segment atoms + OTHER live pickups' atoms. A placement overlapping a
    still-live pickup would refuse that pickup mid-chain later; blocking it
-   up front is consistent and trivially cheap. The box is 3D: xy from the
-   preset, z = +/-``display_z`` (the SAME constant the displayed box uses,
-   ``pymol_bridge.BOX_DISPLAY_Z``, passed in as a parameter so this module
-   stays PURE and the bridge owns the constant).
+   up front is consistent and trivially cheap. OWNER DIRECTIVE
+   2026-09-20c: the WALL leg of the gate is RETIRED — placements are
+   NEVER refused for leaving the play box ("remove the refuse (let it
+   stack out of box since we only bound the head in box)"). The stacked
+   chain may extend past the box in ANY axis; only the HEAD is box-bound
+   (via the GAME-05 crash rule in game_engine). The ATOM clash leg is
+   UNTOUCHED (REFUSE_ATOM stays the STACK-05 demonstrator; the box
+   parameters of gate()/resolve() are retained for call-site stability
+   but no longer bound the placement).
 
 4. **Outcome contract:** resolve() returns exactly one of
 
    - ``{'status': 'placed', 'placed_atoms', 'R', 't',
-        'ring_centroid_xy', 'interaction', 'citation_short'}``
+     'ring_centroid_xy', 'interaction', 'citation_short'}``
    - ``{'status': 'skipped', 'code'}``
-   - ``{'status': 'refused', 'code', 'detail'}`` (detail =
-     ``'%.2f A' % clash_distance``)
+   - ``{'status': 'refused', 'code', 'detail'}`` (code is REFUSE_ATOM
+     only; detail = ``'%.2f A' % clash_distance``)
 
    resolve() is a PURE function — it NEVER touches engine state. The GUI
    maps codes to text via hud_logic (plan 05-09) and ALWAYS calls
@@ -74,7 +79,9 @@ SKIP_NOT_APPROVED = 'SKIP_NOT_APPROVED'
 SKIP_MODE = 'SKIP_MODE'
 SKIP_NO_RING = 'SKIP_NO_RING'
 SKIP_NONPLANAR = 'SKIP_NONPLANAR'
-REFUSE_WALL = 'REFUSE_WALL'
+# REFUSE_WALL retired 2026-09-20c (owner directive): the wall leg of the
+# clash gate is gone — only atom clashes refuse. The placement taxonomy
+# is now placed / clash-refuse / skip.
 REFUSE_ATOM = 'REFUSE_ATOM'
 
 # The only stacking mode v1 knows how to place.
@@ -178,19 +185,31 @@ def attempt_place(pickup_atoms, pickup_stack_ring,
     return (placed4, R, t, ring_centroid)
 
 
-def gate(placed_atoms, existing_atoms, box_min2d, box_max2d, display_z):
-    """Thin 3D-box wrapper over stacking.check_clash (no reimplementation).
+# The wall leg of stacking.check_clash is retired (owner directive
+# 2026-09-20c): gate() feeds an effectively UNBOUNDED box so the wall
+# check can never fire and the ATOM leg is the only refusal left.
+_UNBOUNDED_MIN = (float('-inf'), float('-inf'), float('-inf'))
+_UNBOUNDED_MAX = (float('inf'), float('inf'), float('inf'))
 
-    box_min2d/box_max2d are the 2D preset (x, y); display_z turns them into
-    the 3D gate box (x0, y0, -display_z) .. (x1, y1, +display_z) — the same
-    z faces the displayed box uses. ``existing_atoms`` is the caller's full
-    gate set: head + all segments + other live pickups. Returns
-    stacking.check_clash's dict (or None) unchanged.
+
+def gate(placed_atoms, existing_atoms, box_min2d, box_max2d, display_z):
+    """Thin wrapper over stacking.check_clash (no reimplementation).
+
+    ``existing_atoms`` is the caller's full gate set: head + all
+    segments + other live pickups. Returns stacking.check_clash's dict
+    (or None) unchanged.
+
+    box_min2d / box_max2d / display_z are RETAINED for call-site
+    stability only: since 2026-09-20c (owner directive — "remove the
+    refuse (let it stack out of box since we only bound the head in
+    box)") placements are never refused for leaving the play box, so the
+    gate box is effectively unbounded and 'wall' violations can never
+    be returned; only 'atom' clashes refuse (REFUSE_ATOM).
     """
+    _ = (box_min2d, box_max2d, display_z)  # retained args (see docstring)
     return stacking.check_clash(
         _xyz(placed_atoms), _xyz(existing_atoms),
-        (box_min2d[0], box_min2d[1], -display_z),
-        (box_max2d[0], box_max2d[1], display_z))
+        _UNBOUNDED_MIN, _UNBOUNDED_MAX)
 
 
 def resolve(pickup_rec, records_by_id, stacking_data, head_atoms,
@@ -205,7 +224,10 @@ def resolve(pickup_rec, records_by_id, stacking_data, head_atoms,
     stacking dataset. head_atoms/head_stack_ring/heading: the first-capture
     tail policy inputs. segments: engine segment records (last = newest).
     existing_atoms: the full clash-gate set (head + segments + other live
-    pickups). box_min2d/box_max2d/display_z: the 3D gate box.
+    pickups). box_min2d/box_max2d/display_z: retained for call-site
+    stability; the wall leg is retired (owner directive 2026-09-20c), so
+    only atom clashes refuse — placements may land past the box in any
+    axis (only the head is box-bound, via GAME-05).
 
     Returns the outcome contract documented in the module docstring. Never
     raises for data problems (they become outcome codes; a ValueError from
@@ -228,9 +250,8 @@ def resolve(pickup_rec, records_by_id, stacking_data, head_atoms,
     violation = gate(placed, existing_atoms,
                      box_min2d, box_max2d, display_z)
     if violation is not None:
-        if violation['kind'] == 'wall':
-            return {'status': 'refused', 'code': REFUSE_WALL,
-                    'detail': '%.2f A' % violation['distance']}
+        # gate() can only return 'atom' violations (the wall leg is
+        # retired); every refusal is an atom clash.
         return {'status': 'refused', 'code': REFUSE_ATOM,
                 'detail': '%.2f A' % violation['distance']}
 

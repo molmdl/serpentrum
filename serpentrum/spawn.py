@@ -24,12 +24,16 @@ PINNED POLICY (stated explicitly per the planning mandate):
     round-robin serve order (never permanently excluded -- the 5-mol
     pool + cap 10 REQUIRES repeats), so the NEXT spawn is a DIFFERENT
     molecule; a placed capture resets the consecutive-refuse counter.
-    If refuses in a row reach the pool size (every candidate refused
+    If refuses in a     row reach the pool size (every candidate refused
     consecutively), spawning PAUSES for a resumable COOLDOWN of
     EXHAUST_COOLDOWN_TICKS movement ticks (2026-09-20 follow-up: the
     permanent latch from f211d97 deadlocked runs near walls -- those
-    refuses are POSITION-dependent and clear once the head moves away,
-    so a permanent stop was wrong). The controller advances the
+    refuses were POSITION-dependent and cleared once the head moved
+    away, so a permanent stop was wrong). Since 2026-09-20c (owner
+    directive, wall placement gate removed) refusals are CLASH-only, so
+    the cooldown now fires only on genuine clash streaks -- the
+    near-wall deadlock class it was built to absorb is gone, and it
+    remains a pure safety net. The controller advances the
     cooldown clock via ``tick()`` once per 100 ms movement tick; when
     it elapses, the refuse streak resets and spawning RESUMES
     automatically with the same slot policy as before.

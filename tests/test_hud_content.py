@@ -296,10 +296,13 @@ class TestReasonText(unittest.TestCase):
                                   'naphthalene'),
             'skipped naphthalene: ring geometry not planar')
 
-    def test_refuse_codes(self):
-        self.assertEqual(
-            hud_logic.reason_text(placement.REFUSE_WALL, None, 'naphthalene'),
-            'skipped naphthalene: placement would leave the play box')
+    def test_refuse_wall_reason_is_retired(self):
+        # 2026-09-20c owner directive: the wall placement gate is gone —
+        # only REFUSE_ATOM remains in the refuse taxonomy, and no
+        # 'leave the play box' reason literal may survive.
+        self.assertNotIn('REFUSE_WALL', placement.__dict__)
+        self.assertNotIn('leave the play box',
+                         ' '.join(hud_logic._REASON_TEXT.values()))
 
     def test_refuse_atom_includes_detail(self):
         self.assertEqual(
@@ -428,7 +431,7 @@ class TestReasonCoalescer(unittest.TestCase):
     message breaks the run.
     """
 
-    LINE = 'skipped Biphenyl: placement would leave the play box'
+    LINE = 'skipped Biphenyl: placement clashes (0.95 A)'
 
     def test_first_occurrence_appends(self):
         c = hud_logic.ReasonCoalescer()
