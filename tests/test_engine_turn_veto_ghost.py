@@ -1,23 +1,28 @@
-"""Ghost-point turn-veto regression — OWNER-OVERRIDDEN wall rule (2026-09-19 UTC).
+"""Ghost-point turn-veto regression — OWNER-OVERRIDDEN veto rules.
 
 History: the live report ("i wasnt at boundary yet ... all other keys not
 working lilke after hitting a 'ghost point'") was diagnosed as the pinned
-rigid-chain sweep veto (GAME-10: _sweep_check_safe's boundary leg refused
-a turn whose SWUNG CHAIN would leave the margin box, even with the head
-far from any wall) plus the pinned silent drops for same-direction /
-180-degree keys. The veto was geometrically CORRECT — and the product
-owner OVERRODE it at the 05-16 checkpoint (verbatim directive: "only
-detect wall from head, ignore tail"), because vetoes driven by the tail
-were unplayable.
+rigid-chain sweep veto (the boundary leg refused a turn whose SWUNG CHAIN
+would leave the margin box, even with the head far from any wall) plus
+the pinned silent drops for same-direction / 180-degree keys. The 2026-09-20
+re-test found the SAME frozen-snake symptom persisting via the body and
+pickup legs (with several floating refused pickups on the board, EVERY
+turn near them was vetoed; "none of the arrow key ever works").
 
-This file now pins the OWNER-APPROVED rule:
+This file pins the OWNER-APPROVED end state (2026-09-20 UTC, 05-16
+re-test directive):
 
-  - Turn sweeps are vetted by the BODY and PICKUP legs ONLY; the chain
-    may swing past the box during a turn (visual box clipping of the
-    segments mid-swing is explicitly owner-accepted).
+  - Turn sweeps have NO swept pre-check at all — a perpendicular key
+    ALWAYS opens the rigid sweep. Visual clipping of the swinging chain
+    through walls / the snake's own body / floating pickups is
+    owner-accepted (a silly outcome is recoverable; a frozen snake is
+    not).
   - Walls apply to the HEAD only: the forward-motion 'crashed'/'boundary'
-    rule (GAME-05) is UNCHANGED and lives in tests/test_engine_rules.py.
-  - Same-direction / 180-degree keys still drop silently (unchanged).
+    and 'crashed'/'body' rules (GAME-05) are UNCHANGED and live in
+    tests/test_engine_rules.py.
+  - Same-direction keys still drop silently (unchanged); the 180-degree
+    backward key is the ONE remaining turn refusal, dropped at request
+    time in request_direction (its DBG classification line stays).
 
 The EXACT state from the original report (heading 'up', head (6,2),
 3-segment chain trailing down, small-ish +/-12 box) is preserved as the
@@ -223,31 +228,39 @@ class TestAfterTheTurn(unittest.TestCase):
         self.assertIsNotNone(eng.sweeping)
 
 
-class TestBodyAndPickupLegsStillVeto(unittest.TestCase):
-    """The wall leg is gone; the BODY and PICKUP legs are NOT — rigid
-    sweeps still refuse to clip the snake's own body or a live pickup.
-    (Fixtures transplanted from tests/test_engine_turns.py, plan 02-13 —
-    those legs were never in dispute.)"""
+class TestBodyAndPickupLegsAlsoRemoved(unittest.TestCase):
+    """2026-09-20 UTC (05-16 re-test directive): the BODY and PICKUP
+    legs are REMOVED TOO — the exact states that used to refuse now
+    OPEN the sweep and run it to completion. A frozen snake is worse
+    than a silly swing. (Fixtures transplanted from
+    tests/test_engine_turns.py, plan 02-13 — SAME geometries, flipped
+    verdicts.)"""
 
-    def test_body_veto_still_refuses(self):
+    def test_body_fixture_now_opens(self):
         def seg_at(x, y):
             return {'molecule_id': 'm', 'centroid': (x, y),
                     'atoms': [('C', x, y, 0.0)], 'atoms_n': 1}
-        # head (4,0); checked edge (c0,c1) = y=1 from x=-2..2.5; head's
-        # distance to the CURRENT pose (sample k=0) is already < 2.0
-        # (clamped endpoint (2.5, 1.0), dist^2 = 3.25) -> 'body'.
+        # head (4,0); the OLD body leg measured dist^2 = 3.25 < 4.0 vs
+        # edge (c0,c1) at the unrotated pose and refused 'body'. NEW:
+        # no veto — the sweep opens and the chain swings through.
         segs = [seg_at(-2.0, 1.0), seg_at(2.5, 1.0),
                 seg_at(3.5, 0.0), seg_at(4.0, -0.5)]
         engine = GameEngine(head=(4.0, 0.0), heading='right',
                             segments=segs)
         opened, events = engine.start_sweep('up')
-        self.assertFalse(opened)
-        self.assertEqual(events, [('turn_refused', 'body')])
+        self.assertTrue(opened)
+        self.assertEqual(events, [])
+        self.assertIsNotNone(engine.sweeping)
+        for _ in range(6):
+            engine.step(0.1)
         self.assertIsNone(engine.sweeping)
+        self.assertEqual(engine.heading, (0.0, 1.0))  # right -> up (CCW)
+        self.assertFalse(engine.finished)  # a swing clip is not a crash
 
-    def test_pickup_veto_still_refuses(self):
-        # chain atom (3,0) arcs within 2.5 A of the live pickup atom
-        # (0,3) at the 45-degree sample -> 'pickup'.
+    def test_pickup_fixture_now_opens(self):
+        # chain atom (3,0) passes within 2.5 A of the live pickup atom
+        # (0,3) mid-swing — the OLD pickup leg refused 'pickup'; NEW:
+        # the sweep opens regardless and the pickup stays LIVE.
         seg = {'molecule_id': 'm', 'centroid': (3.0, 0.0),
                'atoms': [('C', 3.0, 0.0, 0.0)], 'atoms_n': 1}
         pickup = {'id': 'p1', 'centroid': (0.0, 3.0),
@@ -255,10 +268,29 @@ class TestBodyAndPickupLegsStillVeto(unittest.TestCase):
         engine = GameEngine(head=(0.0, 0.0), heading='right',
                             segments=[seg], pickups=[pickup])
         opened, events = engine.start_sweep('up')
-        self.assertFalse(opened)
-        self.assertEqual(events, [('turn_refused', 'pickup')])
-        self.assertIsNone(engine.sweeping)
+        self.assertTrue(opened)
+        self.assertEqual(events, [])
+        self.assertIsNotNone(engine.sweeping)
+        for _ in range(6):
+            engine.step(0.1)
+        self.assertEqual(engine.heading, (0.0, 1.0))
         self.assertIn('p1', engine.live_pickup_ids)
+        self.assertFalse(engine.finished)
+
+    def test_180_key_is_the_one_remaining_refusal(self):
+        # heading 'right' with a floating pickup AT the head (zero
+        # distance — maximal pickup "veto" under the old rule): the
+        # perpendicular key STILL opens (no veto), and the 180 key is
+        # refused at request time (never buffered, no event).
+        pickup = {'id': 'p1', 'centroid': (0.0, 0.0),
+                  'atoms': [('O', 0.0, 0.0, 0.0)], 'atoms_n': 1}
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            pickups=[pickup])
+        self.assertIs(engine.request_direction('up'), True)
+        self.assertIs(engine.request_direction('left'), False)  # the 180
+        self.assertEqual(engine.pending, ['up'])
+        events = engine.step(0.1)
+        self.assertEqual(events, [('turning', 1.0 / 6.0)])
 
 
 if __name__ == '__main__':

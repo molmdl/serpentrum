@@ -640,12 +640,13 @@ class GameTab(QtWidgets.QWidget):
         """
         kind = ev[0]
         if kind == 'turn_refused':
-            # Ghost-point follow-up (05-16 retest): the remaining veto
-            # legs (body/pickup) are about the SWINGING CHAIN, not the
-            # head - say so in the log line so a correct refusal never
-            # reads as dead keys (hud_logic keeps the checkpoint's
-            # 'turn refused: <reason>' prefix; the wall leg was removed
-            # 2026-09-19 - walls stop the HEAD only).
+            # DEFENSIVE-ONLY handler (2026-09-20 owner directive): the
+            # engine emits NO 'turn_refused' events anymore - the swept
+            # pre-check is removed and the ONLY refused turn is the 180
+            # backward key, dropped at REQUEST time in
+            # request_direction (its DBG line comes from the
+            # _make_debug_steer classifier, 'dropped: 180 reversal').
+            # Kept so a stray future event can never crash the HUD.
             self._log(hud_logic.turn_refuse_text(ev[1]))
             self._dbg_event(engine, 'turn_refused', result=ev[1])
         elif kind == 'turning':

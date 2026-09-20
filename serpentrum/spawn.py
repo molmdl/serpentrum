@@ -21,9 +21,10 @@ PINNED POLICY (stated explicitly per the planning mandate):
   - POSITION: LOOKAHEAD_A = 8.0 along the current heading plus a seeded
     lateral offset in [-6.0, +6.0] quantized to 0.1 A, validated
     against: wall margin 3.5 A (shrunk box), head-centroid clearance
-    5.0 A, chain-ATOM clearance 3.0 A (keeps the engine's 2.5 A
-    SWEEP_PICKUP_CLEARANCE_A sweep pickup-leg pre-check satisfiable near
-    fresh spawns), live-pickup-centroid clearance 6.0 A. Up to 32
+    5.0 A, chain-ATOM clearance 3.0 A (originally sized to keep the
+    since-REMOVED 2.5 A sweep pickup-leg pre-check satisfiable near
+    fresh spawns; kept 2026-09-20 as good placement hygiene), and
+    live-pickup-centroid clearance 6.0 A. Up to 32
     seeded retries (MAX_DRAWS), then a DETERMINISTIC grid-scan fallback
     (GRID_STEP_A = 2.0 over the shrunk box, x-major / y-minor order,
     first legal wins), else None. On None there is NO state advance --
@@ -70,8 +71,9 @@ LATERAL_QUANTUM_A = 0.1       # lateral quantization step
 WALL_MARGIN_A = 3.5           # shrunk-box containment margin
 HEAD_CLEARANCE_A = 5.0        # centroid distance from the head
 CHAIN_ATOM_CLEARANCE_A = 3.0  # per-atom distance vs chain atoms (> 2.5 A
-                              #SWEEP_PICKUP_CLEARANCE_A so fresh spawns keep
-                              # the sweep pickup-leg pre-check satisfiable)
+                              # — sized against the since-REMOVED
+                              # game_engine.SWEEP_PICKUP_CLEARANCE_A sweep
+                              # pickup leg; kept as spawn hygiene 2026-09-20)
 LIVE_PICKUP_CLEARANCE_A = 6.0  # centroid distance vs live pickups
 MAX_DRAWS = 32                # seeded retries before the grid-scan fallback
 GRID_STEP_A = 2.0             # deterministic fallback scan step

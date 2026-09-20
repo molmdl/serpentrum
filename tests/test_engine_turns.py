@@ -1,21 +1,29 @@
 """GameEngine rigid-pivot turn-sweep tests (plan 02-13, GAME-10).
 
 Covers the rigid chain pivot: a turn rotates the WHOLE chain rigidly
-about the head over TURN_TICKS=6 ticks (15 deg/tick), REFUSED with
-('turn_refused', reason) and zero state mutation when any of the 7
-sampled swept poses clips the body or swings a chain atom within
-SWEEP_PICKUP_CLEARANCE_A (2.5 A, atom-level) of a live pickup atom.
-180-degree enforcement is judged at sweep level (against the sweep
-target while sweeping). Pending applies exactly once at the start of the
-step after sweep completion; reset wipes all turn state.
+about the head over TURN_TICKS=6 ticks (15 deg/tick) and ALWAYS
+executes — 180-degree enforcement is judged at request level (and at
+sweep level against the sweep target). Pending applies exactly once at
+the start of the step after sweep completion; reset wipes all turn
+state.
 
-OWNER-APPROVED RULE CHANGE (2026-09-19 UTC, 05-16 checkpoint directive
-"only detect wall from head, ignore tail"): the boundary leg of the
-sweep pre-check is REMOVED — the chain may swing past the box during a
-turn (visual clipping owner-accepted); walls apply to the HEAD only
-(the forward-motion 'crashed'/'boundary' rule is unchanged and pinned
-in tests/test_engine_rules.py). The former boundary-refusal tests were
-rewritten to pin the override (each carries a dated comment).
+OWNER-APPROVED RULE CHANGES:
+
+  2026-09-19 UTC (05-16 checkpoint directive "only detect wall from
+  head, ignore tail"): the boundary leg of the sweep pre-check REMOVED
+  — the chain may swing past the box during a turn (visual clipping
+  owner-accepted); walls apply to the HEAD only (the forward-motion
+  'crashed'/'boundary' rule is unchanged and pinned in
+  tests/test_engine_rules.py).
+
+  2026-09-20 UTC (05-16 re-test directive): the pre-check's remaining
+  BODY and PICKUP legs REMOVED TOO — a rigid sweep ALWAYS executes
+  (clipping the swinging chain through the body or a floating pickup is
+  a silly-but-recoverable visual outcome; a frozen snake is not). The
+  ONLY turn refusal left is the 180-degree backward key, dropped at
+  request time in request_direction (never buffered, never an event).
+  The former body/pickup-refusal tests were rewritten to pin the flip
+  (each carries a dated comment).
 
 Determinism (research sec 7): pure float math on fixed constants; tests
 set engine state directly (plain data) and use assertAlmostEqual for
@@ -145,17 +153,14 @@ class TestSweepConstants(unittest.TestCase):
         self.assertEqual(game_engine.TURN_TICKS + 1, 7)
 
 
-class TestSweepRefusalLegs(unittest.TestCase):
-    """start_sweep's 7-sample two-leg pre-check: body / pickup
-    refusals with reason-tagged ('turn_refused', reason) events and ZERO
-    state mutation. Head excluded from the pickup leg (it is the pivot).
-
-    OWNER-APPROVED RULE CHANGE (2026-09-19 UTC): the former third
-    (boundary) leg is removed — 'only detect wall from head, ignore
-    tail' (05-16 checkpoint directive). The old
-    test_boundary_refusal_centroid_leg pinned the opposite verdict on
-    this exact geometry; it is rewritten below as
-    test_wall_crossing_swing_now_opens."""
+class TestSweepAlwaysExecutes(unittest.TestCase):
+    """start_sweep ALWAYS opens a perpendicular sweep — the swept
+    pre-check is GONE (owner directives 2026-09-19 boundary leg,
+    2026-09-20 body + pickup legs). The exact geometries that used to
+    refuse now OPEN; visual clipping of the swinging chain through
+    walls / the body / floating pickups is owner-accepted (a silly
+    outcome is recoverable; a frozen snake is not). The only refused
+    turn is the 180 backward key, dropped at request time."""
 
     def test_wall_crossing_swing_now_opens(self):
         # box ((-2,-2),(20,2)); margin walls x in [-1, 19], y in [-1, 1].
@@ -181,58 +186,62 @@ class TestSweepRefusalLegs(unittest.TestCase):
         self.assertEqual(engine.segments[0]['centroid'], (7.0, 0.0))
         self.assertEqual(engine.segments[1]['centroid'], (10.0, 0.0))
 
-    def test_body_refusal_defensive_leg(self):
-        # head (4,0) heading (1,0); segs c0=(-2,1), c1=(2.5,1),
-        # c2=(3.5,0), c3=(4,-0.5). n=4 -> only edge 0 (c0->c1) is
-        # checked (limit = 4-1-2 = 1). head (4,0) to edge 0 (horizontal
-        # y=1, x in [-2, 2.5]): nearest point is the clamped endpoint
-        # (2.5, 1.0); dist^2 = (4-2.5)^2 + (0-1)^2 = 1.5^2 + 1.0^2 =
-        # 2.25 + 1.0 = 3.25 < 4.0 (BODY_COLLISION_RADIUS_A^2) -> the
-        # CURRENT pose (sample k=0, th=0, unrotated) already violates ->
-        # refuse 'body'. No box, no pickups -> only the body leg fires.
+    def test_body_close_pose_sweep_opens_and_runs(self):
+        # OLD PIN (overridden 2026-09-20): this exact fixture refused
+        # 'body' — head (4,0) heading (1,0); segs c0=(-2,1), c1=(2.5,1),
+        # c2=(3.5,0), c3=(4,-0.5); the unrotated pose was already inside
+        # the strict body radius vs edge (c0->c1) (dist^2 = 3.25 < 4.0).
+        # NEW (05-16 re-test directive): the SAME geometry OPENS the
+        # sweep and runs it to completion — the swinging chain may clip
+        # the snake's own body (visual clipping, owner-accepted). The
+        # forward-motion body CRASH rule (GAME-05) is untouched.
         segs = [make_seg_at(-2.0, 1.0, 'c0'), make_seg_at(2.5, 1.0, 'c1'),
                 make_seg_at(3.5, 0.0, 'c2'), make_seg_at(4.0, -0.5, 'c3')]
         engine = GameEngine(head=(4.0, 0.0), heading='right', segments=segs)
         opened, events = engine.start_sweep('up')
-        self.assertFalse(opened)
-        self.assertEqual(events, [('turn_refused', 'body')])
-        self.assertEqual(engine.heading, (1.0, 0.0))
-        self.assertEqual(engine.segments[0]['centroid'], (-2.0, 1.0))
-        self.assertEqual(engine.segments[3]['centroid'], (4.0, -0.5))
+        self.assertTrue(opened)
+        self.assertEqual(events, [])
+        self.assertIsNotNone(engine.sweeping)
+        self.assertEqual(engine.sweeping['target_heading'], (0.0, 1.0))
+        for _ in range(TURN_N):
+            tick_events = engine.step(0.1)
+            self.assertEqual([e[0] for e in tick_events], ['turning'])
         self.assertIsNone(engine.sweeping)
-        self.assertEqual(engine.pending, [])
+        self.assertEqual(engine.heading, (0.0, 1.0))
+        self.assertFalse(engine.finished)  # no crash from a swing clip
+        self.assertEqual(engine.head, (4.0, 0.0))  # pivot unmoved
 
-    def test_pickup_refusal_atom_level(self):
-        # head (0,0) heading (1,0); seg m1 centroid (3,0) atom
-        # ('C',3,0,0); live pickup p1 centroid (0,3) atom ('O',0,3,0).
-        # start_sweep('up') CCW +90: the chain atom (3,0) rotates on the
-        # radius-3 circle about the origin. At sample k=3 (th=45 deg) it
-        # sits at (3*cos45, 3*sin45) = (2.1213, 2.1213); distance to the
-        # pickup atom (0,3) = sqrt(2.1213^2 + (2.1213-3)^2) =
-        # sqrt(4.5 + 0.7721) = sqrt(5.2721) = 2.296 < 2.5
-        # (SWEEP_PICKUP_CLEARANCE_A) -> refuse 'pickup'. (n=1 -> no body
-        # leg; no box -> only the pickup leg fires.)
+    def test_pickup_close_sweep_opens_and_runs(self):
+        # OLD PIN (overridden 2026-09-20): this exact fixture refused
+        # 'pickup' — head (0,0) heading (1,0); seg atom ('C',3,0,0)
+        # arced within 2.5 A of the live pickup atom ('O',0,3,0) at the
+        # 45-degree sample. NEW: the SAME geometry OPENS the sweep;
+        # the swinging chain passes through the floating molecule
+        # (visual clipping, owner-accepted) and the pickup stays LIVE
+        # (a sweep never captures).
         seg = make_seg_at(3.0, 0.0, 'm1', atoms=[('C', 3.0, 0.0, 0.0)])
         pickup = make_pickup('p1', 0.0, 3.0, atoms=[('O', 0.0, 3.0, 0.0)])
         engine = GameEngine(head=(0.0, 0.0), heading='right',
                             segments=[seg], pickups=[pickup])
         opened, events = engine.start_sweep('up')
-        self.assertFalse(opened)
-        self.assertEqual(events, [('turn_refused', 'pickup')])
-        self.assertEqual(engine.heading, (1.0, 0.0))
-        self.assertEqual(engine.segments[0]['centroid'], (3.0, 0.0))
-        self.assertEqual(engine.segments[0]['atoms'],
-                         [('C', 3.0, 0.0, 0.0)])
-        self.assertIsNone(engine.sweeping)
-        self.assertEqual(engine.pending, [])
-        # Pickup still live (not captured by a sweep pre-check).
-        self.assertIn('p1', engine.live_pickup_ids)
+        self.assertTrue(opened)
+        self.assertEqual(events, [])
+        self.assertIsNotNone(engine.sweeping)
+        for _ in range(TURN_N):
+            engine.step(0.1)
+        self.assertEqual(engine.heading, (0.0, 1.0))  # right -> up (CCW)
+        # Chain atom rotated rigidly: (3,0) rel head -> (0,3) at +90.
+        self.assertAlmostEqual(engine.segments[0]['atoms'][0][1],
+                               0.0, delta=DELTA)
+        self.assertAlmostEqual(engine.segments[0]['atoms'][0][2],
+                               3.0, delta=DELTA)
+        self.assertIn('p1', engine.live_pickup_ids)  # never captured
+        self.assertFalse(engine.finished)
 
-    def test_pickup_positive_control_sweep_opens(self):
-        # Same chain geometry, pickup atom at (12,0,0). The rotating
-        # chain atom traces the radius-3 circle; its min distance to
-        # (12,0) is 12 - 3 = 9 > 2.5 -> no pickup hit. No box, no body
-        # (n=1) -> start_sweep returns (True, []) and the sweep opens.
+    def test_pickup_clear_pose_sweep_opens(self):
+        # Positive control: same chain geometry, pickup atom at
+        # (12,0,0) — far from every swept pose. Opens, obviously, under
+        # both the old and the new (no pre-check) rules.
         seg = make_seg_at(3.0, 0.0, 'm1', atoms=[('C', 3.0, 0.0, 0.0)])
         pickup = make_pickup('p1', 12.0, 0.0, atoms=[('O', 12.0, 0.0, 0.0)])
         engine = GameEngine(head=(0.0, 0.0), heading='right',
@@ -247,14 +256,10 @@ class TestSweepRefusalLegs(unittest.TestCase):
         self.assertEqual(engine.sweeping['tick'], 0)
         self.assertEqual(engine.sweeping['total_ticks'], TURN_N)
 
-    def test_head_excluded_from_pickup_leg(self):
-        # Live pickup with its atom EXACTLY at the head/pivot (0,0,0)
-        # (centroid (0,0)). The chain atom (3,0,0) rotates on the
-        # radius-3 circle about the origin; its distance to the origin
-        # is 3.0 at EVERY sampled pose > 2.5 -> the sweep OPENS. This
-        # proves the head/pivot point itself is NOT treated as a checked
-        # chain atom (a head-level check would refuse at distance 0 at
-        # every pose). The head is the invariant pivot, not a chain atom.
+    def test_pivot_pickup_does_not_block_sweep(self):
+        # Live pickup exactly at the head/pivot (0,0,0): the sweep
+        # OPENS — nothing about pickup proximity can veto a turn
+        # anymore (2026-09-20), whatever the distance.
         seg = make_seg_at(3.0, 0.0, 'm1', atoms=[('C', 3.0, 0.0, 0.0)])
         pickup = make_pickup('p1', 0.0, 0.0, atoms=[('O', 0.0, 0.0, 0.0)])
         engine = GameEngine(head=(0.0, 0.0), heading='right',

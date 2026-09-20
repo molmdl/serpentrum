@@ -283,19 +283,25 @@ def debug_event_trace(kind, tick=None, heading=None, head_xy=None,
 # the (then-pinned) rigid-chain sweep veto plus the pinned silent drops for
 # same-direction and 180-degree key presses.
 #
-# OWNER-APPROVED RULE CHANGE (2026-09-19 UTC, 05-16 checkpoint directive
-# "only detect wall from head, ignore tail"): the sweep pre-check no
-# longer vets the swinging chain against the walls — the chain may swing
-# past the box during a turn; walls apply to the HEAD only (the forward
-# 'crashed'/'boundary' rule is unchanged). The remaining veto legs are
-# BODY (the swung chain would clip the snake's own body) and PICKUP (the
-# swung chain would clip a floating molecule). These builders give each
-# verdict a voice a player can act on.
+# OWNER-APPROVED RULE CHANGES:
+#   2026-09-19 UTC ("only detect wall from head, ignore tail"): the sweep
+#     pre-check stopped vetting the swinging chain against the walls —
+#     walls apply to the HEAD only.
+#   2026-09-20 UTC (05-16 re-test directive): the pre-check's remaining
+#     BODY and PICKUP legs are removed too — a rigid sweep ALWAYS
+#     executes. The ONLY turn refusal left is the 180-degree backward
+#     key, dropped at request time in request_direction (classified
+#     'dropped: 180 reversal' by classify_turn_request below — that DBG
+#     line for the 180 case stays). turn_refuse_text / _TURN_REFUSE_WHY
+#     are therefore DEFENSIVE-ONLY (the engine emits no 'turn_refused'
+#     events at all); they are kept so a stray future event can never
+#     crash the HUD, and so the 05-16 human-verify text contract
+#     ('turn refused: <reason> (why)') stays stable.
 
 
 # One clause per engine refusal reason: what the swung chain would hit.
-# 'boundary' is kept DEFENSIVELY (the engine can no longer emit it as a
-# sweep refusal since 2026-09-19) with truthful head-only wording.
+# ALL reasons are DEFENSIVE (the engine emits no 'turn_refused' events
+# since 2026-09-20); the text is kept truthful to the historical rules.
 _TURN_REFUSE_WHY = {
     'boundary': 'walls only stop the head '
                 '(the chain may swing past the box during a turn)',
@@ -312,6 +318,11 @@ def turn_refuse_text(reason):
     one clause - the missing piece that made a correct chain veto feel
     like a ghost point. Unknown reasons fall back to a generic clause
     (never raises on a future engine reason).
+
+    DEFENSIVE-ONLY (2026-09-20): the engine no longer emits any
+    'turn_refused' event — the only refused turn is the 180 backward
+    key, which is classified at request time and never becomes an
+    event. This builder exists so a stray event can never crash the HUD.
     """
     why = _TURN_REFUSE_WHY.get(
         reason, 'the swinging chain is blocked at this position')
