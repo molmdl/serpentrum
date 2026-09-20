@@ -61,10 +61,12 @@ Straight-fit: max N segments with 3.6*N <= 2H - 2*BOUNDARY_MARGIN_A(1.0):
 ## Final gates state
 
 - `python3.6 tests/run_gates.py` — gate 1 syntax+plugin-path PASS,
-  gate 2 purity PASS, gate 3 unittest 620 PASS.
-- `python3.6 tests/run_gates.py --smoke` — all required smokes flush
-  SMOKE-OK; smoke 08 includes the new SMOKE-OK SCENECLR sentinel;
-  smoke 02 informational FAIL known (Qt widget headless) as before.
+  gate 2 purity PASS, gate 3 unittest 615 PASS.
+- `python3.6 tests/run_gates.py --smoke` — all 7 required smokes flush
+  SMOKE-OK; smoke 08 flushes all 7 sentinels (EDGEON, PLACE360,
+  PLANEPAR, SPAWNOFFS, HEADRESET, PICKUPS, SCENECLR — the new fix-C
+  ordering pin); smoke 02 informational FAIL known (Qt widget headless)
+  as before.
 
 ## Re-test checklist (what the user should now see)
 
