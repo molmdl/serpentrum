@@ -43,6 +43,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **STACK-03**: A pickup without a verified dataset entry is skipped (not placed), with the info box stating why — no invented chemistry
 - [x] **STACK-04**: Info box shows per-pickup structured content (interaction name, distance, one-line explanation, citation short-code), plus idle chemistry tips, early controls hints, and an end-of-run interaction breakdown
 - [x] **STACK-05**: A clash gate rejects stacking placements that would collide (protecting xtb from inferring spurious covalent bonds)
+- [ ] **STACK-06**: User-consented generic π-stack fallback for uploads carrying a canonical planar 6-ring — placement reuses the already-approved idealized Set-A geometry (3.60 Å @ 20°), every in-game surface labels it "generic (illustrative geometry — user-approved)", consent is OFF by default and persisted; uploads without a planar 6-ring still skip *(promoted from v2 with Phase 5.2, 2026-09-20 — owner request)*
 
 ### Spectra
 
@@ -94,7 +95,7 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ### Stacking
 
-- **STACK-06**: User-approved generic fallback list (e.g. vdW contact) for uploads without dataset entries
+- **STACK-06**: ~~User-approved generic fallback list~~ **PROMOTED to v1 2026-09-20** (Phase 5.2 — generic π-stack, Setup-consented, labeled illustrative; see v1 STACK-06)
 - **STACK-07**: Mixed-interaction sets (chain alternates π-stack / H-bond links)
 
 ### Spectra
@@ -147,6 +148,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STACK-03 | Phase 5 | Complete |
 | STACK-04 | Phase 5 | Complete |
 | STACK-05 | Phase 5 | Complete |
+| STACK-06 | Phase 5.2 | Pending |
 | SPECTRA-01 | Phase 7 | Pending |
 | SPECTRA-02 | Phase 6 | Pending |
 | SPECTRA-03 | Phase 7 | Pending |
@@ -170,8 +172,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCS-05 | Phase 8 | Pending |
 
 **Coverage:**
-- v1 requirements: 45 total (44 original + GAME-11 inserted with Phase 5.1, 2026-09-20)
-- Mapped to phases: 45
+- v1 requirements: 46 total (44 original + GAME-11 with Phase 5.1 + STACK-06 promoted from v2 with Phase 5.2, 2026-09-20)
+- Mapped to phases: 46
 - Unmapped: 0 ✓
 
 > Count corrected from 41 → 44 during roadmap creation (2026-09-06): the listed ID ranges (SETUP-01..08, GAME-01..10, STACK-01..05, SPECTRA-01..06, DATA-01..04, INFRA-01..06, DOCS-01..05) sum to 44. Each requirement maps to exactly one phase — see ROADMAP.md for phase goals and success criteria.
@@ -181,3 +183,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 *Last updated: 2026-09-14 — Phase 4 complete (verified 40/40 must-haves): GAME-01, GAME-02, GAME-03, GAME-07, GAME-08 marked Complete*
 *2026-09-20 — GAME-11 added (Phase 5.1 inserted): Setup-selectable game speed/difficulty, constant per run (GAME-08 intact), persisted, default = baseline 3.0 Å/s. Coverage 44 → 45. GAME-10 behavior note: 05-16 checkpoint owner overrides amended the in-run turn model (turn pre-check refuses 180° only; REFUSE_WALL placement gate removed; chain may extend outside the box — only the head is box-bound) — statuses to be finalized at Phase 5 completion.*
 *2026-09-20b — **Phase 5 COMPLETE** (05-VERIFICATION: passed — 48/48 plan must-have truths, 3 verified-as-owner-amended; 5/5 success criteria; 7-round human checkpoint 2026-09-18..20): GAME-04, GAME-05, GAME-06, GAME-09, GAME-10, STACK-01, STACK-03, STACK-04, STACK-05 → Complete. GAME-10 shipped contract = owner-amended: rigid chain sweep with train-follow tail (immutable 3.60 Å spacing), turn pre-check refuses 180° only, REFUSE_WALL removed (chain may extend outside box; only head box-bound), REFUSE_ATOM clash gate intact (STACK-05).*
+*2026-09-20c — STACK-06 PROMOTED v2 → v1 (Phase 5.2 inserted, owner request): generic π-stack for canonical-planar-6-ring uploads, Setup-consented (OFF default), labeled "illustrative — user-approved"; plan before Phase 5.1, execute sequentially. Coverage 45 → 46.*

@@ -2,7 +2,7 @@
 
 **Created:** 2026-09-06
 **Depth:** comprehensive (8 phases)
-**Coverage:** 45/45 v1 requirements mapped — 0 unmapped, 0 duplicated (44 original after the 41→44 count correction + GAME-11 inserted with Phase 5.1, 2026-09-20)
+**Coverage:** 46/46 v1 requirements mapped — 0 unmapped, 0 duplicated (44 original after the 41→44 count correction + GAME-11 with Phase 5.1 + STACK-06 promoted from v2 with Phase 5.2, 2026-09-20)
 
 ## Overview
 
@@ -22,6 +22,7 @@ A PyMOL plugin game: steer a molecular head around a bounded box, stack real sma
 - [x] **Phase 4: Game Loop & Input** - Arrow-key steered movement on a 2D locked-camera plane with countdown, HUD, pause/restart *(research D — input spike)*
 - [x] **Phase 5: Stacking & Game Rules Complete** - Pickups stack at cited geometry; rigid-pivot turns; collisions end runs; win/crash both reach spectra *(research E)*
 - [ ] **Phase 5.1: Game Speed / Difficulty (INSERTED 2026-09-20)** - Setup-selectable constant speed tier (difficulty), persisted; baseline 3.0 Å/s unchanged *(owner insertion — playtesting feedback)*
+- [ ] **Phase 5.2: Generic Upload Stacking Consent (INSERTED 2026-09-20)** - Opt-in generic π-stack geometry for ring-bearing uploads (illustrative, labeled); upload-only games become winnable *(owner insertion — promotes v2 STACK-06)* *(STACK-03 integrity guards: non-silent, labeled, human-approved geometry)*
 - [ ] **Phase 6: xtb Pipeline** - Async cancellable `xtb --ohess` with verified success contract and calibrated atom-budget guard *(research F — parallel track)*
 - [ ] **Phase 7: Spectra UI** - Broadened IR plot, clickable frequency table → static mode vectors, streaming log, saveable plot *(research G)*
 - [ ] **Phase 8: Demo Data, Docs & Release Audit** - Human-approved Set A + attribution, 6-button setup persistence, help/docs, end-to-end audit *(research H)*
@@ -179,6 +180,21 @@ Notes: The clash gate is a game rule, not a spectra afterthought (a clashing app
 
 Notes: Inserted per owner playtesting feedback 2026-09-20 ("current speed is easy, kinda slow even with small box"). Draft tiers for planning (at the 100 ms tick): relaxed ≈ 2.0 Å/s, normal = 3.0 Å/s (current), fast ≈ 4.5 Å/s, expert ≈ 6.0 Å/s — final values approved by the owner at the feel-check. Distinct from v2 GAME-10-v2 (speed increasing with snake length — still deferred). **Plan AFTER Phase 5 wrap-up** so these plans don't tangle Phase 5's verification.
 
+### Phase 5.2: Generic Upload Stacking Consent *(INSERTED 2026-09-20 — urgent insertion, owner request; promotes v2 STACK-06 into v1)*
+
+**Goal**: Uploaded molecules with a canonical planar 6-ring can stack at the ALREADY-APPROVED idealized π-stack geometry (3.60 Å @ 20° off-normal — the DATA-02/Janiak-pinned Set-A entry) when the user explicitly opts in — clearly labeled "illustrative/generic" in-game — so upload-only and mixed games become winnable; uploads without a planar 6-ring still skip with a reason; the consent OFF default keeps today's honest skip behavior byte-identical.
+**Depends on**: Phase 5 (COMPLETE)
+**Requirements**: STACK-06
+**Success Criteria** (what must be TRUE):
+  1. Setup tab shows an opt-in control for generic upload stacking (OFF by default; a modal popup is purity-banned — use an inline Setup control, checkbox or combo); the choice persists via Save/Load Setup with schema backcompat (absent key = OFF). [STACK-06]
+  2. With consent ON: an upload carrying a canonical planar 6-ring captures and places at the approved idealized geometry (placed d = 3.60 Å verified by DBG capture line) with every HUD line/recap labeled "generic π-stack (illustrative geometry — user-approved) [Janiak 2000]"; the win path works in an upload-only game. [STACK-06]
+  3. With consent ON, an upload WITHOUT a planar 6-ring still skips with a specific reason ("no aromatic ring for generic π-stack" class); with consent OFF, behavior is byte-identical to today (skip, no invented chemistry). [STACK-03 integrity]
+  4. End-of-run recap groups generic placements under the labeled generic interaction (distinct from dataset entries); DATA-sources/docs wording updated to describe the generic mode. [STACK-04]
+  5. A live human feel-check approves the consent UX + labeling (checkpoint). [STACK-06]
+**Plans**: TBD (expected 2–3; pure generic-entry injection + ring eligibility + labeled content ∥ Setup control + persistence + GameTab wiring ∥ gates + feel-check checkpoint — parallelizable)
+
+Notes: Inserted per owner question 2026-09-20 ("possible to have user accept a pre-defined stacking in a popup and allow play as usual?"). Repos rule honored: distance is NOT invented (reuses the human-approved DATA-02 geometry); consent is explicit and non-silent; labeling keeps educational integrity (the v2 "silent fallback" out-of-scope entry stays out of scope). Absorbs the debug-session's C2 soft-warning seam into the same Setup surface. **Plan BEFORE Phase 5.1 (owner choice 2026-09-20); execute Phase 5.2 → 5.1 sequentially** (both touch gui_setup/hud_logic — no parallel waves across the two phases). Eligibility reuses 05-01/05-19d machinery: canonical planar 6-ring extractor + edge-on parity.
+
 ### Phase 6: xtb Pipeline *(research phase F — parallel track, largely de-risked)*
 
 **Goal**: The final snake can be handed to a real, cancellable, async `xtb --ohess` run with a verified success contract and a calibrated atom-budget guard — while the UI never blocks.
@@ -246,13 +262,13 @@ Wave 5:  Phase 8                              (needs Phases 5–7 + approvals re
 |----------|--------------|--------|
 | Setup & Configuration | SETUP-01..08 | 1, 3, 8 |
 | Gameplay | GAME-01..11 | 4, 5, 5.1 |
-| Molecular Stacking | STACK-01..05 | 2, 5 |
+| Molecular Stacking | STACK-01..06 | 2, 5, 5.2 |
 | Spectra | SPECTRA-01..06 | 6, 7 |
 | Demo Data & Attribution | DATA-01..04 | 3, 8 |
 | Infrastructure & Environment | INFRA-01..06 | 1, 3 |
 | Documentation & Audit | DOCS-01..05 | 8 |
 
-**Total: 45/45 v1 requirements mapped — 0 unmapped, 0 duplicated** (44 original + GAME-11 via inserted Phase 5.1, 2026-09-20).
+**Total: 46/46 v1 requirements mapped — 0 unmapped, 0 duplicated** (44 original + GAME-11 via Phase 5.1 + STACK-06 promoted from v2 via Phase 5.2, 2026-09-20).
 
 > **Count note:** REQUIREMENTS.md previously said "41 total"; the listed ID ranges (SETUP-01..08, GAME-01..10, STACK-01..05, SPECTRA-01..06, DATA-01..04, INFRA-01..06, DOCS-01..05) sum to **44**. All 44 are mapped exactly once; REQUIREMENTS.md's Coverage block is corrected accordingly.
 
@@ -269,7 +285,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. Molecules in the Viewer & Setup Tab | 8/8 | Complete (verified 5/5 must-haves) | 2026-09-12 |
 | 4. Game Loop & Input | 9/9 | Complete (verified 5/5 must-haves) | 2026-09-14 |
 | 5. Stacking & Game Rules Complete | 16/16 | Complete (verified 48/48 plan truths, 3 owner-amended; 5/5 criteria; 9/9 reqs; 7-round human checkpoint) | 2026-09-20 |
-| 5.1. Game Speed / Difficulty (INSERTED 2026-09-20) | 0/TBD | Not started (plan after Phase 5 wrap) | - |
+| 5.1. Game Speed / Difficulty (INSERTED 2026-09-20) | 0/TBD | Not started (plan after Phase 5.2) | - |
+| 5.2. Generic Upload Stacking Consent (INSERTED 2026-09-20) | 0/TBD | Next (owner chose plan-first) | - |
 | 6. xtb Pipeline | 0/TBD | Not started | - |
 | 7. Spectra UI | 0/TBD | Not started | - |
 | 8. Demo Data, Docs & Release Audit | 0/TBD | Not started | - |

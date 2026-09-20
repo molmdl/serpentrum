@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
-**Current focus:** Phase 5 COMPLETE (verified 2026-09-20) — next: Phase 5.1 Game Speed / Difficulty (GAME-11, inserted); owner question on generic upload stacking pending decision (possible Phase 5.2 insertion)
+**Current focus:** Phase 5 COMPLETE (verified 2026-09-20) — next: Phase 5.2 Generic Upload Stacking Consent (STACK-06 promoted v2->v1, owner chose plan-first), then Phase 5.1 (GAME-11 speed tiers); execute 5.2 -> 5.1 sequentially (shared gui_setup/hud_logic files)
 
 ## Current Position
 
@@ -80,13 +80,14 @@ Recent decisions affecting current work:
 
 ### Roadmap Evolution
 
-- 2026-09-20: **Phase 5.1 (Game Speed / Difficulty, GAME-11) inserted after Phase 5** (URGENT — owner playtesting feedback "current speed is easy, kinda slow even with small box"); directory .planning/phases/5.1-game-speed-difficulty/; coverage 44 -> 45; plan ONLY after Phase 5 wrap so its plans don't tangle Phase 5 verification; draft tiers relaxed ~2.0 / normal 3.0 (default) / fast ~4.5 / expert ~6.0 A/s — owner feel-check finalizes. Distinct from v2 GAME-10-v2 (speed-vs-length, still deferred).
+- 2026-09-20: **Phase 5.1 (Game Speed / Difficulty, GAME-11) inserted after Phase 5** (URGENT — owner playtesting feedback "current speed is easy, kinda slow even with small box"); directory .planning/phases/5.1-game-speed-difficulty/; coverage 44 -> 45; draft tiers relaxed ~2.0 / normal 3.0 (default) / fast ~4.5 / expert ~6.0 A/s — owner feel-check finalizes. Distinct from v2 GAME-10-v2 (speed-vs-length, still deferred).
+- 2026-09-20: **Phase 5.2 (Generic Upload Stacking Consent, STACK-06 promoted v2->v1) inserted after 5.1** (owner request 2026-09-20, planning choice = plan-first before 5.1); directory .planning/phases/5.2-generic-upload-stacking-consent/; coverage 45 -> 46; consent via inline Setup control (modal popup purity-banned — .exec_() gate), OFF default, persisted; generic entry = already-approved idealized 3.60 A @ 20 geometry for canonical-planar-6-ring uploads, labeled "generic (illustrative — user-approved)" everywhere; ring-less uploads still skip; absorbs debug C2 seam; execute 5.2 -> 5.1 sequentially (shared gui_setup/hud_logic files).
 
 ### Pending Todos
 
 - ~~Phase 5 leftover (05-16 checkpoint)~~ DONE 2026-09-20 — Phase 5 COMPLETE + VERIFIED (wrap-up commit; upload-endless debug resolved; all close-out steps executed).
-- **Owner decision pending:** generic upload stacking — user asked "possible to have user accept a pre-defined stacking in a popup and allow play as usual?" (v2 STACK-06 concept promoting to v1); candidate = inserted Phase 5.2, design sketch in conversation 2026-09-20 (consent via Setup checkbox — modeless rule bans .exec_() popups until a child-dialog allowlist exists; generic entry = already-approved idealized 3.60 A @ 20 pi-stack for planar-6-ring uploads, labeled illustrative in-game); DEFAULT = close v1 without it (current demo-mode note + skip path already honest).
-- C2 soft Apply-time stacking warning (debug session left it as owner opt-in; seam documented in .planning/debug/resolved/05-upload-only-endless-run.md) — ABSORB into Phase 5.2 planning if 5.2 happens, else skip.
+- ~~Owner decision pending: generic upload stacking~~ DECIDED 2026-09-20c — Phase 5.2 INSERTED (STACK-06 promoted v2->v1; design per Roadmap Evolution entry); plan it FIRST, then Phase 5.1.
+- ~~C2 soft Apply-time stacking warning~~ ABSORBED into Phase 5.2 scope (consent/label surface lives in the same Setup area; seam in .planning/debug/resolved/05-upload-only-endless-run.md).
 - ~~Adjacent observation (old srp_seg_* decay on Restart)~~ RESOLVED 2026-09-20 in 56dd68b (begin_game hard-cleans all srp_* before materializing).
 - ~~Phase 5 design note (biphenyl WALL refuse at display_z 5.0)~~ SUPERSEDED 2026-09-20 by d33f74c: REFUSE_WALL placement gate removed entirely; biphenyl's refuse path is now REFUSE_ATOM clash (1.87 Å — the STACK-05 demonstrator); placed z-extent is no longer gated.
 - Phase 6 calibration pending: QProcess-in-conda smoke, ~100-atom `--ohess` wall time, OMP env (`[TRAIN]`) — Phase 6 can run parallel with Phases 4-5 (depends only on Phase 2).
@@ -103,7 +104,7 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-09-20 (execute-phase orchestrator — 05-16 checkpoint APPROVED BY EVIDENCE (final-pass test 1: small-box cap-10 win with correct refused-clash recap; test 2: upload demo-mode note + skipped-Nx recap); 05-16-SUMMARY b0ed958; gsd-verifier FINAL 05-VERIFICATION passed (48/48 truths, 3 owner-amended; 5/5 criteria; 9/9 reqs); Phase 5 wrap-up committed)
-Stopped at: Phase 5 COMPLETE + VERIFIED. Awaiting owner decision: insert Phase 5.2 (generic upload stacking consent) or not — then Phase 5.1 planning.
+Stopped at: Phase 5 COMPLETE + VERIFIED (1a251b6); Phase 5.2 INSERTED per owner choice (plan-first); Phase 5.1 queued after.
 Resume file: None needed (Phase 5 closed); HANDOFF-2026-09-20-phase5-resume.md is historical (all steps complete)
-Next action: (1) owner answers 5.2 question; (2) /gsd-plan-phase 5.1 (+ 5.2 if approved — plan 5.2 first, hot context; execute sequentially to avoid gui_setup/hud_logic collisions); (3) then Phase 6 (xtb Pipeline — QProcess smoke gates it) or Phase 7
+Next action: (1) /gsd-plan-phase 5.2 (+ optionally /gsd-discuss-phase 5.2 first to settle consent-control wording); (2) execute 5.2 fully, then /gsd-plan-phase 5.1 + execute (sequential — shared gui_setup/hud_logic files); (3) then Phase 6 (xtb Pipeline — QProcess smoke gates it) or Phase 7
 Date convention: planning-doc dates are UTC (git commit dates authoritative) — the dev shell is HKT (UTC+8); never stamp from the local date.
