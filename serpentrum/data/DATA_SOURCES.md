@@ -60,6 +60,19 @@ statement. Human approval covers this license note.
   `has_repository_copy: false`; RSC 403): any statement of a 3.3 Å lower
   bound or a 3.4 Å value. DO NOT SHIP either number unless a human verifies
   them from an authorized full-text copy.
+- SCOPE CAVEAT (added 2026-09-20, owner review): per the title, Janiak's
+  corpus is π-stacking in **metal complexes with aromatic nitrogen-containing
+  ligands** — crystalline coordination compounds, not free neutral
+  hydrocarbons. Transferability of the ~20° / ≤3.8 Å figures to (a) free
+  small-molecule aromatics and (b) **aqueous / solution-phase conditions**
+  (solvent screening, hydration, conformational freedom) is NOT verified
+  from this source. The shipped 3.60 Å value does not rest on Janiak alone:
+  it is pinned primarily by the measured CC0 COD organic structures
+  (3.555/3.570/3.580 Å above); Janiak supplies the qualitative rule
+  (parallel-displaced, ~20° off-normal). TODO before any solution-phase or
+  "real-world geometry" claim in docs/help (Phase 8 audit): check the
+  geometry in aqueous/solvated conditions (e.g. via a verified solution-phase
+  study or an explicit crystalline-state framing in the UI text).
 - License: © Royal Society of Chemistry. Cited, not redistributed.
 
 ### [COD4003564] Phenanthrene·TCNB cocrystal — measured mixed π-stack  [VERIFIED]
@@ -115,6 +128,10 @@ info box. (COD entries 7238223/5000168 carry clean public-domain headers;
 - "3.4 Å": UNVERIFIED — no accessible source states it.
 - Biphenyl: no neat-crystal measurement available in COD (absent); biphenyl
   uses the set's generic approved rule, labeled idealized.
+- Janiak 2000 scope transferability (metal-complex crystal corpus → free
+  aromatics / aqueous conditions): NOT verified — see the SCOPE CAVEAT under
+  [JAN2000]; open TODO for Phase 8 (aqueous/solution geometry check or
+  explicit crystalline-state framing in UI text).
 - PubChem-specific license page: 404 this session; NCBI policy page used.
 
 ## 4. Precision note

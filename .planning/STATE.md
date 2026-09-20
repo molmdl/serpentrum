@@ -92,6 +92,7 @@ Recent decisions affecting current work:
 - ~~Phase 5 design note (biphenyl WALL refuse at display_z 5.0)~~ SUPERSEDED 2026-09-20 by d33f74c: REFUSE_WALL placement gate removed entirely; biphenyl's refuse path is now REFUSE_ATOM clash (1.87 Å — the STACK-05 demonstrator); placed z-extent is no longer gated.
 - Phase 6 calibration pending: QProcess-in-conda smoke, ~100-atom `--ohess` wall time, OMP env (`[TRAIN]`) — Phase 6 can run parallel with Phases 4-5 (depends only on Phase 2).
 - Demo-data FULL DATA_SOURCES.md checklist sign-off (all molecules + attribution) remains Phase 8-gated — Set A data placement is done (03-05), not the full DATA-02/04 approval.
+- **2026-09-20 (owner flag):** Janiak 2000 scope transferability — SCOPE CAVEAT added to DATA_SOURCES.md [JAN2000]: its corpus is metal-complex crystal structures (N-ligands), not free neutral hydrocarbons; aqueous/solution-phase geometry NOT verified. Shipped 3.60 Å is pinned by the measured CC0 COD organics (Janiak supplies only the qualitative ~20° parallel-displaced rule). Phase 8 TODO: check geometry in aqueous/solvated conditions (verified solution-phase study) or use explicit crystalline-state framing in UI/help text.
 - `tmp/upload_test/` holds the human-checkpoint upload test files (reject_4_rings.sdf tetracene C18H12, reject_no_h.sdf, accept_naphthalene.sdf, accept_benzene.mol2) — gitignored, disposable, regenerate per 03-08-SUMMARY if needed.
 
 ### Blockers/Concerns
