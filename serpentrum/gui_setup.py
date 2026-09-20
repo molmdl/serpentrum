@@ -57,9 +57,9 @@ _UPLOAD_SENTINEL = '__upload__'
 class SetupTab(QtWidgets.QWidget):
     """The Setup configuration form.
 
-    Five QGroupBox sections (Molecule set, Box, Head molecule, xtb, Win
-    cap) + a persistent status QLabel + three temporary buttons (Apply /
-    Show in Viewer, Cleanup, Start). collect_state()/apply_state()
+    Six QGroupBox sections (Molecule set, Box, Head molecule, xtb, Win
+    cap, Speed) + a persistent status QLabel + three temporary buttons
+    (Apply / Show in Viewer, Cleanup, Start). collect_state()/apply_state()
     round-trip is the established pattern: collect_state reads widgets
     into the setup dict; apply_state populates widgets from the dict. A
     _loading flag guards apply_state against cascading signal recompute.
@@ -126,6 +126,12 @@ class SetupTab(QtWidgets.QWidget):
         self.hessian_label.setStyleSheet('color: #cc6600;')
         self.hessian_label.hide()
 
+        # --- Speed section (Phase 5.1, plan 5.1-04; 1:1 box_combo
+        #     pattern copy over setup_logic.SPEED_TIERS) ---
+        self.speed_combo = QtWidgets.QComboBox(self)
+        for name, aps in setup_logic.SPEED_TIERS:
+            self.speed_combo.addItem('%s (%.1f A/s)' % (name, aps), aps)
+
         # --- Status label ---
         self.status_label = QtWidgets.QLabel('ready', self)
         self.status_label.setWordWrap(True)
@@ -138,7 +144,7 @@ class SetupTab(QtWidgets.QWidget):
         self.start_btn = QtWidgets.QPushButton('Start', self)
 
     def _build_layout(self):
-        """Arrange widgets into 5 QGroupBox sections + status + buttons."""
+        """Arrange widgets into 6 QGroupBox sections + status + buttons."""
         layout = QtWidgets.QVBoxLayout(self)
 
         # --- Molecule set group (QVBoxLayout: upload row needs
@@ -190,6 +196,13 @@ class SetupTab(QtWidgets.QWidget):
         cap_form.addRow('', self.hessian_label)
         layout.addWidget(cap_group)
 
+        # --- Speed group (Phase 5.1, plan 5.1-04; appended AFTER the
+        #     Win cap group as a new sibling section) ---
+        speed_group = QtWidgets.QGroupBox('Speed', self)
+        speed_form = QtWidgets.QFormLayout(speed_group)
+        speed_form.addRow('Tier:', self.speed_combo)
+        layout.addWidget(speed_group)
+
         # --- Status label ---
         layout.addWidget(self.status_label)
 
@@ -214,6 +227,7 @@ class SetupTab(QtWidgets.QWidget):
         self.upload_path_field.textChanged.connect(self._refresh_status)
         self.win_cap_spin.valueChanged.connect(self._on_cap_changed)
         self.win_cap_spin.valueChanged.connect(self._refresh_status)
+        self.speed_combo.currentIndexChanged.connect(self._refresh_status)
         self.apply_btn.clicked.connect(self._on_apply)
         self.cleanup_btn.clicked.connect(self._on_cleanup)
         self.start_btn.clicked.connect(self._on_start)
@@ -226,9 +240,11 @@ class SetupTab(QtWidgets.QWidget):
         """Read all widgets into the setup dict and write back to the anchor.
 
         The demo combo's '__upload__' sentinel maps to the last real set
-        (self._last_real_set) so the dict stays valid. Non-widget fields
-        (schema_version, atom_budget, broadening_fwhm, speed) are
-        preserved from the existing dict via a shallow copy.
+        (self._last_real_set) so the dict stays valid. Speed is
+        widget-written via the tier combo (Phase 5.1, plan 5.1-04). The
+        remaining non-widget fields (schema_version, atom_budget,
+        broadening_fwhm) are preserved from the existing dict via a
+        shallow copy.
         """
         setup = dict(self._setup)
         source = self.demo_combo.currentData()
@@ -240,6 +256,9 @@ class SetupTab(QtWidgets.QWidget):
         box = self.box_combo.currentData()
         if box is not None:
             setup['box_preset'] = box
+        speed = self.speed_combo.currentData()
+        if speed is not None:
+            setup['speed'] = speed
         head = self.head_combo.currentData()
         if head is not None:
             setup['head_molecule'] = head
@@ -273,6 +292,17 @@ class SetupTab(QtWidgets.QWidget):
         idx = self.box_combo.findData(box)
         if idx >= 0:
             self.box_combo.setCurrentIndex(idx)
+        # Speed tier (Phase 5.1, plan 5.1-04). Loaded non-tier values
+        # (e.g. hand-edited 50.0) fall back to the DEFAULT tier; the
+        # dict keeps the custom value until the next collect_state
+        # normalizes it (house fallback semantics).
+        idx = self.speed_combo.findData(
+            setup.get('speed', setup_logic.DEFAULTS['speed']))
+        if idx < 0:
+            idx = self.speed_combo.findData(setup_logic.DEFAULTS['speed'])
+        if idx < 0:
+            idx = 0
+        self.speed_combo.setCurrentIndex(idx)
         # Head molecule (fallback Random if not in the combo).
         head = setup.get('head_molecule', 'random')
         idx = self.head_combo.findData(head)
