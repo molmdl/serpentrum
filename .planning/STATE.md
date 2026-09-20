@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
-**Current focus:** Phase 5 — Stacking & Game Rules (16/16 plans executed; 05-VERIFICATION passed 15/15 machine-checked; 05-16 human checkpoint MID-FLIGHT — user re-test pending after 2026-09-19 gameplay-override fixes)
+**Current focus:** Phase 5 — Stacking & Game Rules (16/16 plans executed; 05-VERIFICATION passed 15/15 machine-checked; 05-16 checkpoint FINAL PASS — all gameplay verified across rounds 1-6; open: upload-only-endless debug item → Phase 5.1 → one confirmation game; queue in HANDOFF-2026-09-20-phase5-resume.md)
 
 ## Current Position
 
@@ -78,11 +78,15 @@ Recent decisions affecting current work:
 - **2026-09-19d (owner directive + upload-path fixes, 05-16 re-test round 4):** (a) REFUSE_WALL placement gate REMOVED entirely — stacked chain may extend past the box on any axis; only the HEAD is box-bound (GAME-05 crash intact); REFUSE_ATOM clash gate untouched and remains the STACK-05 demonstrator (biphenyl 1.87 A); cooldown now fires only on genuine clash streaks (near-wall deadlock class structurally gone). (b) Upload path fixed: skip taxonomy pre-resolved BEFORE any geometry (uploads never inherit dataset entries per 03-04 -> clean `skipped <name>: no verified stacking entry` + (xN) coalescing; the `NoneType has no len()` placement crash is structurally impossible now; skips never feed the exhaust streak) + upload molecules WITH a canonical planar 6-ring render EDGE-ON like the demo set (incl. upload head); ring-less/non-planar uploads fall back to as-stored. Round-4 human verdicts so far: Get Spectra PASS (win ending; crash ending approved round 3). (d33f74c/93f4b2b/22b7245/3f89779; 630 tests)
 - **2026-09-18 (checkpoint fixes within 05-16):** perpendicular-stack root cause = _reset_head_viewer double-applied edge_on_m16 (displayed head ring normal 90.00° off placed slabs while looking edge-on) → pymol_bridge.reload_head (fresh load + edge-on once); SPANOFFS/PLANEPAR smoke steps pin viewer spawn-offset algebra + plane parallelism (old checks were distance-only — why the bug was invisible; tracer added: SRP_DEBUG=1 capture lines `dot=1.000000 d=3.6000` + per-event steering lines; ghost-point cascade explained = same-dir + 180° silently dropped by design + one real chain-vs-wall veto (now overridden per (b) above); gates at the time: 575 → 593 → 603 unittests
 
+### Roadmap Evolution
+
+- 2026-09-20: **Phase 5.1 (Game Speed / Difficulty, GAME-11) inserted after Phase 5** (URGENT — owner playtesting feedback "current speed is easy, kinda slow even with small box"); directory .planning/phases/5.1-game-speed-difficulty/; coverage 44 -> 45; plan ONLY after Phase 5 wrap so its plans don't tangle Phase 5 verification; draft tiers relaxed ~2.0 / normal 3.0 (default) / fast ~4.5 / expert ~6.0 A/s — owner feel-check finalizes. Distinct from v2 GAME-10-v2 (speed-vs-length, still deferred).
+
 ### Pending Todos
 
 - **Phase 5 leftover (05-16 checkpoint, owner-paused 2026-09-20):** all gameplay items verified across rounds 1-6; only the upload-only endless-run design gap remains (debug session); close-out sequence per HANDOFF-2026-09-20-phase5-resume.md: debug fix -> Phase 5.1 -> one confirmation game -> SUMMARY -> verifier -> wrap-up.
 - ~~Adjacent observation (old srp_seg_* decay on Restart)~~ RESOLVED 2026-09-20 in 56dd68b (begin_game hard-cleans all srp_* before materializing).
-- Phase 5 design note (05-05-SUMMARY): at display_z 5.0, biphenyl refuses as WALL (placed z-extent 6.914 Å) — still the designed refuse path; unchanged by the head-only turn veto (that veto is the turn pre-check, the z check is the placement gate).
+- ~~Phase 5 design note (biphenyl WALL refuse at display_z 5.0)~~ SUPERSEDED 2026-09-20 by d33f74c: REFUSE_WALL placement gate removed entirely; biphenyl's refuse path is now REFUSE_ATOM clash (1.87 Å — the STACK-05 demonstrator); placed z-extent is no longer gated.
 - Phase 6 calibration pending: QProcess-in-conda smoke, ~100-atom `--ohess` wall time, OMP env (`[TRAIN]`) — Phase 6 can run parallel with Phases 4-5 (depends only on Phase 2).
 - Demo-data FULL DATA_SOURCES.md checklist sign-off (all molecules + attribution) remains Phase 8-gated — Set A data placement is done (03-05), not the full DATA-02/04 approval.
 - `tmp/upload_test/` holds the human-checkpoint upload test files (reject_4_rings.sdf tetracene C18H12, reject_no_h.sdf, accept_naphthalene.sdf, accept_benzene.mol2) — gitignored, disposable, regenerate per 03-08-SUMMARY if needed.
