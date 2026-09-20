@@ -176,9 +176,17 @@ Notes: The clash gate is a game rule, not a spectra afterthought (a clashing app
   2. The selected speed applies at GO! and stays constant for the whole run; Restart keeps the selection. [GAME-11]
   3. Save Setup → Load Setup reproduces the chosen speed; setup files written before this feature load with the default tier (schema backcompat). [GAME-11]
   4. A live human feel-check approves the final tier values (checkpoint). [GAME-11]
-**Plans**: TBD (expected 2–3; pure speed parameter + schema backcompat ∥ Setup UI + persistence wiring ∥ gates + feel-check checkpoint — parallelizable)
+**Plans**: 6 plans (3 waves; 2026-09-20 — planned per owner directive; STATE's "plan 5.2 first" superseded by the owner's explicit /gsd-plan-phase 5.1)
 
-Notes: Inserted per owner playtesting feedback 2026-09-20 ("current speed is easy, kinda slow even with small box"). Draft tiers for planning (at the 100 ms tick): relaxed ≈ 2.0 Å/s, normal = 3.0 Å/s (current), fast ≈ 4.5 Å/s, expert ≈ 6.0 Å/s — final values approved by the owner at the feel-check. Distinct from v2 GAME-10-v2 (speed increasing with snake length — still deferred). **Plan AFTER Phase 5 wrap-up** so these plans don't tangle Phase 5's verification.
+Plans:
+- [ ] 5.1-01-PLAN.md — TDD engine `speed_a_per_s` trailing kwarg + per-tier/determinism tests (Wave 1, parallel)
+- [ ] 5.1-02-PLAN.md — TDD SPEED_TIERS table + merge_defaults backcompat + speed_tier_for (Wave 1, parallel)
+- [ ] 5.1-03-PLAN.md — TDD hud_logic.speed_note pure builder (Wave 1, parallel)
+- [ ] 5.1-04-PLAN.md — Setup-tab Speed QGroupBox + tier combo, box_combo pattern (Wave 2, parallel)
+- [ ] 5.1-05-PLAN.md — _build_engine injection + once-per-run speed note (Wave 2, parallel)
+- [ ] 5.1-06-PLAN.md — pure integration chain + gates + owner feel-check checkpoint (Wave 3, blocking)
+
+Notes: Inserted per owner playtesting feedback 2026-09-20 ("current speed is easy, kinda slow even with small box"). Draft tiers for planning (at the 100 ms tick): relaxed ≈ 2.0 Å/s, normal = 3.0 Å/s (current), fast ≈ 4.5 Å/s, expert ≈ 6.0 Å/s — final values approved by the owner at the feel-check (5.1-06 Task 2; values are data-only edits in setup_logic.SPEED_TIERS). Distinct from v2 GAME-10-v2 (speed increasing with snake length — still deferred). Planned 2026-09-20 after Phase 5 wrap-up via 2 parallel researchers (engine-speed plumbing / Setup-UI persistence) → 6 focused plans; shared-file sequencing with 5.2 handled by symbol-anchored plans + merge_defaults reuse-or-add executor note. Execution order with 5.2 remains sequential (no parallel waves across 5.2/5.1).
 
 ### Phase 5.2: Generic Upload Stacking Consent *(INSERTED 2026-09-20 — urgent insertion, owner request; promotes v2 STACK-06 into v1)*
 
