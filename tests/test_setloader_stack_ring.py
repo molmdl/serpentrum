@@ -30,6 +30,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from serpentrum import molfile  # noqa: E402
+from serpentrum import orientation  # noqa: E402
 from serpentrum import setloader  # noqa: E402
 from serpentrum import stacking  # noqa: E402
 
@@ -198,6 +199,54 @@ class TestUploadStackRing(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertNotIn('stack_ring', records[0])
         self.assertEqual(records[0]['set'], '__upload__')
+
+
+class TestUploadEdgeOn(unittest.TestCase):
+    """fix G2/G3 (2026-09-20c, upload edge-on): an edge-on m16 is
+    produced from a planar-6-ring upload record via the SAME pure
+    machinery the demo seams use; ring-less or non-planar-ring uploads
+    fall back to None (as-stored orientation, documented)."""
+
+    def test_planar_ring_upload_produces_edge_on_m16(self):
+        path = os.path.join(FIXTURES, 'benzene.mol2')
+        records, errors = setloader.load_upload(
+            path, setloader.default_stacking_path())
+        self.assertEqual(errors, [])
+        record = records[0]
+        self.assertIn('stack_ring', record)
+        parsed = molfile.read_mol2(record['file'])[0]
+        m16 = orientation.edge_on_m16(
+            parsed['elements'], parsed['coords'], record['stack_ring'])
+        self.assertEqual(len(m16), 16)
+        for value in m16:
+            self.assertIsInstance(value, float)
+        # The canonicalization is real: the raw fixture lies FLAT in xy
+        # (z-span 0.0) while the edge-on pose stands the ring up to its
+        # in-plane diameter — the exact transform _pickup_m16 /
+        # reload_head build from it (matrix_rt(R_edge, t, pre)).
+        raw_zs = [c[2] for c in parsed['coords']]
+        self.assertEqual(max(raw_zs), min(raw_zs))  # fixture: flat
+        edges = orientation.edge_on_atoms(
+            parsed['elements'], parsed['coords'], record['stack_ring'])
+        edge_zs = [a[3] for a in edges]
+        self.assertAlmostEqual(
+            max(edge_zs) - min(edge_zs), 4.314, places=3)
+
+    def test_ringless_upload_edge_on_fallback_is_none(self):
+        parsed = molfile.read_sdf(os.path.join(FIXTURES, 'methane.sdf'))
+        self.assertIsNone(setloader._upload_stack_ring(parsed[0]))
+
+    def test_nonplanar_ring_upload_edge_on_fallback_is_none(self):
+        # A non-planar 6-ring (benzene with one ring atom pulled 0.5 A
+        # off the plane — past the 0.15 A tolerance) must NOT produce a
+        # stack_ring: the GUI seams would raise in edge_on_* otherwise.
+        source = molfile.read_sdf(
+            os.path.join(FIXTURES, 'benzene_naphthalene.sdf'))[0]
+        record = dict(source)
+        coords = list(source['coords'])
+        coords[0] = (coords[0][0], coords[0][1], coords[0][2] + 0.5)
+        record['coords'] = coords
+        self.assertIsNone(setloader._upload_stack_ring(record))
 
 
 if __name__ == '__main__':

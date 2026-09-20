@@ -29,6 +29,10 @@ verdicts are flushed sentinels grepped by tests/run_gates.py --smoke:
                          cleanup_srp BEFORE materialize on Restart --
                          stale chain/pickup leftovers purged, fresh
                          box + canonical edge-on head rebuilt
+    SMOKE-OK UPLEDGEON   2026-09-20c fix G2: an UPLOAD record with a
+                         planar 6-ring carries stack_ring at load and
+                         renders EDGE-ON through the shipping bridge
+                         path (viewer z-span == pure edge-on span)
     SMOKE-FAIL <step>    a step failed (traceback follows, sentinel withheld)
     SMOKE-08 DONE        the script reached the end (any state)
 
@@ -440,6 +444,44 @@ def s_sceneclr():
         'rebuilt head ring centroid %r != origin' % (c1,)
 
 
+def s_upledgeon():
+    """UPLEDGEON: upload edge-on parity (2026-09-20c fix G2).
+
+    A benzene file loaded through setloader.load_upload (the game-3
+    upload-only path) now carries stack_ring at load when a canonical
+    planar 6-ring resolves -- the '__upload__' skip keying is untouched
+    (set sentinel + has_stack_entry=False; the capture skip keys on the
+    missing DATASET entry, never the ring). The upload then renders
+    through the SAME edge-on bridge path as demo records: load + ONE
+    edge_on_m16 + the viewer z-span == the pure edge_on_atoms z-span
+    (and the 4.297 A research anchor)."""
+    records, errors = setloader.load_upload(
+        BENZENE, setloader.default_stacking_path())
+    assert errors == [], errors
+    record = records[0]
+    assert record['set'] == '__upload__'
+    assert not record['has_stack_entry']
+    assert 'stack_ring' in record, \
+        'upload record lost stack_ring (fix G2 regression)'
+    ring = record['stack_ring']
+    parsed = molfile.read_sdf(record['file'])[0]
+    m16 = orientation.edge_on_m16(
+        parsed['elements'], parsed['coords'], ring)
+    pymol_bridge.load_molecule(record['file'], 'srp_pickup_upload')
+    pymol_bridge.apply_matrix('srp_pickup_upload', m16)
+    (zmin, zmax) = (cmd.get_extent('srp_pickup_upload')[0][2],
+                    cmd.get_extent('srp_pickup_upload')[1][2])
+    viewer_z = zmax - zmin
+    pure = orientation.edge_on_atoms(
+        parsed['elements'], parsed['coords'], ring)
+    pure_z = (max(a[3] for a in pure) - min(a[3] for a in pure))
+    assert abs(viewer_z - pure_z) <= 1e-3, \
+        'upload viewer z-span %.5f != pure z-span %.5f' % (viewer_z,
+                                                           pure_z)
+    assert abs(viewer_z - 4.297) <= 2e-3, \
+        'upload viewer z-span %.5f != 4.297 research anchor' % viewer_z
+
+
 for _name, _fn in [
     ('EDGEON', s_edgeon),
     ('PLACE360', s_place360),
@@ -448,6 +490,7 @@ for _name, _fn in [
     ('HEADRESET', s_headreset),
     ('PICKUPS', s_sticks),
     ('SCENECLR', s_sceneclr),
+    ('UPLEDGEON', s_upledgeon),
 ]:
     check(_name, _fn)
 

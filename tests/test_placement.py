@@ -601,6 +601,44 @@ class TestResolveOrchestrator(_FixtureBase):
         self.assertEqual(outcome, {'status': 'skipped',
                                    'code': placement.SKIP_NO_ENTRY})
 
+    def test_upload_capture_with_stack_ring_still_skips_no_entry(self):
+        # 2026-09-20c fix G2 world: uploads with a planar 6-ring now
+        # CARRY stack_ring (the edge-on display enabler). The capture
+        # must STILL skip SKIP_NO_ENTRY — the skip keying is the missing
+        # dataset entry (has_stack_entry), NEVER the ring. (The
+        # info-line wording for this code is pinned in
+        # tests/test_hud_content.py: 'skipped <name>: no verified
+        # stacking entry ...'.)
+        upload_rec = {'set': '__upload__', 'has_stack_entry': False,
+                      'stack_ring': list(_BENZENE_RING),
+                      'atoms': self.benzene_raw}
+        outcome = placement.resolve(
+            upload_rec, self.records_by_id, self.stacking_data,
+            self.head, _BENZENE_RING, _HEADING_EAST,
+            [], _xyz(self.head),
+            _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
+        self.assertEqual(outcome, {'status': 'skipped',
+                                   'code': placement.SKIP_NO_ENTRY})
+
+    def test_skip_never_touches_geometry_ringless_head(self):
+        # The G1 live-crash regression pin ('placement error: object of
+        # type NoneType has no len()' repeating every few ticks in an
+        # upload-only game): resolve() must reach the skip outcome
+        # WITHOUT any geometry — head_stack_ring=None and an empty chain
+        # must not raise (ANY tail-frame access would call
+        # stacking.ring_frame(atoms, None) -> len(None) TypeError). The
+        # GUI additionally pre-resolves the taxonomy before its
+        # SRP_DEBUG tail frame (gui_game._handle_stack_event).
+        upload_rec = {'set': '__upload__', 'has_stack_entry': False,
+                      'atoms': self.benzene_raw}
+        outcome = placement.resolve(
+            upload_rec, self.records_by_id, self.stacking_data,
+            [], None, _HEADING_EAST,
+            [], [],
+            _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
+        self.assertEqual(outcome, {'status': 'skipped',
+                                   'code': placement.SKIP_NO_ENTRY})
+
     def test_out_of_box_placement_now_places(self):
         # 2026-09-20c owner directive: head parked 10 A west — the 3.6 A
         # stack lands past the -x face (the old REFUSE_WALL case). With
