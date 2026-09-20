@@ -156,6 +156,27 @@ def stack_mode_note(records):
             'practice steering; only a crash ends the run')
 
 
+def speed_note(tier_name, speed):
+    """The once-per-run speed info-box line (plan 5.1-03).
+
+    No setup value surfaces in the Game-tab HUD today: the tier the
+    user picked on the Setup tab is invisible during play. begin_game
+    logs this ONE line per run (Start or Restart -- never per tick,
+    never per capture) naming the tier and its A/s value, on the
+    stack_mode_note precedent (pure builder, GUI logs once).
+
+    tier_name: resolved by the CALLER via setup_logic.speed_tier_for
+    (exact tier match, else 'custom' for hand-tuned speeds); hud_logic
+    only renders sentences and never imports setup_logic. speed always
+    exists (setup validation guarantees a number > 0), so there is no
+    None case -- unlike stack_mode_note. ASCII 'A/s' (house style).
+    GAME-04 hidden-counts policy untouched: the line carries ONLY the
+    user-chosen tier + speed, never a molecule/atom count.
+    """
+    return ('speed: %s (%.1f A/s) - steering cadence and turn time '
+            'are unchanged' % (tier_name, speed))
+
+
 def completion_lines(result, molecules, snake_molecules, atoms_total):
     """The four completion summary lines (GAME-09 / SPECTRA-06).
 

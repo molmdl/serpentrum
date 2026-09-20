@@ -52,6 +52,7 @@ Discovery command (python3.6 — no '-t .' on non-package start dir):
 """
 import math
 import os
+import re
 import sys
 import unittest
 
@@ -579,6 +580,62 @@ class TestStackModeNote(unittest.TestCase):
         self.assertEqual(source.count('stack_mode_note('), 1,
                          'exactly one stack_mode_note call site '
                          '(begin_game, once per run)')
+
+
+class TestSpeedNote(unittest.TestCase):
+    """speed_note: the once-per-run speed info-box line (plan 5.1-03).
+
+    No speed display exists anywhere in the HUD today; begin_game logs
+    this builder's line ONCE per run (Start or Restart - the plan 5.1-05
+    wiring point) naming the tier and its A/s value so the choice is
+    visible without a counter. GAME-04 hidden-counts policy untouched:
+    the line carries the user-chosen tier + speed ONLY - never a
+    molecule/atom count. The tier name comes from the caller
+    (setup_logic.speed_tier_for: exact match or 'custom'); speed always
+    exists, so there is no None case (unlike stack_mode_note).
+    """
+
+    SUFFIX = ' - steering cadence and turn time are unchanged'
+
+    def test_normal_tier_exact(self):
+        self.assertEqual(
+            hud_logic.speed_note('normal', 3.0),
+            'speed: normal (3.0 A/s)' + self.SUFFIX)
+
+    def test_fast_and_expert_tiers_exact(self):
+        self.assertEqual(
+            hud_logic.speed_note('fast', 4.5),
+            'speed: fast (4.5 A/s)' + self.SUFFIX)
+        # %.1f always renders one decimal: expert 6.0 -> '6.0'.
+        self.assertEqual(
+            hud_logic.speed_note('expert', 6.0),
+            'speed: expert (6.0 A/s)' + self.SUFFIX)
+
+    def test_custom_speed_surfaces_honestly(self):
+        # Hand-tuned speeds render with the 'custom' tier name.
+        self.assertEqual(
+            hud_logic.speed_note('custom', 3.2),
+            'speed: custom (3.2 A/s)' + self.SUFFIX)
+
+    def test_trailing_decimal_always_rendered(self):
+        # '2.0', never '2' (the relaxed tier's round value).
+        line = hud_logic.speed_note('relaxed', 2.0)
+        self.assertIn('(2.0 A/s)', line)
+        self.assertNotIn('(2 A/s)', line)
+
+    def test_count_free_game_04_guard(self):
+        # GAME-04 guard: every line matches the exact template with
+        # ONLY (tier, value) substituted - no other digit-run that
+        # could read as a hidden molecule/atom count, one line only.
+        shape = re.compile(
+            r'^speed: [a-z]+ \([0-9]+\.[0-9] A/s\)'
+            r' - steering cadence and turn time are unchanged$')
+        for tier, speed in [('relaxed', 2.0), ('normal', 3.0),
+                            ('fast', 4.5), ('expert', 6.0),
+                            ('custom', 3.2)]:
+            line = hud_logic.speed_note(tier, speed)
+            self.assertIsNotNone(shape.match(line), line)
+            self.assertNotIn('\n', line)
 
 
 class TestDebugSpawnCooldown(unittest.TestCase):
