@@ -34,6 +34,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **GAME-08**: Snake speed is constant for v1
 - [ ] **GAME-09**: On completion (win or crash): viewer clears, camera focuses the completed snake, info box shows snake length + total score (molecule count), and "Get Spectra" activates
 - [ ] **GAME-10**: Turning rotates the entire chain as a rigid body (stacking geometry immutable at all times); a turn whose sweep would collide with the boundary or body is refused; 180° reversal is forbidden
+- [ ] **GAME-11**: Setup tab offers a game speed/difficulty selector with named tiers (speed constant within a run per GAME-08); the choice persists via Save/Load Setup; default = the v1 baseline speed (3.0 Å/s) *(inserted 2026-09-20 with Phase 5.1 — owner playtesting feedback)*
 
 ### Molecular Stacking
 
@@ -140,6 +141,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GAME-08 | Phase 4 | Complete |
 | GAME-09 | Phase 5 | Pending |
 | GAME-10 | Phase 5 | Pending |
+| GAME-11 | Phase 5.1 | Pending |
 | STACK-01 | Phase 5 | Pending |
 | STACK-02 | Phase 2 | Complete |
 | STACK-03 | Phase 5 | Pending |
@@ -168,8 +170,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCS-05 | Phase 8 | Pending |
 
 **Coverage:**
-- v1 requirements: 44 total
-- Mapped to phases: 44
+- v1 requirements: 45 total (44 original + GAME-11 inserted with Phase 5.1, 2026-09-20)
+- Mapped to phases: 45
 - Unmapped: 0 ✓
 
 > Count corrected from 41 → 44 during roadmap creation (2026-09-06): the listed ID ranges (SETUP-01..08, GAME-01..10, STACK-01..05, SPECTRA-01..06, DATA-01..04, INFRA-01..06, DOCS-01..05) sum to 44. Each requirement maps to exactly one phase — see ROADMAP.md for phase goals and success criteria.
@@ -177,3 +179,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 ---
 *Requirements defined: 2026-09-06*
 *Last updated: 2026-09-14 — Phase 4 complete (verified 40/40 must-haves): GAME-01, GAME-02, GAME-03, GAME-07, GAME-08 marked Complete*
+*2026-09-20 — GAME-11 added (Phase 5.1 inserted): Setup-selectable game speed/difficulty, constant per run (GAME-08 intact), persisted, default = baseline 3.0 Å/s. Coverage 44 → 45. GAME-10 behavior note: 05-16 checkpoint owner overrides amended the in-run turn model (turn pre-check refuses 180° only; REFUSE_WALL placement gate removed; chain may extend outside the box — only the head is box-bound) — statuses to be finalized at Phase 5 completion.*

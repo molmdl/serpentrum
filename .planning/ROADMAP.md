@@ -2,7 +2,7 @@
 
 **Created:** 2026-09-06
 **Depth:** comprehensive (8 phases)
-**Coverage:** 44/44 v1 requirements mapped — 0 unmapped, 0 duplicated (count corrected from 41; see Coverage note)
+**Coverage:** 45/45 v1 requirements mapped — 0 unmapped, 0 duplicated (44 original after the 41→44 count correction + GAME-11 inserted with Phase 5.1, 2026-09-20)
 
 ## Overview
 
@@ -21,6 +21,7 @@ A PyMOL plugin game: steer a molecular head around a bounded box, stack real sma
 - [x] **Phase 3: Molecules in the Viewer & Setup Tab** - Configure a game in the Setup tab; box + head molecule materialize in the viewer; uploads gated *(research C)*
 - [x] **Phase 4: Game Loop & Input** - Arrow-key steered movement on a 2D locked-camera plane with countdown, HUD, pause/restart *(research D — input spike)*
 - [ ] **Phase 5: Stacking & Game Rules Complete** - Pickups stack at cited geometry; rigid-pivot turns; collisions end runs; win/crash both reach spectra *(research E)*
+- [ ] **Phase 5.1: Game Speed / Difficulty (INSERTED 2026-09-20)** - Setup-selectable constant speed tier (difficulty), persisted; baseline 3.0 Å/s unchanged *(owner insertion — playtesting feedback)*
 - [ ] **Phase 6: xtb Pipeline** - Async cancellable `xtb --ohess` with verified success contract and calibrated atom-budget guard *(research F — parallel track)*
 - [ ] **Phase 7: Spectra UI** - Broadened IR plot, clickable frequency table → static mode vectors, streaming log, saveable plot *(research G)*
 - [ ] **Phase 8: Demo Data, Docs & Release Audit** - Human-approved Set A + attribution, 6-button setup persistence, help/docs, end-to-end audit *(research H)*
@@ -164,6 +165,20 @@ Plans:
 
 Notes: The clash gate is a game rule, not a spectra afterthought (a clashing append makes xtb infer covalent bonds → garbage hessian; π-stack at 3.4 Å verified safe `[RUN]`). `transform_selection` matrix layout + one-call rigid sweep + placement exactness are researcher-VERIFIED (05-RESEARCH-pymol-mechanics.md) — plans wire them as-is, smokes replicate the probes as regression. Biphenyl ships with rings at 90° → every biphenyl stack clashes → it is the designed refuse-path demonstrator (data observation recorded, not fixed). Edge-on orientation lands at materialization BEFORE any stacking (locked 03-08 + 04-07). Avoids Pitfalls 9, 10, 4-restore, 11-aggregation.
 
+### Phase 5.1: Game Speed / Difficulty *(INSERTED 2026-09-20 — urgent insertion, owner request)*
+
+**Goal**: The Setup tab offers a game speed/difficulty selector; the chosen speed is constant within a run (GAME-08 intact) and persists via Save/Load Setup — the current baseline (0.3 Å/tick = 3.0 Å/s) remains the default tier.
+**Depends on**: Phase 5
+**Requirements**: GAME-11
+**Success Criteria** (what must be TRUE):
+  1. Setup tab shows a speed/difficulty selector with named tiers; default = the v1 baseline speed. [GAME-11]
+  2. The selected speed applies at GO! and stays constant for the whole run; Restart keeps the selection. [GAME-11]
+  3. Save Setup → Load Setup reproduces the chosen speed; setup files written before this feature load with the default tier (schema backcompat). [GAME-11]
+  4. A live human feel-check approves the final tier values (checkpoint). [GAME-11]
+**Plans**: TBD (expected 2–3; pure speed parameter + schema backcompat ∥ Setup UI + persistence wiring ∥ gates + feel-check checkpoint — parallelizable)
+
+Notes: Inserted per owner playtesting feedback 2026-09-20 ("current speed is easy, kinda slow even with small box"). Draft tiers for planning (at the 100 ms tick): relaxed ≈ 2.0 Å/s, normal = 3.0 Å/s (current), fast ≈ 4.5 Å/s, expert ≈ 6.0 Å/s — final values approved by the owner at the feel-check. Distinct from v2 GAME-10-v2 (speed increasing with snake length — still deferred). **Plan AFTER Phase 5 wrap-up** so these plans don't tangle Phase 5's verification.
+
 ### Phase 6: xtb Pipeline *(research phase F — parallel track, largely de-risked)*
 
 **Goal**: The final snake can be handed to a real, cancellable, async `xtb --ohess` run with a verified success contract and a calibrated atom-budget guard — while the UI never blocks.
@@ -230,14 +245,14 @@ Wave 5:  Phase 8                              (needs Phases 5–7 + approvals re
 | Category | Requirements | Phases |
 |----------|--------------|--------|
 | Setup & Configuration | SETUP-01..08 | 1, 3, 8 |
-| Gameplay | GAME-01..10 | 4, 5 |
+| Gameplay | GAME-01..11 | 4, 5, 5.1 |
 | Molecular Stacking | STACK-01..05 | 2, 5 |
 | Spectra | SPECTRA-01..06 | 6, 7 |
 | Demo Data & Attribution | DATA-01..04 | 3, 8 |
 | Infrastructure & Environment | INFRA-01..06 | 1, 3 |
 | Documentation & Audit | DOCS-01..05 | 8 |
 
-**Total: 44/44 v1 requirements mapped — 0 unmapped, 0 duplicated.**
+**Total: 45/45 v1 requirements mapped — 0 unmapped, 0 duplicated** (44 original + GAME-11 via inserted Phase 5.1, 2026-09-20).
 
 > **Count note:** REQUIREMENTS.md previously said "41 total"; the listed ID ranges (SETUP-01..08, GAME-01..10, STACK-01..05, SPECTRA-01..06, DATA-01..04, INFRA-01..06, DOCS-01..05) sum to **44**. All 44 are mapped exactly once; REQUIREMENTS.md's Coverage block is corrected accordingly.
 
@@ -253,7 +268,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. Pure Core — Game & Chemistry Logic | 14/14 | Complete (verified 4/4 must-haves) | 2026-09-10 |
 | 3. Molecules in the Viewer & Setup Tab | 8/8 | Complete (verified 5/5 must-haves) | 2026-09-12 |
 | 4. Game Loop & Input | 9/9 | Complete (verified 5/5 must-haves) | 2026-09-14 |
-| 5. Stacking & Game Rules Complete | 0/16 | Not started | - |
+| 5. Stacking & Game Rules Complete | 0/16 | Executing — 16/16 plans executed, checkpoint 05-16 final pass (1 design item in debug) | - |
+| 5.1. Game Speed / Difficulty (INSERTED 2026-09-20) | 0/TBD | Not started (plan after Phase 5 wrap) | - |
 | 6. xtb Pipeline | 0/TBD | Not started | - |
 | 7. Spectra UI | 0/TBD | Not started | - |
 | 8. Demo Data, Docs & Release Audit | 0/TBD | Not started | - |
