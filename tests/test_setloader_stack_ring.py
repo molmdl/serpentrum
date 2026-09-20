@@ -1,12 +1,17 @@
 """stack_ring carry-through pins (locked decisions 5 + 7; plan 05-08).
 
 setloader computes ``stack_ring = molfile.ring_cycle(record)`` at load
-time via ``_build_record`` for DEMO records ONLY; upload records stay
-ring-less BY DESIGN (the skip policy keys on the absent ring, STACK-03,
-locked decision 7). Placement (05-05) and tail frames (05-11/05-13)
-index placed atoms 1:1 by ``stack_ring`` -- the indices alignment
-contract: the record's ``elements``/parsed ``coords`` order is the same
-order the ring indices were computed against.
+time via ``_build_record`` for DEMO records (plan 05-08) and -- since
+2026-09-20c (fix G2, upload edge-on) -- for UPLOAD records too, WHEN the
+molecule has a canonical PLANAR 6-ring (``_upload_stack_ring``; ring-less
+or non-planar-ring uploads stay ring-less and render as stored). The
+upload stack_ring is a DISPLAY field: the STACK-03 capture skip keys on
+the missing dataset entry (locked decision 7, the '__upload__' set
+sentinel -> has_stack_entry=False), NEVER on the absent ring. Placement
+(05-05) and tail frames (05-11/05-13) index placed atoms 1:1 by
+``stack_ring`` -- the indices alignment contract: the record's
+``elements``/parsed ``coords`` order is the same order the ring indices
+were computed against.
 
 Zero stubs; real shipped data (load_demo_set on the shipped Set A,
 upload fixtures from tests/fixtures/molfile/ -- the test_setloader.py
@@ -26,6 +31,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from serpentrum import molfile  # noqa: E402
 from serpentrum import setloader  # noqa: E402
+from serpentrum import stacking  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES = os.path.join(ROOT, 'tests', 'fixtures', 'molfile')
@@ -100,7 +106,11 @@ class TestDemoStackRing(unittest.TestCase):
 
 
 class TestUploadStackRing(unittest.TestCase):
-    """Upload records NEVER carry stack_ring (locked decision 7)."""
+    """2026-09-20c fix G2 (upload edge-on): upload records carry
+    stack_ring WHEN a canonical PLANAR 6-ring is resolvable at load
+    (``setloader._upload_stack_ring``); ring-less uploads stay ring-less.
+    The STACK-03 skip keying (locked decision 7) is untouched: the skip
+    keys on the missing dataset entry, never on the ring."""
 
     def _tmpdir(self):
         path = tempfile.mkdtemp(prefix='srp_stack_ring_test_')
@@ -113,10 +123,11 @@ class TestUploadStackRing(unittest.TestCase):
             handle.write(molfile.write_sdf_text(record))
         return path
 
-    def test_single_record_upload_has_no_stack_ring(self):
-        # Build a minimal single-record SDF (benzene -- a molecule WITH a
-        # 6-ring) in a tempdir: the ring exists, yet the record must stay
-        # ring-less -- omission is POLICY, not lack of a ring.
+    def test_single_record_upload_carries_stack_ring(self):
+        # Build a minimal single-record SDF (benzene -- a molecule WITH
+        # a planar 6-ring) in a tempdir: since fix G2 the ring is
+        # computed at load (the edge-on enabler), while the skip policy
+        # is untouched.
         source = molfile.read_sdf(
             os.path.join(FIXTURES, 'benzene_naphthalene.sdf'))
         path = self._write_sdf(self._tmpdir(), 'benzene_upload.sdf',
@@ -125,12 +136,23 @@ class TestUploadStackRing(unittest.TestCase):
             path, setloader.default_stacking_path())
         self.assertEqual(errors, [])
         self.assertEqual(len(records), 1)
-        self.assertNotIn('stack_ring', records[0])
+        self.assertIn('stack_ring', records[0])
+        ring = records[0]['stack_ring']
+        self.assertEqual(len(ring), 6)
+        self.assertEqual(len(set(ring)), 6)
+        for index in ring:
+            self.assertIsInstance(index, int)
+        # The ring is PROVABLY planar over the record's own file coords
+        # (the _upload_stack_ring planarity contract).
+        parsed = molfile.read_sdf(records[0]['file'])
+        self.assertEqual(len(parsed), 1)
+        stacking.ring_frame(parsed[0]['coords'],
+                            records[0]['stack_ring'])
         # Skip-policy keying intact: __upload__ matches no interaction.
         self.assertEqual(records[0]['set'], '__upload__')
         self.assertFalse(records[0]['has_stack_entry'])
 
-    def test_multi_record_split_upload_has_no_stack_ring(self):
+    def test_multi_record_split_upload_carries_stack_ring(self):
         path = os.path.join(FIXTURES, 'benzene_naphthalene.sdf')
         records, errors = setloader.load_upload(
             path, setloader.default_stacking_path())
@@ -139,16 +161,43 @@ class TestUploadStackRing(unittest.TestCase):
         self.addCleanup(shutil.rmtree,
                         os.path.dirname(records[0]['file']), True)
         for record in records:
-            self.assertNotIn('stack_ring', record)
+            self.assertIn('stack_ring', record)
             self.assertEqual(record['set'], '__upload__')
+            self.assertFalse(record['has_stack_entry'])
+            # Indices alignment contract holds per SPLIT file: the
+            # ring_frame proof indexes the split file's coords 1:1.
+            parsed = molfile.read_sdf(record['file'])
+            self.assertEqual(len(parsed), 1)
+            stacking.ring_frame(parsed[0]['coords'],
+                                record['stack_ring'])
 
-    def test_mol2_upload_has_no_stack_ring(self):
+    def test_mol2_upload_carries_stack_ring(self):
         path = os.path.join(FIXTURES, 'benzene.mol2')
         records, errors = setloader.load_upload(
             path, setloader.default_stacking_path())
         self.assertEqual(errors, [])
         self.assertEqual(len(records), 1)
+        self.assertIn('stack_ring', records[0])
+        ring = records[0]['stack_ring']
+        self.assertEqual(len(ring), 6)
+        self.assertEqual(len(set(ring)), 6)
+        for index in ring:
+            self.assertIsInstance(index, int)
+        # Alignment + planarity over the mol2 record's own coords.
+        parsed = molfile.read_mol2(records[0]['file'])
+        stacking.ring_frame(parsed[0]['coords'], ring)
+
+    def test_ringless_upload_stays_ringless(self):
+        # Methane (no rings) passes the gate but has no 6-ring to
+        # canonicalize: stack_ring stays OMITTED and the molecule
+        # renders in its as-stored orientation (fix G2 fallback).
+        path = os.path.join(FIXTURES, 'methane.sdf')
+        records, errors = setloader.load_upload(
+            path, setloader.default_stacking_path())
+        self.assertEqual(errors, [])
+        self.assertEqual(len(records), 1)
         self.assertNotIn('stack_ring', records[0])
+        self.assertEqual(records[0]['set'], '__upload__')
 
 
 if __name__ == '__main__':

@@ -167,8 +167,11 @@ def rebuild_scene(setup, records_by_id):
     (re-applying an m16 to an already-canonicalized object double-
     rotates the ring plane - the live-verified perpendicular-stack
     defect; the m16 encodes the transform OF THE RAW SDF COORDS).
-    Upload heads (no stack_ring) reload with m16=None, matching the
-    Apply path's head_m16=None parity. No resolvable head record ->
+    Upload heads (2026-09-20c fix G2): upload records now carry
+    stack_ring whenever a canonical planar 6-ring is resolvable at load,
+    so a ring-bearing upload head gets the SAME edge-on m16 a demo head
+    does; ring-less uploads reload with m16=None, matching the Apply
+    path's head_m16=None parity. No resolvable head record ->
     box-only scene (record=None parity with the old box-only seam).
 
     Module-level (not a GameTab method) so smoke/08 can pin the
@@ -475,7 +478,10 @@ class GameTab(QtWidgets.QWidget):
         (pymol_bridge._select_head_record; errors discarded - Apply
         already surfaced them). Returns (None, None) when the scene has
         no head (box-only Apply) or the record has no stack_ring
-        (uploads degrade flat, matching the Apply path). head_atoms are
+        (ring-less uploads degrade flat, matching the Apply path; since
+        2026-09-20c fix G2 uploads WITH a canonical planar 6-ring carry
+        stack_ring and take the full edge-on path like demo records).
+        head_atoms are
         edge_on_atoms EXTENT-CENTERED in pure math - the exact pose
         edge_on_m16 + place_head gives srp_head - so mirror == viewer.
         """
@@ -492,10 +498,11 @@ class GameTab(QtWidgets.QWidget):
         """Origin-centered (sym, x, y, z) mirror atoms for ONE record.
 
         The spawner/engine truth for this molecule BEFORE the spawn
-        centroid translate. Records WITH stack_ring (demo):
+        centroid translate. Records WITH stack_ring (demo; since
+        2026-09-20c fix G2 also ring-bearing uploads):
         edge_on_atoms (ring centroid at origin - the exact pose
         materialize_pickup's m16 puts in the viewer). Records WITHOUT
-        (uploads): stored coords extent-centered, matching
+        (ring-less uploads): stored coords extent-centered, matching
         _pickup_m16's identity-rotation fallback, so the spawner's
         per-atom clearance leg stays truthful for upload pickups too.
         """
@@ -513,7 +520,9 @@ class GameTab(QtWidgets.QWidget):
         orientation.matrix_rt(R_edge, (cx, cy, 0.0), pre) per
         materialize_pickup's caller contract - the exact transform
         whose result _mirror_atoms + build_pickup_seed mirror purely.
-        Records without stack_ring (uploads) use an identity rotation
+        Records without stack_ring (ring-less uploads; 2026-09-20c fix
+        G2 gave ring-bearing uploads the demo stack_ring/edge-on path)
+        use an identity rotation
         with the extent-center pre-shift (stored pose centered at the
         spawn point, the same fallback _mirror_atoms uses).
         """
@@ -844,6 +853,15 @@ class GameTab(QtWidgets.QWidget):
         live id set / remaining counter exactly as reset() would
         have - same record shape, engine-owned thereafter.
 
+        2026-09-20c fix G1: the skip taxonomy is pre-resolved BEFORE any
+        geometry (tail frame / placement math / the SRP_DEBUG trace
+        inputs) runs, so records without a dataset entry ('__upload__'
+        keying) skip cleanly - on the live re-test, the debug tail frame
+        alone was enough to raise on an upload capture ('NoneType' has
+        no len() -> the 'placement error' line repeating every few
+        ticks). The try/except stays, but as a true last resort: nothing
+        on the skip path may print 'placement error'.
+
         The whole body is wrapped in try/except -> 'placement error'
         + reject_pickup(id, 'error') as the last-resort counter
         guard (a capture may never dangle). A segment already
@@ -875,30 +893,45 @@ class GameTab(QtWidgets.QWidget):
                 resolve_rec['stack_ring'] = list(record['stack_ring'])
             resolve_rec['has_stack_entry'] = record.get('has_stack_entry')
             resolve_rec['set'] = record.get('set')
-            # Locked clash-gate set (plan 05-05): head + ALL segment
-            # atoms + OTHER live pickups' atoms (own atoms excluded).
-            existing_atoms = list(head_atoms)
-            for seg in engine.segments:
-                existing_atoms.extend(seg['atoms'])
-            for p in engine.pickups:
-                if (p['id'] in engine.live_pickup_ids
-                        and p['id'] != pickup_rec['id']):
-                    existing_atoms.extend(p['atoms'])
-            # SRP_DEBUG=1: capture the PRE-RESOLUTION tail frame (the
-            # same inputs resolve consumes below; resolve returns the
-            # PLACEMENT geometry, never the tail, so the trace pairs
-            # the placed ring against its own recomputed tail).
-            debug = session.get('debug')
-            debug_tail = None
-            if debug:
-                debug_tail = placement.tail_frame(
-                    engine.segments, records_by_id, head_atoms,
-                    head_stack_ring, engine.heading)
-            outcome = placement.resolve(
-                resolve_rec, records_by_id, stacking_data,
-                head_atoms, head_stack_ring, engine.heading,
-                engine.segments, existing_atoms,
-                engine.box_min, engine.box_max, display_z)
+            # 2026-09-20c fix G1: pre-resolve the skip taxonomy BEFORE
+            # any geometry runs (the SRP_DEBUG tail frame included).
+            # Records without a dataset entry (the '__upload__' keying --
+            # uploads never inherit set_a's stacking entry) take the
+            # clean SKIP_NO_ENTRY path HERE: no tail frame, no placement
+            # math, no coalesced-spam source, and NOTHING may print
+            # 'placement error'. Live failure this fixes: with
+            # SRP_DEBUG=1 the pre-resolution tail frame ran
+            # stacking.ring_frame over an upload head's
+            # head_stack_ring=None and raised "object of type 'NoneType'
+            # has no len()" on EVERY upload capture (the re-capture loop
+            # then printed it every few ticks).
+            skip_code = placement.resolve_skip(resolve_rec, stacking_data)
+            if skip_code is not None:
+                outcome = {'status': 'skipped', 'code': skip_code}
+                debug_tail = None
+            else:
+                # Locked clash-gate set (plan 05-05): head + ALL segment
+                # atoms + OTHER live pickups' atoms (own atoms excluded).
+                existing_atoms = list(head_atoms)
+                for seg in engine.segments:
+                    existing_atoms.extend(seg['atoms'])
+                for p in engine.pickups:
+                    if (p['id'] in engine.live_pickup_ids
+                            and p['id'] != pickup_rec['id']):
+                        existing_atoms.extend(p['atoms'])
+                # SRP_DEBUG=1: capture the PRE-RESOLUTION tail frame (the
+                # same inputs resolve consumes below; resolve returns the
+                # PLACEMENT geometry, never the tail, so the trace pairs
+                # the placed ring against its own recomputed tail).
+                if session.get('debug'):
+                    debug_tail = placement.tail_frame(
+                        engine.segments, records_by_id, head_atoms,
+                        head_stack_ring, engine.heading)
+                outcome = placement.resolve(
+                    resolve_rec, records_by_id, stacking_data,
+                    head_atoms, head_stack_ring, engine.heading,
+                    engine.segments, existing_atoms,
+                    engine.box_min, engine.box_max, display_z)
             name = record['name']
             if outcome['status'] == 'placed':
                 engine.attach_segment(pickup_rec['molecule_id'],
@@ -972,11 +1005,17 @@ class GameTab(QtWidgets.QWidget):
             # spawner so the NEXT spawn serves a different molecule;
             # every-candidate-refused pauses spawning for the exhaust
             # cooldown (05-16; auto-resuming, never latched).
+            # 2026-09-20c fix G1: only genuine REFUSES (placement
+            # clashes) count toward the exhaust streak. SKIP_* outcomes
+            # are informational (uploads carry no dataset entry; the
+            # reason was already shown via the coalesced info line) and
+            # feed refused=False, so an upload-only pool can NEVER latch
+            # the spawn cooldown.
             spawner = session['spawner']
             if spawner is not None:
                 spawner.note_resolution(
                     pickup_rec['molecule_id'],
-                    refused=(outcome['status'] != 'placed'))
+                    refused=(outcome['status'] == 'refused'))
             self._respawn_pickup(session, engine)
         except Exception as exc:
             self._log('placement error: %s' % exc)

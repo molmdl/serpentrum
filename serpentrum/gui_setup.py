@@ -496,8 +496,10 @@ class SetupTab(QtWidgets.QWidget):
         # pure-with-respect-to-cmd (no cmd usage), so calling it again
         # picks the SAME record materialize will (its advisory errors
         # are re-generated inside materialize's own error list). A
-        # record without 'stack_ring' (uploads; demo records pre-05-08)
-        # or any parse/frame failure degrades to head_m16=None — today's
+        # record without 'stack_ring' (ring-less uploads — 2026-09-20c
+        # fix G2 gave uploads with a canonical planar 6-ring the demo
+        # stack_ring/edge-on path; records without a resolvable ring
+        # still) or any parse/frame failure degrades to head_m16=None —
         # flat head — rather than blocking Apply; load problems already
         # surface through the record-building error list.
         head_m16 = None

@@ -230,16 +230,22 @@ class PickupSpawner(object):
         """Record one capture resolution for demote-after-refuse (05-16
         cascade fix, 2026-09-20).
 
-        refused=True (a REFUSE_* or SKIP_* outcome): move the record to
-        the BACK of the serve order so the next spawn serves a
+        refused=True (a REFUSE_* outcome; 2026-09-20c fix G1: only
+        placement clashes -- the wall leg is retired): move the record
+        to the BACK of the serve order so the next spawn serves a
         DIFFERENT molecule (never a permanent exclusion -- cap 10
         requires repeats), and count consecutive refuses; refuses in a
         row >= pool size PAUSE spawning for exhaust_cooldown_ticks
         movement ticks (auto-resuming, NEVER latched). While paused
         the streak does NOT advance (resolves of pickups still live on
         the board may neither extend nor refresh the cooldown).
+        SKIP_* outcomes are INFORMATIONAL (2026-09-20c fix G1: upload
+        captures skip for the missing dataset entry, they are not
+        placement refuses) and must be reported with refused=False so
+        they never latch the exhaust cooldown.
 
-        refused=False (a 'placed' capture): reset the consecutive
+        refused=False (a 'placed' capture, or an informational SKIP_*
+        outcome per fix G1 above): reset the consecutive
         counter IMMEDIATELY (any successful placement ends the refuse
         streak). A molecule already at the back of the order needs no
         rotation (the just-served front already advanced), so demotion

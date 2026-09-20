@@ -32,6 +32,11 @@ Two public entry points:
   in one ``srp_upload_`` tempdir. Upload records carry
   ``set='__upload__'`` which matches NO interaction ->
   ``has_stack_entry=False`` (the STACK-03 skip-policy keying, DATA-03).
+  Since 2026-09-20c (fix G, upload edge-on) accepted upload records with
+  a resolvable canonical PLANAR 6-ring additionally carry ``stack_ring``
+  -- a DISPLAY field only (the materialization/spawn/head seams reuse
+  the demo edge-on canonicalization); the capture skip keys on the
+  missing dataset entry, never on the ring.
 
 The ``__upload__`` sentinel is the adopted consolidated decision: no
 formula/name matching -- an uploaded benzene must NOT inherit set_a's
@@ -52,6 +57,7 @@ import tempfile
 
 from . import molfile
 from . import molecule_data
+from . import stacking
 
 
 # Sentinel set id for uploaded molecules. Matches NO interaction in the
@@ -78,14 +84,17 @@ def _build_record(molfile_record, *, id, name, file, set_id, source,
     when ``stacking_data`` is not None, else False.
 
     ``ring_atoms`` is passed through from the manifest for demo records;
-    upload records omit it (they are skip-at-pickup, no stacking
-    placement, so ``stacking.ring_frame`` is never called on them).
+    upload records omit it.
 
     ``stack_ring`` is the canonical ONE-ring cycle in ring-walk order
     (from ``molfile.ring_cycle``) -- the indices alignment contract
     (same record's coords/elements order) makes placed-atom indexing
-    1:1. Demo records carry it (computed at load time); upload records
-    omit it by design (the skip policy keys on the absent ring).
+    1:1. Demo records carry it (computed at load time). Upload records
+    carry it since 2026-09-20c (fix G) WHEN the molecule has a canonical
+    planar 6-ring -- a display-only field driving the edge-on
+    canonicalization; the skip policy keys on the missing dataset entry
+    (``has_stack_entry``), never on the ring, so an upload capture still
+    takes the STACK-03 SKIP_NO_ENTRY path with the ring present.
     """
     has_stack_entry = False
     if stacking_data is not None:
@@ -230,6 +239,30 @@ def load_demo_set(data_dir=None, set_id='set_a', stacking_path=None):
     return (records, errors)
 
 
+def _upload_stack_ring(record):
+    """The canonical planar 6-ring for an accepted upload record, or None.
+
+    2026-09-20c (fix G, upload edge-on): ``molfile.ring_cycle`` yields
+    the canonical cycle from the bond graph; it is adopted as
+    ``stack_ring`` ONLY when it is a 6-ring AND planar per
+    ``stacking.ring_frame``'s 0.15 A tolerance (cyclohexane chairs,
+    5-rings, and ring-less molecules return None). None means the caller
+    omits the key and the molecule renders in its as-stored orientation.
+
+    This is a DISPLAY field: the STACK-03 capture skip keys on the
+    missing dataset entry (``has_stack_entry``, from the '__upload__'
+    set sentinel), never on the absent ring.
+    """
+    candidate = molfile.ring_cycle(record)
+    if len(candidate) != 6:
+        return None
+    try:
+        stacking.ring_frame(record['coords'], candidate)
+    except ValueError:
+        return None
+    return candidate
+
+
 def load_upload(path, stacking_path=None):
     """Load + gate an uploaded SDF/mol2 file -> (records, errors).
 
@@ -260,6 +293,15 @@ def load_upload(path, stacking_path=None):
     Rejected records surface as errors (the gate reason already carries
     the ``'<name>: <detail>'`` format). File/parse failures
     (MolFileError / IOError) become error entries, never exceptions.
+
+    2026-09-20c (fix G, upload edge-on): accepted records with a
+    resolvable canonical PLANAR 6-ring carry ``stack_ring`` (see
+    ``_upload_stack_ring``) so uploads render edge-on exactly like demo
+    records; ring-less or non-planar-ring uploads keep ``stack_ring``
+    omitted and render in their as-stored orientation (documented,
+    acceptable). Multi-record records are written BEFORE their id's
+    stack_ring is attached, and the split files preserve atom order, so
+    the indices alignment contract holds per split file.
 
     Returns ``(records, errors)``.
     """
@@ -327,7 +369,8 @@ def load_upload(path, stacking_path=None):
                 file=split_path,
                 set_id=UPLOAD_SET_ID,
                 source='upload',
-                stacking_data=stacking_data))
+                stacking_data=stacking_data,
+                stack_ring=_upload_stack_ring(record)))
     else:
         # Single-record SDF or mol2: file = original path.
         for record in accepted:
@@ -339,6 +382,7 @@ def load_upload(path, stacking_path=None):
                 file=path,
                 set_id=UPLOAD_SET_ID,
                 source='upload',
-                stacking_data=stacking_data))
+                stacking_data=stacking_data,
+                stack_ring=_upload_stack_ring(record)))
 
     return (records, errors)
