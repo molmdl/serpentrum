@@ -87,3 +87,59 @@ Straight-fit: max N segments with 3.6*N <= 2H - 2*BOUNDARY_MARGIN_A(1.0):
    press Get Spectra or start a new run, as designed).
 4. Fix D: the boxes are bigger (default medium is now a 110 A square);
    a 10-molecule straight train fits with maneuvering room.
+
+## Follow-up (2026-09-20, same day): game-3 deadlock — permanent pool_exhausted latch
+
+**Symptom (live SRP_DEBUG=1 log, game 3 near the small-box +/-35
+walls):** five consecutive placements refused REFUSE_WALL with tiny
+positional overshoots (0.76 / 0.81 / 0.83 / 0.83 A past the box edge)
+as the head patrolled the wall; the demote-after-refuse round-robin
+cycled all 5 demo molecules, then the pool_exhausted latch (f211d97)
+fired:
+
+    DBG spawn pool exhausted (5 molecule(s) refused in a row) - no more
+    pickups this run
+
+and spawning stopped PERMANENTLY — the run became unwinnable and
+un-feedable even though the refuses were position-dependent: once the
+head moved away from the wall, the same placements succeeded again.
+
+**Root cause:** the latch conflated "every candidate refused
+consecutively" (a local, REVERSIBLE board state) with "the pool can
+never succeed" (a global, terminal state). Near a wall streak ==
+pool size is EASY to reach and self-resolving — a permanent latch is
+the wrong consequence for a temporary condition.
+
+**Fix (ee2a1d8 + 6b3017a): pool exhaustion is a resumable COOLDOWN,
+never permadeath.**
+
+- Refuse streak reaching the pool size now PAUSES spawning for
+  `spawn.EXHAUST_COOLDOWN_TICKS = 100` movement ticks (~10 s at the
+  100 ms game tick; module-level constant so it is tunable, accepted
+  via the `exhaust_cooldown_ticks` constructor kwarg for tests).
+- The controller advances the clock once per movement tick
+  (`gui_game._on_tick` -> `spawner.tick()`); pause-of-game freezes the
+  clock in play time. On the resume edge the streak resets and one
+  spawn attempt fires immediately with the SAME slot policy as before.
+- The refuse streak does NOT advance while paused (no extend, no
+  refresh); a placed capture still resets the streak immediately;
+  re-pausing after a resume requires a FRESH pool-size streak.
+- DBG lines (SRP_DEBUG=1 only): on pause
+  `DBG spawn pool cooldown (N refused in a row) - spawning paused K ticks`,
+  once per episode; on resume
+  `DBG spawn pool cooldown over - spawning resumed`.
+- NOT changed: demote-after-refuse round-robin, refused-pickup
+  despawn, ReasonCoalescer, REFUSE_WALL/REFUSE_ATOM gate tolerances,
+  biphenyl demonstrators, GAME-05 crash rules.
+
+**Chosen K = 100 ticks (~10 s).** Long enough that a permanent wall
+hug produces quiet, pause-bounded feeding pauses instead of a refuse
+storm; short enough that the transient near-wall case (the deadlock
+scenario) recovers within one cruising pass — at 0.3 A/tick the head
+travels 30 A during the window, comfortably farther than the 8 A
+lookahead that was producing the wall overshoots.
+
+**Re-test expectation:** in the same near-wall situation the refuse
+streak now pauses spawning for ~10 s with (under SRP_DEBUG=1) the
+cooldown line, then feeding resumes automatically once the head has
+moved on — the run stays winnable.
