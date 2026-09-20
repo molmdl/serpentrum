@@ -240,9 +240,11 @@ class SetupTab(QtWidgets.QWidget):
         """Read all widgets into the setup dict and write back to the anchor.
 
         The demo combo's '__upload__' sentinel maps to the last real set
-        (self._last_real_set) so the dict stays valid. Non-widget fields
-        (schema_version, atom_budget, broadening_fwhm, speed) are
-        preserved from the existing dict via a shallow copy.
+        (self._last_real_set) so the dict stays valid. Speed is
+        widget-written via the tier combo (Phase 5.1, plan 5.1-04). The
+        remaining non-widget fields (schema_version, atom_budget,
+        broadening_fwhm) are preserved from the existing dict via a
+        shallow copy.
         """
         setup = dict(self._setup)
         source = self.demo_combo.currentData()
@@ -254,6 +256,9 @@ class SetupTab(QtWidgets.QWidget):
         box = self.box_combo.currentData()
         if box is not None:
             setup['box_preset'] = box
+        speed = self.speed_combo.currentData()
+        if speed is not None:
+            setup['speed'] = speed
         head = self.head_combo.currentData()
         if head is not None:
             setup['head_molecule'] = head
@@ -287,6 +292,17 @@ class SetupTab(QtWidgets.QWidget):
         idx = self.box_combo.findData(box)
         if idx >= 0:
             self.box_combo.setCurrentIndex(idx)
+        # Speed tier (Phase 5.1, plan 5.1-04). Loaded non-tier values
+        # (e.g. hand-edited 50.0) fall back to the DEFAULT tier; the
+        # dict keeps the custom value until the next collect_state
+        # normalizes it (house fallback semantics).
+        idx = self.speed_combo.findData(
+            setup.get('speed', setup_logic.DEFAULTS['speed']))
+        if idx < 0:
+            idx = self.speed_combo.findData(setup_logic.DEFAULTS['speed'])
+        if idx < 0:
+            idx = 0
+        self.speed_combo.setCurrentIndex(idx)
         # Head molecule (fallback Random if not in the combo).
         head = setup.get('head_molecule', 'random')
         idx = self.head_combo.findData(head)
