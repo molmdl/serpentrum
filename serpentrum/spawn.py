@@ -25,9 +25,14 @@ PINNED POLICY (stated explicitly per the planning mandate):
     pool + cap 10 REQUIRES repeats), so the NEXT spawn is a DIFFERENT
     molecule; a placed capture resets the consecutive-refuse counter.
     If refuses in a row reach the pool size (every candidate refused
-    consecutively), the spawner LATCHES ``pool_exhausted`` for the rest
-    of the run and ``_spawn`` returns None (the controller documents
-    that state once, in DBG).
+    consecutively), spawning PAUSES for a resumable COOLDOWN of
+    EXHAUST_COOLDOWN_TICKS movement ticks (2026-09-20 follow-up: the
+    permanent latch from f211d97 deadlocked runs near walls -- those
+    refuses are POSITION-dependent and clear once the head moves away,
+    so a permanent stop was wrong). The controller advances the
+    cooldown clock via ``tick()`` once per 100 ms movement tick; when
+    it elapses, the refuse streak resets and spawning RESUMES
+    automatically with the same slot policy as before.
   - POSITION: LOOKAHEAD_A = 8.0 along the current heading plus a seeded
     lateral offset in [-6.0, +6.0] quantized to 0.1 A, validated
     against: wall margin 3.5 A (shrunk box), head-centroid clearance
@@ -87,6 +92,12 @@ CHAIN_ATOM_CLEARANCE_A = 3.0  # per-atom distance vs chain atoms (> 2.5 A
 LIVE_PICKUP_CLEARANCE_A = 6.0  # centroid distance vs live pickups
 MAX_DRAWS = 32                # seeded retries before the grid-scan fallback
 GRID_STEP_A = 2.0             # deterministic fallback scan step
+EXHAUST_COOLDOWN_TICKS = 100  # exhaust pause window in movement ticks
+                              # (100 ms tick -> ~10 s of wall-clock play):
+                              # refuses in a row == pool size PAUSES
+                              # spawning for this many ticks, then it
+                              # auto-resumes; ANY placed capture or a
+                              # completed cooldown resets the streak
 
 # Heading name -> unit vector in the xy plane. Deliberately a PRIVATE
 # mirror of game_engine.DIRS (this module is fully decoupled -- it must
@@ -153,6 +164,9 @@ class PickupSpawner(object):
       atoms_by_id: record id -> that molecule's ORIGIN-CENTERED atoms as
                    (sym, x, y, z) tuples. Every record id MUST be
                    present (KeyError is the loud caller-bug signal).
+      exhaust_cooldown_ticks: the exhaust-pause window in movement
+                   ticks (default EXHAUST_COOLDOWN_TICKS = 100, ~10 s at
+                   the 100 ms tick). Tunable for tests / difficulty.
 
     State: a round-robin serve ORDER over records + a spawn counter
     (pids 'pick_0001', 'pick_0002', ...). Both advance ONLY on a
@@ -161,10 +175,12 @@ class PickupSpawner(object):
     issued spawn (front record moves to the back -- equivalent to the
     original cyclic index) and additionally on demote-after-refuse
     (the refused record moves to the back EARLY); pid assignment is
-    untouched by demotions.
+    untouched by demotions. The refuse-streak / cooldown state machine
+    (note_resolution + tick) never touches order or pid either.
     """
 
-    def __init__(self, records, box_min, box_max, seed, atoms_by_id):
+    def __init__(self, records, box_min, box_max, seed, atoms_by_id,
+                 exhaust_cooldown_ticks=EXHAUST_COOLDOWN_TICKS):
         self._records = list(records)
         self._box_min = (float(box_min[0]), float(box_min[1]))
         self._box_max = (float(box_max[0]), float(box_max[1]))
@@ -173,10 +189,13 @@ class PickupSpawner(object):
         self._order = list(records)  # round-robin serve order (front first)
         self._issued = 0
         # Demote-after-refuse state (2026-09-20): consecutive refused
-        # resolutions; reaching the pool size latches pool_exhausted
-        # for the rest of the run (see note_resolution).
+        # resolutions; reaching the pool size PAUSES spawning for
+        # exhaust_cooldown_ticks movement ticks (a resumable cooldown,
+        # NEVER a permanent latch -- position-dependent refuses clear
+        # once the head moves). tick() advances the clock.
+        self._exhaust_cooldown_ticks = int(exhaust_cooldown_ticks)
         self._consecutive_refuses = 0
-        self._pool_exhausted = False
+        self._cooldown_remaining = 0
 
     # --- public API -------------------------------------------------
 
@@ -185,14 +204,22 @@ class PickupSpawner(object):
         return live_count < MAX_LIVE_PICKUPS
 
     @property
-    def pool_exhausted(self):
-        """True once EVERY pool record refused consecutively (latched for
-        the rest of the run; ``_spawn`` returns None). Read-only."""
-        return self._pool_exhausted
+    def spawn_paused(self):
+        """True during the exhaust cooldown: every pool record refused
+        consecutively, so ``_spawn`` returns None. Resumable -- the
+        controller's per-tick ``tick()`` calls count the window down
+        and spawning then resumes automatically. Read-only."""
+        return self._cooldown_remaining > 0
+
+    @property
+    def exhaust_cooldown_ticks(self):
+        """The configured exhaust-pause window in movement ticks (for
+        the GUI's cooldown DBG line)."""
+        return self._exhaust_cooldown_ticks
 
     @property
     def pool_size(self):
-        """The number of pool records (for the GUI's exhaust DBG line)."""
+        """The number of pool records (for the GUI's cooldown DBG line)."""
         return len(self._order)
 
     def note_resolution(self, molecule_id, refused):
@@ -203,11 +230,14 @@ class PickupSpawner(object):
         the BACK of the serve order so the next spawn serves a
         DIFFERENT molecule (never a permanent exclusion -- cap 10
         requires repeats), and count consecutive refuses; refuses in a
-        row >= pool size LATCH pool_exhausted (stop spawning for the
-        rest of the run).
+        row >= pool size PAUSE spawning for exhaust_cooldown_ticks
+        movement ticks (auto-resuming, NEVER latched). While paused
+        the streak does NOT advance (resolves of pickups still live on
+        the board may neither extend nor refresh the cooldown).
 
         refused=False (a 'placed' capture): reset the consecutive
-        counter. A molecule already at the back of the order needs no
+        counter IMMEDIATELY (any successful placement ends the refuse
+        streak). A molecule already at the back of the order needs no
         rotation (the just-served front already advanced), so demotion
         is a no-op in the common "served then immediately refused"
         case. Unknown molecule ids are ignored (defensive).
@@ -215,13 +245,37 @@ class PickupSpawner(object):
         if not refused:
             self._consecutive_refuses = 0
             return
-        self._consecutive_refuses += 1
-        if self._consecutive_refuses >= len(self._order):
-            self._pool_exhausted = True
         for i, record in enumerate(self._order):
             if record['id'] == molecule_id:
                 self._order.append(self._order.pop(i))
                 break
+        if self._cooldown_remaining > 0:
+            # Paused already: demote above still applies (round-robin
+            # policy is untouched), but the streak is frozen so the
+            # cooldown cannot be extended or refreshed.
+            return
+        self._consecutive_refuses += 1
+        if self._consecutive_refuses >= len(self._order):
+            self._cooldown_remaining = self._exhaust_cooldown_ticks
+
+    def tick(self):
+        """Advance the exhaust cooldown clock by ONE movement tick
+        (the controller's 100 ms game tick; wall-clock pauses stop the
+        tick timer, so the window elapses in PLAY time).
+
+        Returns True exactly on the tick the cooldown elapses (the
+        resume edge -- the streak resets and spawning resumes), False
+        otherwise. Calling tick() while not paused is a cheap no-op.
+        """
+        if self._cooldown_remaining <= 0:
+            return False
+        self._cooldown_remaining -= 1
+        if self._cooldown_remaining == 0:
+            # Resume edge: the streak resets, so re-pausing requires a
+            # fresh run of pool-size consecutive refuses.
+            self._consecutive_refuses = 0
+            return True
+        return False
 
     def first(self, head_xy, heading):
         """Spawn the initial pickup (begin_game): no chain, no live."""
@@ -245,9 +299,10 @@ class PickupSpawner(object):
     def _spawn(self, head_xy, heading, chain_atoms, live_centroids):
         if not self._order:
             return None
-        if self._pool_exhausted:
-            # Demote-after-refuse latch: every pool record refused in a
-            # row -- stop spawning for the rest of the run (05-16).
+        if self._cooldown_remaining > 0:
+            # Exhaust cooldown pause: every pool record refused in a
+            # row -- spawning is paused until tick() counts the window
+            # down (resumable, NEVER a permanent latch).
             return None
         if heading not in _DIRS:
             raise ValueError('unknown heading: %r (valid: %s)'

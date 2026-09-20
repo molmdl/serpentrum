@@ -33,8 +33,9 @@ it never writes chemistry:
   hud_logic.ReasonCoalescer -> the 05-16 anti-spam state (2026-09-20):
       consecutive identical skip/refuse lines coalesce into a '(xN)'
       suffix rewrite; the first of a run always appends.
-  hud_logic.debug_spawn_exhausted(pool_size) -> one DBG line when the
-      demote-after-refuse latch stops spawning for the run.
+  hud_logic.debug_spawn_cooldown(pool_size, cooldown_ticks) ->
+      one DBG line when the demote-after-refuse exhaust cooldown pauses
+      spawning; debug_spawn_cooldown_over() -> the resume-edge line.
 
 The real shipped dataset is used (molecule_data.load_stacking over
 setloader.default_stacking_path()) so the pins track real data changes.
@@ -463,14 +464,19 @@ class TestReasonCoalescer(unittest.TestCase):
         self.assertEqual(c.note(self.LINE), ('append', self.LINE))
 
 
-class TestDebugSpawnExhausted(unittest.TestCase):
-    """debug_spawn_exhausted: one DBG line for the latched pool state."""
+class TestDebugSpawnCooldown(unittest.TestCase):
+    """debug_spawn_cooldown / debug_spawn_cooldown_over: DBG lines for
+    the exhaust cooldown pause + resume edge (SRP_DEBUG=1)."""
 
-    def test_line_shape(self):
-        line = hud_logic.debug_spawn_exhausted(5)
+    def test_pause_line_shape(self):
+        line = hud_logic.debug_spawn_cooldown(5, 100)
         self.assertEqual(line,
-                         'DBG spawn pool exhausted (5 molecule(s) '
-                         'refused in a row) - no more pickups this run')
+                         'DBG spawn pool cooldown (5 refused in a row)'
+                         ' - spawning paused 100 ticks')
+
+    def test_resume_line_shape(self):
+        self.assertEqual(hud_logic.debug_spawn_cooldown_over(),
+                         'DBG spawn pool cooldown over - spawning resumed')
 
 
 if __name__ == '__main__':

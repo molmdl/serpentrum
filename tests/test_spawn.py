@@ -26,7 +26,9 @@ Nine pin groups mirror the plan's behavior cases:
      state advance (same record + same pid offered on the next call).
  10. Demote       -- demote-after-refuse (2026-09-20, 05-16 cascade fix):
      a refused molecule is not re-served next (never permanently
-     excluded either); every-candidate-refused latches pool exhaustion.
+     excluded either); every-candidate-refused PAUSES spawning for a
+     resumable exhaust cooldown (auto-resumes after K ticks; never a
+     permanent latch).
 
 Spawners are built from the REAL demo records (setloader.load_demo_set
 with the shipped stacking dataset) and origin-centered synthetic atoms (6
@@ -289,7 +291,10 @@ class TestPickupSeedShape(SpawnTestBase):
 class TestDemoteAfterRefuse(SpawnTestBase):
     """Case 10: demote-after-refuse (05-16 re-test refuse-cascade fix,
     2026-09-20) — a refused molecule is NOT re-served immediately;
-    every-candidate-refused latches pool exhaustion for the run."""
+    every-candidate-refused pauses spawning for a resumable exhaust
+    cooldown (NEVER a permanent latch — 2026-09-20 follow-up: the
+    permanent latch deadlocked runs near walls where refuses are
+    position-dependent)."""
 
     def test_refused_molecule_not_reserved_next(self):
         # Serve the first pickup, refuse its molecule, then the NEXT
@@ -321,35 +326,46 @@ class TestDemoteAfterRefuse(SpawnTestBase):
         self.assertEqual(served.count(refused_id), 1)
         self.assertEqual(served[-1], refused_id)
 
-    def test_pool_exhaustion_latches_and_stops_spawning(self):
-        # Every pool candidate refuses consecutively: reach the latch
-        # exactly at the pool size; afterwards _spawn returns None
-        # FOREVER (the rest of the run), even with a clear board.
-        spawner = self.make_spawner(1234)
-        self.assertFalse(spawner.pool_exhausted)
+    def test_full_streak_pauses_then_auto_resumes(self):
+        # Every pool candidate refuses consecutively: the pause fires
+        # exactly at the pool size; during the cooldown _spawn returns
+        # None even with a clear board -- but the pause is RESUMABLE
+        # (tick() counts the window down and spawning resumes), NEVER
+        # a permanent latch. (Granular timing/streak-freeze pins live
+        # in TestExhaustCooldown.)
+        spawner = spawn.PickupSpawner(
+            self.records, BOX_MIN, BOX_MAX, 1234, self.atoms_by_id,
+            exhaust_cooldown_ticks=3)
+        self.assertFalse(spawner.spawn_paused)
         ids = [r['id'] for r in self.records]
         # Drive one issue per refusal: each refused spawn rotates the
-        # order; after len(pool) consecutive refuses the latch fires.
+        # order; after len(pool) consecutive refuses the pause fires.
         result = spawner.first((0.0, 0.0), 'right')
         self.assertIsNotNone(result)
         live = [result[2]]
         spawner.note_resolution(result[0]['id'], refused=True)
-        self.assertFalse(spawner.pool_exhausted)
+        self.assertFalse(spawner.spawn_paused)
         for _ in range(len(ids) - 1):
             result = spawner.next_after((0.0, 0.0), 'right', [], live)
             self.assertIsNotNone(result)
             live.append(result[2])
             spawner.note_resolution(result[0]['id'], refused=True)
         # len(ids) consecutive refuses have now been recorded.
-        self.assertTrue(spawner.pool_exhausted)
-        # Latched: no spawn ever again, cleared board or not.
+        self.assertTrue(spawner.spawn_paused)
+        # Paused: no spawn while the cooldown runs, cleared board or not.
         self.assertIsNone(spawner.next_after((0.0, 0.0), 'right', [], []))
         self.assertIsNone(spawner.next_after((0.0, 0.0), 'right', [], []))
+        # Cooldown elapses: spawning auto-resumes with the same policy.
+        while not spawner.tick():
+            pass
+        self.assertFalse(spawner.spawn_paused)
+        self.assertIsNotNone(spawner.next_after((0.0, 0.0), 'right',
+                                                [], []))
 
     def test_placed_resolution_resets_consecutive_counter(self):
         # A placed capture between refuses keeps the pool alive: the
-        # consecutive counter resets, so 2N-1 total refuses (alternating
-        # with one placement per cycle) never latch.
+        # consecutive counter resets immediately, so 2N-1 total refuses
+        # (alternating with one placement per cycle) never pause.
         spawner = self.make_spawner(1234)
         result = spawner.first((0.0, 0.0), 'right')
         self.assertIsNotNone(result)
@@ -361,14 +377,14 @@ class TestDemoteAfterRefuse(SpawnTestBase):
             self.assertIsNotNone(result)
             live.append(result[2])
             spawner.note_resolution(result[0]['id'], refused=False)
-            self.assertFalse(spawner.pool_exhausted)
+            self.assertFalse(spawner.spawn_paused)
             for _ in range(len(self.records) - 1):
                 result = spawner.next_after((0.0, 0.0), 'right', [], live)
                 self.assertIsNotNone(result)
                 live.append(result[2])
                 spawner.note_resolution(result[0]['id'], refused=True)
-            # Only len-1 consecutive refuses: below the latch.
-            self.assertFalse(spawner.pool_exhausted)
+            # Only len-1 consecutive refuses: below the pause.
+            self.assertFalse(spawner.spawn_paused)
 
     def test_unknown_molecule_id_is_ignored(self):
         spawner = self.make_spawner(1234)

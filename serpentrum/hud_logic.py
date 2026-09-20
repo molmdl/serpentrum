@@ -292,15 +292,24 @@ def debug_capture_trace(pickup_id, name, code, detail=None,
     return line
 
 
-def debug_spawn_exhausted(pool_size):
-    """One DBG line when the spawn pool LATCHES exhausted (SRP_DEBUG=1).
+def debug_spawn_cooldown(pool_size, cooldown_ticks):
+    """One DBG line when the spawn pool enters the exhaust cooldown
+    (SRP_DEBUG=1).
 
-    The demote-after-refuse terminal state (2026-09-20): every pool
-    candidate refused consecutively -> no more pickups spawn for the
-    rest of the run. Logged ONCE per run by the controller.
+    The demote-after-refuse pause state (2026-09-20): every pool
+    candidate refused consecutively -> spawning PAUSES for
+    ``cooldown_ticks`` movement ticks (~10 s at the 100 ms default),
+    then auto-resumes (NEVER a permanent latch). Logged ONCE per pause
+    episode by the controller.
     """
-    return ('DBG spawn pool exhausted (%d molecule(s) refused in a row)'
-            ' - no more pickups this run' % pool_size)
+    return ('DBG spawn pool cooldown (%d refused in a row)'
+            ' - spawning paused %d ticks' % (pool_size, cooldown_ticks))
+
+
+def debug_spawn_cooldown_over():
+    """One DBG line when the exhaust cooldown elapses and spawning
+    resumes (SRP_DEBUG=1). Logged ONCE per resume edge."""
+    return 'DBG spawn pool cooldown over - spawning resumed'
 
 
 def debug_event_trace(kind, tick=None, heading=None, head_xy=None,

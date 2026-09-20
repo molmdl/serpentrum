@@ -627,6 +627,18 @@ class GameTab(QtWidgets.QWidget):
                 session['head_atoms'] = [
                     (sym, x + dx, y + dy, z)
                     for (sym, x, y, z) in session['head_atoms']]
+        # Exhaust cooldown clock (05-16 follow-up): one tick() per
+        # movement tick. The early returns above (paused / finished)
+        # freeze the clock in play time. On the resume edge the pause
+        # DBG-noted flag clears (the NEXT pause logs its line again,
+        # and the resume line logs once per episode), then one spawn
+        # attempt fires immediately with the normal slot policy.
+        spawner = session.get('spawner')
+        if spawner is not None and spawner.tick():
+            session['_spawn_cooldown_noted'] = False
+            if session.get('debug'):
+                self._log(hud_logic.debug_spawn_cooldown_over())
+            self._respawn_pickup(session, engine)
         self._update_remaining()
         if engine.finished:
             self._end_run(engine)
@@ -958,7 +970,8 @@ class GameTab(QtWidgets.QWidget):
                     self._log(hud_logic.resume_note(name))
             # Demote-after-refuse: feed the resolution back to the
             # spawner so the NEXT spawn serves a different molecule;
-            # every-candidate-refused latches pool exhaustion (05-16).
+            # every-candidate-refused pauses spawning for the exhaust
+            # cooldown (05-16; auto-resuming, never latched).
             spawner = session['spawner']
             if spawner is not None:
                 spawner.note_resolution(
@@ -1037,15 +1050,16 @@ class GameTab(QtWidgets.QWidget):
             engine.head, _heading_name(engine.heading),
             chain_atoms, live_centroids)
         if result is None:
-            # 05-16 fix B: when the cause is the demote-after-refuse
-            # latch (every pool molecule refused in a row), document it
-            # ONCE in DBG (the designed terminal state for this run).
-            if (spawner.pool_exhausted and not
-                    session.get('_spawn_exhaust_noted')):
-                session['_spawn_exhaust_noted'] = True
+            # 05-16 fix B follow-up: when the cause is the exhaust
+            # cooldown pause (every pool molecule refused in a row),
+            # document the pause ONCE in DBG; tick() auto-resumes and
+            # _on_tick logs the resume edge after the window elapses.
+            if (spawner.spawn_paused and not
+                    session.get('_spawn_cooldown_noted')):
+                session['_spawn_cooldown_noted'] = True
                 if session.get('debug'):
-                    self._log(hud_logic.debug_spawn_exhausted(
-                        spawner.pool_size))
+                    self._log(hud_logic.debug_spawn_cooldown(
+                        spawner.pool_size, spawner.exhaust_cooldown_ticks))
             return  # no legal position: NO state advance (05-03)
         record, pid, centroid = result
         seed = spawn_mod.build_pickup_seed(
