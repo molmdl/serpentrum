@@ -11,8 +11,8 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 
 Phase: 5 of 8 (Stacking & Game Rules Complete) — executing
 Plan: 16 of 16 executed (05-01..05-16); 05-VERIFICATION.md: passed machine-checked portion (was human_needed at 15/15 plans, zero gaps, committed 8da8796); 05-16 checkpoint: Task 1 gate pass green, Task 2 human-verify in progress
-Status: machine half green (630 unittests, 7/7 required smokes, smoke 08 8/8 incl. UPLEDGEON); human half: ALL gameplay items functionally verified across rounds 1-6 (win/crash/restart/turn/near-wall/skip/Get-Spectra); biphenyl REFUSE_ATOM clash confirmed-by-design with owner; ONE open design item: upload-only runs are endless -> .planning/debug/05-upload-only-endless-run.md (owner decision on C1-C4); checkpoint closed pending: debug fix + Phase 5.1 + one confirmation game
-Last activity: 2026-09-20 — upload-endless logged to debug session; Phase 5.1 (GAME-11 speed/difficulty) INSERTED into ROADMAP/REQUIREMENTS; HANDOFF-2026-09-20-phase5-resume.md written; PAUSED here by owner: dedicated debugger next, then fresh session resumes checkpoint
+Status: machine half green (640 unittests, 7/7 required smokes); human half: ALL gameplay items functionally verified across rounds 1-6; upload-endless debug session RESOLVED 2026-09-20 (C1 demo-mode begin_game note 64882c3 + C4 skip/refuse recap taxonomy e0b2814; C2 soft Start-warning left as owner opt-in, seam documented in resolved debug file); checkpoint closed pending: Phase 5.1 + one confirmation game
+Last activity: 2026-09-20 — debug session resolved (64882c3/e0b2814/2bff573, archived to .planning/debug/resolved/); next: /gsd-plan-phase 5.1 (GAME-11 speed tiers)
 
 Progress: [█████████░] ~85% (53 plans executed — Phases 1-5 firm at 6+14+8+9+16; Phases 6-8 TBD per roadmap estimates, ~8-11 expected)
 
@@ -100,8 +100,8 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-09-20 (execute-phase orchestrator — 05-16 checkpoint rounds 4-6: REFUSE_WALL removed + upload fixes + cooldown + final-pass tests; upload-endless logged to debug; Phase 5.1 inserted (GAME-11); handoff written; PAUSED by owner for a dedicated debug session)
-Stopped at: Phase 5 checkpoint Task 2 final pass — all gameplay items verified; ONE open design item (upload-only endless run) awaiting the dedicated debugger + owner decision
-Resume file: .planning/HANDOFF-2026-09-20-phase5-resume.md (full queue + constraints)
-Next action: (1) /gsd-debug on .planning/debug/05-upload-only-endless-run.md (owner picks C1-C4); (2) /gsd-plan-phase 5.1 + execute (GAME-11 speed tiers, owner feel-check); (3) fresh session: resume checkpoint (set SRP_DEBUG=1 first), one confirmation game; (4) on approval: finalize 05-16 (SUMMARY + verifier + wrap-up commit: ROADMAP row, REQUIREMENTS GAME-04/05/06/09/10 + STACK-01/03/04/05 -> Complete, noting the GAME-10 owner-override contract); (5) then Phase 6 (xtb Pipeline) or Phase 7
+Last session: 2026-09-20 (debug orchestrator — upload-only-endless-run RESOLVED: C1 demo-mode note 64882c3 + C4 recap taxonomy e0b2814 + archive 2bff573; C2 soft Start-warning documented as owner opt-in; 640 tests, 7/7 smokes)
+Stopped at: Phase 5 checkpoint Task 2 final pass — all gameplay items verified; design gap closed; awaiting Phase 5.1 then one confirmation game
+Resume file: .planning/HANDOFF-2026-09-20-phase5-resume.md (step 1 complete — continue from step 2)
+Next action: (1) /gsd-plan-phase 5.1 + execute (GAME-11 speed tiers, owner feel-check); (2) fresh session: resume checkpoint (set SRP_DEBUG=1 first), one confirmation game; (3) on approval: finalize 05-16 (SUMMARY + verifier + wrap-up commit: ROADMAP row, REQUIREMENTS GAME-04/05/06/09/10 + STACK-01/03/04/05 -> Complete, noting the GAME-10 owner-override contract); (4) then Phase 6 (xtb Pipeline) or Phase 7
 Date convention: planning-doc dates are UTC (git commit dates authoritative) — the dev shell is HKT (UTC+8); never stamp from the local date.
