@@ -361,6 +361,8 @@ class GameTab(QtWidgets.QWidget):
         one-shot contract - NEVER per-tick), logs the C1 zero-stackable
         demonstration-mode note ONCE per run when the active set has no
         stacking entries (upload-endless debug session, 2026-09-21),
+        logs the once-per-run speed note (tier + A/s, GAME-11 plan
+        5.1-05) right beside it,
         then runs the epoch-guarded countdown. The movement tick starts
         at _begin_play (after GO!).
         """
@@ -418,6 +420,12 @@ class GameTab(QtWidgets.QWidget):
         note = hud_logic.stack_mode_note(records)
         if note is not None:
             self._log(note)
+        # GAME-11 (plan 5.1-05): the once-per-run speed line, beside the
+        # stack_mode_note precedent, BEFORE 'Get ready...'. Once per
+        # begin_game == once per run (Start or Restart), never per tick.
+        speed_val = setup.get('speed', setup_logic.DEFAULTS['speed'])
+        self._log(hud_logic.speed_note(setup_logic.speed_tier_for(speed_val),
+                                       speed_val))
         self._log('Get ready...')
         self.restart_btn.setEnabled(True)
         self._run_countdown(3)
@@ -427,7 +435,12 @@ class GameTab(QtWidgets.QWidget):
 
         head (0,0) matches the bridge's origin centering; heading
         'right'; box from setup_logic.BOX_PRESETS; cap/atom_budget from
-        the setup dict. Phase 5 (plan 05-11): the FIRST pickup is
+        the setup dict. Phase 5.1 (GAME-11): the setup-selected speed
+        tier is injected HERE as speed_a_per_s (setup['speed'] with
+        the DEFAULTS fallback) - the SINGLE production injection
+        point; the engine reads its speed ONCE per run at this call
+        and never re-reads setup mid-run (GAME-08).
+        Phase 5 (plan 05-11): the FIRST pickup is
         spawned deterministically - spawn_mod.PickupSpawner seeded by
         crc32(setup) over the anchored records - and passed to
         GameEngine(pickups=[seed]) so the capture leg has a live target;
@@ -477,7 +490,8 @@ class GameTab(QtWidgets.QWidget):
             box_min=(x0, y0), box_max=(x1, y1),
             pickups=pickups,
             cap=setup.get('win_cap_molecules'),
-            atom_budget=setup.get('atom_budget'))
+            atom_budget=setup.get('atom_budget'),
+            speed_a_per_s=setup.get('speed', setup_logic.DEFAULTS['speed']))
         return (engine, extras)
 
     def _build_head_state(self, records_by_id, setup):
@@ -1225,6 +1239,13 @@ class GameTab(QtWidgets.QWidget):
         Needs a live session AND the anchored setup dict. begin_game
         re-runs teardown, so a mid-countdown Restart dies by the epoch
         guard (no double timer, Pitfall 9.1).
+
+        NOTE (GAME-11 plan 5.1-05): Restart replays the ANCHOR's setup
+        (speed included) through begin_game -> _build_engine; a mid-run
+        Setup-tab tier change therefore applies to the NEXT run only
+        (GAME-08 constant-within-run), and a tier switch re-seeds the
+        deterministic pickup sequence (accepted crc32(setup) semantics,
+        same as changing the box size).
         """
         if self._session is None:
             return

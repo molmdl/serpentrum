@@ -637,6 +637,20 @@ class TestSpeedNote(unittest.TestCase):
             self.assertIsNotNone(shape.match(line), line)
             self.assertNotIn('\n', line)
 
+    def test_begin_game_has_exactly_one_speed_note_call_site(self):
+        # One-shot-ness pin (plan 5.1-05, mirrors the stack_mode_note
+        # pin): the speed line is logged by begin_game EXACTLY ONCE per
+        # run (never per tick, never per capture). A second call site
+        # would duplicate the line; none would drop the note.
+        source_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'serpentrum', 'gui_game.py')
+        with open(source_path) as handle:
+            source = handle.read()
+        self.assertEqual(source.count('speed_note('), 1,
+                         'exactly one speed_note call site '
+                         '(begin_game, once per run)')
+
 
 class TestDebugSpawnCooldown(unittest.TestCase):
     """debug_spawn_cooldown / debug_spawn_cooldown_over: DBG lines for
