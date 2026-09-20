@@ -395,6 +395,118 @@ class TestDemoteAfterRefuse(SpawnTestBase):
         self.assertEqual(result[0]['id'], self.records[0]['id'])
 
 
+class TestExhaustCooldown(SpawnTestBase):
+    """Exhaust = a resumable cooldown, never permadeath (2026-09-20
+    follow-up to the f211d97 latch).
+
+    Pins: default K == EXHAUST_COOLDOWN_TICKS == 100; pause fires at
+    streak == pool size exactly; no spawn during the cooldown; tick()
+    returns True exactly on the Kth tick (the resume edge); the refuse
+    streak does NOT advance while paused (no extend, no refresh);
+    re-pausing after a resume requires a FRESH pool-size streak; a
+    placed capture during the pause resets the streak without cutting
+    the cooldown short.
+    """
+
+    def _paused_spawner(self, cooldown=4):
+        """Helper: drive a small-cooldown spawner into the pause with
+        pool_size consecutive refuses; assert the pause fired. Returns
+        the paused spawner."""
+        spawner = spawn.PickupSpawner(
+            self.records, BOX_MIN, BOX_MAX, 1234, self.atoms_by_id,
+            exhaust_cooldown_ticks=cooldown)
+        result = spawner.first((0.0, 0.0), 'right')
+        assert result is not None
+        live = [result[2]]
+        spawner.note_resolution(result[0]['id'], refused=True)
+        for _ in range(len(self.records) - 1):
+            result = spawner.next_after((0.0, 0.0), 'right', [], live)
+            assert result is not None
+            live.append(result[2])
+            spawner.note_resolution(result[0]['id'], refused=True)
+        assert spawner.spawn_paused
+        return spawner
+
+    def test_default_cooldown_is_100_ticks(self):
+        self.assertEqual(spawn.EXHAUST_COOLDOWN_TICKS, 100)
+        spawner = self.make_spawner(1234)
+        self.assertEqual(spawner.exhaust_cooldown_ticks, 100)
+        self.assertFalse(spawner.spawn_paused)
+
+    def test_constructor_override_smaller_cooldown(self):
+        spawner = spawn.PickupSpawner(
+            self.records, BOX_MIN, BOX_MAX, 1234, self.atoms_by_id,
+            exhaust_cooldown_ticks=2)
+        self.assertEqual(spawner.exhaust_cooldown_ticks, 2)
+
+    def test_no_spawn_for_exactly_k_ticks(self):
+        # Pause with K=4: each of the first K-1 tick() calls returns
+        # False and spawning stays off; the Kth returns True (resume
+        # edge) and spawning is back on.
+        spawner = self._paused_spawner(cooldown=4)
+        for _ in range(3):
+            self.assertFalse(spawner.tick())
+            self.assertTrue(spawner.spawn_paused)
+            self.assertIsNone(
+                spawner.next_after((0.0, 0.0), 'right', [], []))
+        self.assertTrue(spawner.tick())
+        self.assertFalse(spawner.spawn_paused)
+        self.assertIsNotNone(spawner.next_after((0.0, 0.0), 'right',
+                                                [], []))
+        # tick() while NOT paused is a no-op.
+        self.assertFalse(spawner.tick())
+
+    def test_streak_does_not_advance_while_paused(self):
+        # A refuse recorded DURING the cooldown (a still-live pickup
+        # failing on capture) may NOT extend or refresh the window:
+        # resume still fires after exactly K total ticks.
+        spawner = self._paused_spawner(cooldown=4)
+        self.assertFalse(spawner.tick())  # 1 of 4 elapsed
+        refused_again = self.records[0]['id']  # current serve front
+        spawner.note_resolution(refused_again, refused=True)
+        self.assertFalse(spawner.tick())  # 2 of 4
+        self.assertFalse(spawner.tick())  # 3 of 4
+        self.assertTrue(spawner.tick())   # 4 of 4: resume, not refresh
+        self.assertFalse(spawner.spawn_paused)
+        # Demotion itself is untouched: rotation still applied for the
+        # mid-pause refuse (the served order cycles on the next spawn).
+        result = spawner.next_after((0.0, 0.0), 'right', [], [])
+        self.assertIsNotNone(result)
+        self.assertNotEqual(result[0]['id'], refused_again)
+
+    def test_repause_requires_fresh_pool_size_streak(self):
+        # After the resume edge resets the streak, a single refuse does
+        # NOT re-pause; a full new pool-size streak is required.
+        spawner = self._paused_spawner(cooldown=2)
+        self.assertFalse(spawner.tick())
+        self.assertTrue(spawner.tick())
+        self.assertFalse(spawner.spawn_paused)
+        result = spawner.next_after((0.0, 0.0), 'right', [], [])
+        self.assertIsNotNone(result)
+        live = [result[2]]
+        spawner.note_resolution(result[0]['id'], refused=True)
+        self.assertFalse(spawner.spawn_paused)  # 1 refuse: no pause
+        for _ in range(len(self.records) - 1):
+            result = spawner.next_after((0.0, 0.0), 'right', [], live)
+            self.assertIsNotNone(result)
+            live.append(result[2])
+            spawner.note_resolution(result[0]['id'], refused=True)
+        self.assertTrue(spawner.spawn_paused)   # full streak: pause
+
+    def test_placed_during_pause_resets_streak_not_cooldown(self):
+        # Any successful placement resets the refuse streak IMMEDIATELY
+        # (even mid-cooldown) -- but it does NOT cut the cooldown
+        # short: spawning stays paused until the window elapses.
+        spawner = self._paused_spawner(cooldown=3)
+        spawner.note_resolution('anything', refused=False)
+        self.assertTrue(spawner.spawn_paused)  # cooldown still runs
+        self.assertIsNone(spawner.next_after((0.0, 0.0), 'right', [], []))
+        self.assertFalse(spawner.tick())
+        self.assertFalse(spawner.tick())
+        self.assertTrue(spawner.tick())   # resume after exactly 3 ticks
+        self.assertFalse(spawner.spawn_paused)
+
+
 class TestExhaustion(SpawnTestBase):
     """Case 9: no legal position -> None (no exception, no state advance)."""
 
