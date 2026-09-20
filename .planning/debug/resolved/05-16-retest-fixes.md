@@ -2,7 +2,7 @@
 status: resolved
 trigger: "05-16 human re-test (SRP_DEBUG=1) after the 2026-09-19 gameplay-override fixes: 4 decayed-play issues found — turn-refusal storm ('none of the arrow key ever works'), biphenyl re-serve cascade (REFUSE_WALL x18 on pick_0005), crashed-run leftovers riding the new run on Restart, and owner directive 'with win cap 10, box dimension must scale too'"
 created: 2026-09-20T00:00:00Z
-updated: 2026-09-20T00:00:00Z
+updated: 2026-09-20T12:00:00Z
 
 ---
 
@@ -143,3 +143,92 @@ lookahead that was producing the wall overshoots.
 streak now pauses spawning for ~10 s with (under SRP_DEBUG=1) the
 cooldown line, then feeding resumes automatically once the head has
 moved on — the run stays winnable.
+
+---
+
+## 2026-09-20c: wall placement gate removed + upload path fixed (owner-directed)
+
+Two owner-directed fixes on top of the round-3 state, committed direct
+on main: `d33f74c` (fix F, wall gate), `93f4b2b` (fix G code),
+`22b7245` (fix G regression tests). Gates green after every commit.
+
+### Fix F — REFUSE_WALL placement gate removed (owner directive)
+
+**Owner quote:** "remove the refuse (let it stack out of box since we
+only bound the head in box)".
+
+**Live context (the log excerpts that motivated it):** the re-test log
+was dominated by near-wall REFUSE_WALL activity — first the 18x
+re-capture cascade on pick_0005 Biphenyl (`REFUSE_WALL detail=0.95 A`,
+round 2), then post-fix the position-dependent refuse streaks near the
+small-box walls that fired the exhaust cooldown (round 3). All of it
+came from a rule the owner had already abandoned: bounding the CHAIN in
+the box. The head is box-bound via the GAME-05 crash rule; nothing else
+needs the wall.
+
+**Change:** `placement.gate()` now feeds `stacking.check_clash` an
+effectively unbounded box, so the wall leg can never fire; the
+`REFUSE_WALL` constant and its hud_logic
+`'placement would leave the play box'` literal are gone. Taxonomy now:
+**placed / clash-refuse / no-dataset-entry skip**. REFUSE_ATOM is
+UNTOUCHED — the biphenyl 1.87 A clash remains the STACK-05
+demonstrator (at the shipped display_z 5.0 it now refuses REFUSE_ATOM,
+the old REFUSE_WALL-first routing is gone). z/x/y-overshooting
+non-clashing placements now PLACE; the exhaust cooldown stays as the
+safety net but only ever triggers on genuine clash streaks. End-game
+recap grouping (refused-by-reason) unchanged.
+
+**Pins rewritten:** out-of-box placements now PLACE (benzene past the
+-x face; biphenyl's 6.914 A z-overshoot alone passes the gate);
+biphenyl clash at display_z 5.0 -> REFUSE_ATOM; `hasattr(placement,
+'REFUSE_WALL')` is False; no 'leave the play box' literal survives.
+
+### Fix G — upload molecule path: clean skip + edge-on rendering
+
+**Live failure (upload-only game, SRP_DEBUG=1):**
+
+- the head renders with the ring PARALLEL to the xy plane (should be
+  edge-on like the demo set);
+- every spawn/capture attempt prints
+  `placement error: object of type 'NoneType' has no len()`,
+  repeating every few ticks (the eaten-then-'error'-rejected pickup
+  re-arms, so the head loops back and re-captures it).
+
+**Root cause (G1, the crash):** `_handle_stack_event` computed the
+SRP_DEBUG pre-resolution tail frame BEFORE the skip check:
+`placement.tail_frame` -> `stacking.ring_frame(head_atoms,
+head_stack_ring)` with `head_stack_ring=None` for an upload head ->
+`len(ring_indices)` on None. Upload captures therefore crashed on EVERY
+capture under SRP_DEBUG=1 instead of taking the STACK-03 skip path.
+
+**Fix (G1):** the skip taxonomy is pre-resolved
+(`placement.resolve_skip`) BEFORE any geometry runs (debug tail frame
+included); records without a dataset entry ('__upload__' keying —
+uploads never inherit set_a's entry, locked decision) take the clean
+SKIP_NO_ENTRY path: `skipped <name>: no verified stacking entry for
+this molecule (no invented chemistry)`, ReasonCoalescer `(xN)` on
+repeats, pickup despawns per the current refuse semantics. Nothing may
+print 'placement error' on this path. The exhaust streak is
+distinct-handled: `spawner.note_resolution(..., refused=(status ==
+'refused'))` — SKIP_* outcomes are informational and feed
+refused=False, so an upload-only pool never latches the cooldown.
+
+**Fix (G2, edge-on):** `setloader.load_upload` now attaches
+`stack_ring` when `molfile.ring_cycle` finds a canonical cycle that is
+a PLANAR 6-ring (`stacking.ring_frame` planarity-proofed at load).
+Uploads then flow through the same edge-on seams as demo records —
+materialize_pickup / _pickup_m16 / _mirror_atoms / _build_head_state /
+rebuild_scene — unchanged, so a ring-bearing upload head gets the
+edge-on m16 too (begin_game head parity; m16 was None by design
+before). Ring-less (methane) or non-planar-ring (cyclohexane chair)
+uploads keep `stack_ring` omitted and render as stored (documented,
+acceptable). The skip keying has_stack_entry is untouched: an upload
+WITH a ring still skips SKIP_NO_ENTRY (pinned).
+
+**Regression pins (22b7245):** resolve() never touches geometry for a
+no-entry capture even with head_stack_ring=None + empty chain; edge-on
+m16 produced for a planar-6-ring upload (4.314 A over the mol2 benzene
+fixture); _upload_stack_ring falls back None for ring-less and
+non-planar-ring records; smoke 08 gained SMOKE-OK UPLEDGEON (upload
+record renders edge-on through the shipping bridge path, viewer z-span
+== pure span == 4.297 A anchor).
