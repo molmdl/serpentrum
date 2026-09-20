@@ -62,20 +62,33 @@ DEFAULTS = {
 # GameEngine(box_min, box_max) in Phase 4. z-depth is display-only and
 # is the bridge's concern (Phase 4/5) — NOT encoded here.
 #
-# OWNER-APPROVED CONFIG CHANGE (2026-09-19 UTC, 05-16 checkpoint
-# directive "increase box size of all size level, this is already medium
-# cant play at all with 1-2 eaten mol!"): every preset enlarged from the
-# research-R7 values (small +/-12, medium +/-18, large +/-25) because a
-# cap-10 straight chain needs 36.0 A of stacking span plus the 1.0 A
-# crash margin — it could never fit straight in the OLD medium (36 A
-# wide). New capacities (max straight chain N with 3.6*N <= 2H - 1.0):
-# small N<=10 (cap-10 fits, tight), medium N<=16 (cap-10 comfortable),
-# large N<=24 (headroom above the engine cap max 20). Default stays
-# 'medium'. BOX_DISPLAY_Z (5.0) is UNCHANGED (display-only).
+# OWNER-APPROVED CONFIG CHANGES:
+# 2026-09-19 (05-16 checkpoint): enlarged from the research-R7 values
+#   (small +/-12, medium +/-18, large +/-25) to small +/-20, medium
+#   +/-30, large +/-45 — a cap-10 straight chain (10 x 3.60 = 36.0 A)
+#   plus the 1.0 A crash margin could never fit in the old medium.
+# 2026-09-20 (05-16 re-test, owner directive "with win cap 10, box
+#   dimension must scale too"): enlarged again. Rationale: the win cap
+#   default is 10 -> the full train (head + 9 eaten = 10 x 3.60 =
+#   36.0 A straight) plus maneuvering room (a full rigid sweep of that
+#   chain traces a ~36 A radius arc; a few floating pickups occupy
+#   spawn lanes) must fit COMFORTABLY in the default. MEDIUM
+#   (+/-55, 110 A span) is sized for exactly that: a centered 36 A
+#   chain sweeps inside the box with ~19 A headroom per side; SMALL
+#   (+/-35, 70 A span) is deliberately challenging (cap-10 chain fits
+#   straight, cross-box sweeps clip); LARGE (+/-85, 170 A span) is
+#   generous. Straight-fit table (max N straight segments with
+#   3.6*N <= 2H - 2*BOUNDARY_MARGIN_A(1.0)):
+#     small  +/-35 -> 68 A usable -> 18 segments
+#     medium +/-55 -> 108 A usable -> 30 segments
+#     large  +/-85 -> 168 A usable -> 46 segments
+# Default stays 'medium'. BOX_DISPLAY_Z (5.0) is UNCHANGED
+# (display-only; the biphenyl z-overshoot REFUSE_WALL at placement is
+# the designed refuse demonstrator and stays).
 BOX_PRESETS = {
-    'small': ((-20.0, -20.0), (20.0, 20.0)),
-    'medium': ((-30.0, -30.0), (30.0, 30.0)),
-    'large': ((-45.0, -45.0), (45.0, 45.0)),
+    'small': ((-35.0, -35.0), (35.0, 35.0)),
+    'medium': ((-55.0, -55.0), (55.0, 55.0)),
+    'large': ((-85.0, -85.0), (85.0, 85.0)),
 }
 
 # Exact N-cubed hessian-cost warning (SETUP-06 / SPECTRA-06 pure half).

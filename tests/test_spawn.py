@@ -51,10 +51,11 @@ from serpentrum import spawn  # noqa: E402  -- RED: module does not exist yet
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Medium preset xy extents (setup_logic.BOX_PRESETS['medium']).
-# OWNER-APPROVED CONFIG CHANGE (2026-09-19 UTC): medium is now +/-30
-# (was +/-18); all fixtures below scale off these two constants.
-BOX_MIN = (-30.0, -30.0)
-BOX_MAX = (30.0, 30.0)
+# OWNER-APPROVED CONFIG CHANGES (2026-09-19 then 2026-09-20): medium is
+# now +/-55 (was +/-18, then +/-30); all fixtures below scale off these
+# two constants.
+BOX_MIN = (-55.0, -55.0)
+BOX_MAX = (55.0, 55.0)
 WALL_MARGIN_A = 3.5
 
 # Canonical setup dict for the seed pins.
@@ -186,7 +187,7 @@ class TestGeometry(SpawnTestBase):
                 [], live)
             self.assertIsNotNone(result)
             cx, cy = result[2]
-            limit = 30.0 - WALL_MARGIN_A + TOL  # BOX_MAX[0] - margin
+            limit = 55.0 - WALL_MARGIN_A + TOL  # BOX_MAX[0] - margin
             self.assertLessEqual(abs(cx), limit)
             self.assertLessEqual(abs(cy), limit)
             live.append((cx, cy))
@@ -382,18 +383,22 @@ class TestExhaustion(SpawnTestBase):
     """Case 9: no legal position -> None (no exception, no state advance)."""
 
     def test_saturated_box_returns_none_without_advance(self):
-        spawner = self.make_spawner(42)
-        # Chain atoms covering the whole wall-margined box: spacing 1.5 A,
-        # so every in-box point is < 3.0 A from some chain atom.
-        # (Box-size scaling, 2026-09-19 owner-approved presets: the
-        # shrunk box is now +/-26.5 — the lattice spans +/-27, i.e.
-        # BOX_MAX - WALL_MARGIN_A = 30.0 - 3.5, fully covered.)
-        cover = [('C', -27.0 + 1.5 * i, -27.0 + 1.5 * j, 0.0)
-                 for i in range(37) for j in range(37)]
+        # Saturate a SMALL custom box (not the medium preset — the
+        # 2026-09-20 owner-approved +/-55 box would need a 70x70 cover
+        # lattice against the full grid-scan fallback: slow for a pin).
+        # Box +/-6 -> shrunk +/-2.5; the 1.5 A lattice at +/-4.5 puts
+        # every in-box point < 3.0 A from a chain atom (and inside the
+        # 5.0 A head clearance too).
+        spawner = self.make_spawner(42, box_min=(-6.0, -6.0),
+                                    box_max=(6.0, 6.0))
+        cover = [('C', -4.5 + 1.5 * i, -4.5 + 1.5 * j, 0.0)
+                 for i in range(7) for j in range(7)]
         self.assertIsNone(spawner.next_after((0.0, 0.0), 'right', cover, []))
         # No state advance on None: the same record is offered next, and
-        # the pid counter did not consume a serial.
-        result = spawner.next_after((0.0, 0.0), 'right', [], [])
+        # the pid counter did not consume a serial. (Re-head far from
+        # the origin so the 5.0 A head clearance legalizes a spot in
+        # the small box.)
+        result = spawner.next_after((4.0, 4.0), 'left', [], [])
         self.assertIsNotNone(result)
         self.assertEqual(result[0]['id'], self.records[0]['id'])
         self.assertEqual(result[1], 'pick_0001')

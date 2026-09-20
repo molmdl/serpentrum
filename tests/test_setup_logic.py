@@ -80,15 +80,25 @@ class TestDefaults(unittest.TestCase):
         self.assertEqual(SCHEMA_VERSION, 1)
         self.assertEqual(KNOWN_SETS, ('set_a',))
         # Box presets: exact xy extents (Angstrom); z-depth is display-only.
-        # OWNER-APPROVED CONFIG CHANGE (2026-09-19 UTC, 05-16 checkpoint):
-        # all presets enlarged from the research-R7 values (small +/-12,
-        # medium +/-18, large +/-25) — see setup_logic.BOX_PRESETS comment
-        # for the straight-fit derivation.
+        # OWNER-APPROVED CONFIG CHANGES: 2026-09-19 enlarged from the
+        # research-R7 values (small +/-12, medium +/-18, large +/-25);
+        # 2026-09-20 (05-16 re-test directive "with win cap 10, box
+        # dimension must scale too") enlarged again — see
+        # setup_logic.BOX_PRESETS comment for the cap-10 straight-fit
+        # derivation (usable 2H-2.0 -> 18 / 30 / 46 straight segments).
         self.assertEqual(BOX_PRESETS, {
-            'small': ((-20.0, -20.0), (20.0, 20.0)),
-            'medium': ((-30.0, -30.0), (30.0, 30.0)),
-            'large': ((-45.0, -45.0), (45.0, 45.0)),
+            'small': ((-35.0, -35.0), (35.0, 35.0)),
+            'medium': ((-55.0, -55.0), (55.0, 55.0)),
+            'large': ((-85.0, -85.0), (85.0, 85.0)),
         })
+        # Straight-fit: 10 x 3.60 = 36.0 A cap-10 chain fits in EVERY
+        # preset (small is the challenging floor); medium (the default)
+        # has 3x straight room.
+        H = {'small': 35.0, 'medium': 55.0, 'large': 85.0}
+        for name, half in H.items():
+            usable = 2.0 * half - 2.0  # minus BOUNDARY_MARGIN_A both ends
+            self.assertGreaterEqual(usable, 36.0)
+        self.assertGreaterEqual(2.0 * H['medium'] - 2.0, 3.0 * 36.0)
         self.assertEqual(
             HESSIAN_WARNING,
             'hessian cost scales ~N^3; a ~100-atom snake may take 30-90 s')
