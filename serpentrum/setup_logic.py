@@ -93,6 +93,24 @@ BOX_PRESETS = {
     'large': ((-85.0, -85.0), (85.0, 85.0)),
 }
 
+# Speed tiers: named difficulty levels as (name, A/s) pairs (plan 5.1-02,
+# SC1). DRAFT values — owner-finalized at the 5.1 feel-check (plan
+# 5.1-06); value tweaks are edits to THIS table only, and the exact tuple
+# pin in tests/test_setup_logic.py is the visible reviewable diff for
+# those tweaks. A tuple-of-tuples (insertion-ordered, py3.6-safe — NEVER
+# a dict for ordering) because insertion order drives the GUI combo
+# order. SINGLE source for the setup-tab combo (5.1-04), the HUD speed
+# note (5.1-03/05), and speed_tier_for() tier-name resolution. The
+# schema key 'speed' STAYS numeric (DEFAULTS['speed'] = 3.0 = 'normal'):
+# backcompat is free (every setup file ever written already carries it)
+# and no SCHEMA_VERSION bump is needed.
+SPEED_TIERS = (
+    ('relaxed', 2.0),
+    ('normal', 3.0),
+    ('fast', 4.5),
+    ('expert', 6.0),
+)
+
 # Exact N-cubed hessian-cost warning (SETUP-06 / SPECTRA-06 pure half).
 # Rationale: PITFALLS 2 measured 13 atoms 0.28 s / 26 atoms 1.03 s
 # hessian wall; N^3 extrapolation puts a ~100-atom snake at 30-90 s. The
@@ -115,6 +133,43 @@ def new_setup():
     returned dict never touches the module-level DEFAULTS.
     """
     return dict(DEFAULTS)
+
+
+def merge_defaults(loaded):
+    """Overlay a loaded setup dict onto DEFAULTS (plan 5.1-02, SC3).
+
+    Absent keys fall back to the documented defaults — the backcompat
+    seam for setup files written before a key existed (Phase 5.1's
+    'speed'; Phase 5.2 reuses this seam for its consent key, "absent
+    key = OFF"). Keys present in ``loaded`` WIN over the defaults;
+    unknown EXTRA keys in ``loaded`` pass through untouched (unknown
+    keys are tolerated everywhere today).
+
+    NEVER mutates ``loaded`` or module-level DEFAULTS — the returned
+    dict is a fresh copy. Applied by CALLERS after ``load_setup``;
+    ``load_setup`` itself keeps its no-merge contract (it returns the
+    raw dict and lets the caller decide), pinned by
+    test_load_does_not_full_validate.
+    """
+    merged = dict(DEFAULTS)
+    merged.update(loaded)
+    return merged
+
+
+def speed_tier_for(speed):
+    """Resolve a speed (A/s) to its tier name, else 'custom' (plan 5.1-02).
+
+    EXACT float match against SPEED_TIERS values only — deliberately NO
+    nearest-match guessing: a hand-tuned 3.1 is honestly 'custom', not
+    a near-'normal'. Feeds the HUD speed note (5.1-03/05). Deliberately
+    NOT used to tighten validate(): any number > 0 stays legal in the
+    schema (accept-as-is); the tier combo is the UI constraint, not the
+    schema.
+    """
+    for name, aps in SPEED_TIERS:
+        if speed == aps:
+            return name
+    return 'custom'
 
 
 def _is_number(value):
