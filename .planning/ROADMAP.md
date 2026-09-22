@@ -199,7 +199,16 @@ Notes: Inserted per owner playtesting feedback 2026-09-20 ("current speed is eas
   3. With consent ON, an upload WITHOUT a planar 6-ring still skips with a specific reason ("no aromatic ring for generic π-stack" class); with consent OFF, behavior is byte-identical to today (skip, no invented chemistry). [STACK-03 integrity]
   4. End-of-run recap groups generic placements under the labeled generic interaction (distinct from dataset entries); DATA-sources/docs wording updated to describe the generic mode. [STACK-04]
   5. A live human feel-check approves the consent UX + labeling (checkpoint). [STACK-06]
-**Plans**: TBD (expected 2–3; pure generic-entry injection + ring eligibility + labeled content ∥ Setup control + persistence + GameTab wiring ∥ gates + feel-check checkpoint — parallelizable)
+**Plans**: 9 plans in 5 waves (planned 2026-09-23):
+- [ ] 5.2-01-PLAN.md — TDD schema consent key `generic_stack_consent` + validate bool check (Wave 1, parallel)
+- [ ] 5.2-02-PLAN.md — TDD generic_stack module: generic entry, overlay builder, recap name, stackability helper (Wave 1, parallel)
+- [ ] 5.2-03-PLAN.md — TDD SKIP_GENERIC_NO_RING taxonomy branch (Wave 2, sequential)
+- [ ] 5.2-04-PLAN.md — TDD HUD surfaces: reason text, consent-aware stack_mode_note, generic_consent_note (Wave 3, sequential)
+- [ ] 5.2-05-PLAN.md — Setup consent checkbox + overlay anchor + absorbed C2 clause (Wave 4, parallel)
+- [ ] 5.2-06-PLAN.md — GameTab wiring: consent restamp, consent note slot, recap enrollment (Wave 4, parallel)
+- [ ] 5.2-07-PLAN.md — DATA_SOURCES.md generic-mode docs + literal consistency check (Wave 4, parallel)
+- [ ] 5.2-08-PLAN.md — Pure integration chains + upload-only win path + full gates (Wave 4, parallel)
+- [ ] 5.2-09-PLAN.md — Final gates + OFF-pin sweep + owner feel-check checkpoint (Wave 5, blocking)
 
 Notes: Inserted per owner question 2026-09-20 ("possible to have user accept a pre-defined stacking in a popup and allow play as usual?"). Repos rule honored: distance is NOT invented (reuses the human-approved DATA-02 geometry); consent is explicit and non-silent; labeling keeps educational integrity (the v2 "silent fallback" out-of-scope entry stays out of scope). Absorbs the debug-session's C2 soft-warning seam into the same Setup surface. **Plan BEFORE Phase 5.1 (owner choice 2026-09-20); execute Phase 5.2 → 5.1 sequentially** (both touch gui_setup/hud_logic — no parallel waves across the two phases). Eligibility reuses 05-01/05-19d machinery: canonical planar 6-ring extractor + edge-on parity.
 
