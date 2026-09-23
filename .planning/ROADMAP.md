@@ -223,9 +223,23 @@ Notes: Inserted per owner question 2026-09-20 ("possible to have user accept a p
   3. Success is declared only on the verified contract (exit 0 + "normal termination" + expected output files); corrupted input surfaces a clear failure, never a fake success. [SPECTRA-02]
   4. Before launch, the hidden molecule/atom counts are re-checked against the configured cap; exceeding it shows a warning. [SPECTRA-06]
   5. A capped ~100-atom snake completes `--ohess` headless with measured wall time; warning threshold and OMP environment calibrated from the measurement. [SPECTRA-06]
-**Plans**: TBD (expected 2–3; the QProcess-in-conda smoke gates the runner plan — atom-guard + calibration can run as parallel plans once the smoke lands)
+**Plans**: 12 plans in 4 waves (planned 2026-09-24 from 06-RESEARCH-runner/-guard; owner directive: fine-grained plans):
 
-Notes: PyMOL-free; the only gameplay touchpoint is the final-snake xyz handoff. Smoke first: QProcess in the Windows conda PyMOL build (one-line smoke); fallback = worker+queue+QTimer drain (verified pattern). Avoids Pitfalls 1, 2, 3, 6, 11-assert, 12-fixtures. `[TRAIN]` items (OMP env) verified here.
+Plans:
+- [ ] 06-01-PLAN.md — TDD budget_guard: SPECTRA-06 launch re-check (warn-and-proceed, head-inclusive counts) (Wave 1, parallel)
+- [ ] 06-02-PLAN.md — TDD xtb_run: state machine, env knobs, run-input builder, spectra_run record shape (Wave 1, parallel)
+- [ ] 06-03-PLAN.md — QProcess-in-conda gate smoke 09 (informational; unblocks the runner plans) (Wave 1, parallel)
+- [ ] 06-04-PLAN.md — bridge chain_atom_counts + REQUIRED chain-count smoke 10 (Wave 2, parallel; after 5.2 lands)
+- [ ] 06-05-PLAN.md — XtbRunController GUI shell + purity GUI_MODULES entry + spectra_run anchor attr (Wave 2, parallel)
+- [ ] 06-06-PLAN.md — completion anchors snake_xyz (engine-atom run input) + log_external channel (Wave 2, parallel)
+- [ ] 06-07-PLAN.md — calibration: ~104-atom --ohess wall-time sweep + 06-CALIBRATION.md (Wave 2, parallel)
+- [ ] 06-08-PLAN.md — runner contract smoke 11: success/cancel/no-double-run/failure paths (Wave 3, parallel)
+- [ ] 06-09-PLAN.md — launch pipeline interpose + placeholder status/cancel affordances (Wave 3, parallel)
+- [ ] 06-10-PLAN.md — pure integration chain tests (completion→input→guard→state→contract→record) (Wave 3, parallel)
+- [ ] 06-11-PLAN.md — calibration applied: HESSIAN_WARNING wording + runner thread default (Wave 3, parallel; after 5.2 lands)
+- [ ] 06-12-PLAN.md — final gates (--smoke/--xtb) + human-verify pipeline checkpoint (Wave 4, blocking)
+
+Notes: PyMOL-free; the only gameplay touchpoint is the final-snake xyz handoff — resolved as EQ-xyz-1: the run input is assembled at completion from ENGINE/SESSION atoms (05-RESEARCH-core-integration:151 forbids re-reads) and stashed on `last_run['snake_xyz']`; the viewer channel is a counts-only cross-check (06-04). Smoke first: the QProcess-in-conda smoke (06-03, informational) gates the runner plans 06-05/06-08 via depends_on; fallback = worker+queue+QTimer drain (documented, unbuilt). Shared-file rule: plans touching Phase-5.2 files (pymol_bridge, gui_game, setup_logic, __init__) carry depends_on: ["5.2-09"]. Avoids Pitfalls 1, 2, 3, 6, 11-assert, 12-fixtures. `[TRAIN]` items (OMP env) verified/measured by 06-07 + applied by 06-11. SPECTRA-tab UI verdicts defer to Phase 7 (EQ-checkpoint-1: the 06-12 checkpoint covers pipeline behavior via the temporary placeholder affordances).
 
 ### Phase 7: Spectra UI *(research phase G)*
 
@@ -304,6 +318,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Stacking & Game Rules Complete | 16/16 | Complete (verified 48/48 plan truths, 3 owner-amended; 5/5 criteria; 9/9 reqs; 7-round human checkpoint) | 2026-09-20 |
 | 5.1. Game Speed / Difficulty (INSERTED 2026-09-20) | 0/TBD | Not started (plan after Phase 5.2) | - |
 | 5.2. Generic Upload Stacking Consent (INSERTED 2026-09-20) | 0/TBD | Next (owner chose plan-first) | - |
-| 6. xtb Pipeline | 0/TBD | Not started | - |
+| 6. xtb Pipeline | 0/12 | Planned (2026-09-24; 12 plans in 4 waves) | - |
 | 7. Spectra UI | 0/TBD | Not started | - |
 | 8. Demo Data, Docs & Release Audit | 0/TBD | Not started | - |
