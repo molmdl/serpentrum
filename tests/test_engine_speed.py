@@ -8,9 +8,10 @@ construction: one attribute, set once, never mutated mid-run). Cases:
 1. Default preservation: an engine built WITHOUT the kwarg behaves
    exactly as before (SPEED_A_PER_S = 3.0 A/s -> 0.3 A per 0.1 s tick);
    every pre-5.1 call site stays green untouched.
-2. Per-tier displacement: speed 2.0 -> 0.2 A/tick, 6.0 -> 0.6 A/tick,
+2. Per-speed displacement: speed 2.0 -> 0.2 A/tick, 6.0 -> 0.6 A/tick,
    and movement always follows the HEADING unit vector (heading 'up'
-   with 6.0 -> (0.0, 0.6), never hardcoded +x).
+   with 6.0 -> (0.0, 0.6), never hardcoded +x). 6.0 is also the shipped
+   'normal' tier after the 5.1-06 owner retune.
 3. Train-follow parity: the WHOLE CHAIN is translated by the SAME
    per-tier delta the head took (_translate_chain consumes the same
    delta — no second speed source).
@@ -83,15 +84,22 @@ class TestDefaultPreserved(unittest.TestCase):
 
 
 class TestPerTierDisplacement(unittest.TestCase):
-    """Case 2: per-tier step size; movement follows the heading."""
+    """Case 2: per-speed step size; movement follows the heading.
+    Speeds here are arbitrary positive values (the kwarg accepts any
+    > 0) except where noted as shipped tiers — the tier TABLE lives in
+    setup_logic (owner-finalized 5.1-06: 3.0/6.0/7.5/9.0) and the
+    engine never reads it."""
 
-    def test_relaxed_tier_20(self):
+    def test_arbitrary_slow_speed_20(self):
+        # 2.0 A/s: below every shipped tier after the 5.1-06 retune —
+        # still a legal kwarg value (validate is the schema's job).
         engine = GameEngine(speed_a_per_s=2.0, **ENGINE_ARGS)
         events = engine.step(0.1)
         self.assertAlmostEqual(events[0][1][0], 0.2, delta=DELTA)
         self.assertAlmostEqual(events[0][1][1], 0.0, delta=DELTA)
 
-    def test_expert_tier_60(self):
+    def test_normal_tier_60(self):
+        # 6.0 A/s is the shipped 'normal' tier (5.1-06 retune).
         engine = GameEngine(speed_a_per_s=6.0, **ENGINE_ARGS)
         events = engine.step(0.1)
         self.assertAlmostEqual(events[0][1][0], 0.6, delta=DELTA)

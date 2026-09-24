@@ -55,7 +55,10 @@ DEFAULTS = {
     'win_cap_molecules': 10,       # SETUP-06 (~10 mol / ~100 atoms safe)
     'atom_budget': 100,            # warning threshold (hessian ~N^3)
     'broadening_fwhm': 16.0,       # cm^-1; STACK.md §6: ~10-20 typical
-    'speed': 3.0,                  # A/s (mirrors game_engine SPEED_A_PER_S)
+    'speed': 6.0,                  # A/s = the 'normal' tier (owner-final
+                                   # 2026-09-25 feel-check; game_engine's
+                                   # SPEED_A_PER_S stays 3.0 as the v1
+                                   # baseline + kwarg fallback only)
 }
 
 # Box xy-extents in Angstrom (research R7). Consumed by
@@ -94,21 +97,25 @@ BOX_PRESETS = {
 }
 
 # Speed tiers: named difficulty levels as (name, A/s) pairs (plan 5.1-02,
-# SC1). DRAFT values — owner-finalized at the 5.1 feel-check (plan
-# 5.1-06); value tweaks are edits to THIS table only, and the exact tuple
-# pin in tests/test_setup_logic.py is the visible reviewable diff for
-# those tweaks. A tuple-of-tuples (insertion-ordered, py3.6-safe — NEVER
-# a dict for ordering) because insertion order drives the GUI combo
-# order. SINGLE source for the setup-tab combo (5.1-04), the HUD speed
-# note (5.1-03/05), and speed_tier_for() tier-name resolution. The
-# schema key 'speed' STAYS numeric (DEFAULTS['speed'] = 3.0 = 'normal'):
-# backcompat is free (every setup file ever written already carries it)
-# and no SCHEMA_VERSION bump is needed.
+# SC1). OWNER-FINALIZED at the 5.1-06 feel-check (2026-09-25): the drafts
+# (2.0/3.0/4.5/6.0) all played too slow — "only expert feel like playing"
+# — so the scale shifted up: relaxed 3.0 (= the old v1 baseline) and
+# normal 6.0 (= the old expert, the owner's playable anchor) are FINAL;
+# fast 7.5 / expert 9.0 are the owner's "try" values pending a feel round
+# at the new speeds. Value tweaks remain edits to THIS table only, and
+# the exact tuple pin in tests/test_setup_logic.py is the visible
+# reviewable diff for those tweaks. A tuple-of-tuples (insertion-ordered,
+# py3.6-safe — NEVER a dict for ordering) because insertion order drives
+# the GUI combo order. SINGLE source for the setup-tab combo (5.1-04),
+# the HUD speed note (5.1-03/05), and speed_tier_for() tier-name
+# resolution. The schema key 'speed' STAYS numeric (DEFAULTS['speed'] =
+# 6.0 = 'normal'): backcompat is free (every setup file ever written
+# already carries it) and no SCHEMA_VERSION bump is needed.
 SPEED_TIERS = (
-    ('relaxed', 2.0),
-    ('normal', 3.0),
-    ('fast', 4.5),
-    ('expert', 6.0),
+    ('relaxed', 3.0),
+    ('normal', 6.0),
+    ('fast', 7.5),
+    ('expert', 9.0),
 )
 
 # Exact N-cubed hessian-cost warning (SETUP-06 / SPECTRA-06 pure half).

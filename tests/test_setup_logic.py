@@ -9,8 +9,9 @@ randomize_head is seed-deterministic via private random.Random instances
 (never the global random module). Plan 5.1-02 adds the SPEED_TIERS exact
 tuple pin, the merge_defaults absent-key backcompat matrix, speed_tier_for
 exact-match resolution, the custom-speed accept-as-is pin, and a
-non-default-speed save/load round-trip. EXPECTED_DEFAULTS is UNCHANGED
-(speed 3.0 was already the documented default).
+non-default-speed save/load round-trip. EXPECTED_DEFAULTS tracks the
+owner-finalized default (5.1-06 feel-check 2026-09-25: speed 6.0 = the
+'normal' tier; the drafts all played too slow).
 
 Discovery command (verified on python3.6.9 — NOTE: `-t .` FAILS on
 python3.6 with a non-package start dir; do not add it):
@@ -48,7 +49,7 @@ EXPECTED_DEFAULTS = {
     'win_cap_molecules': 10,
     'atom_budget': 100,
     'broadening_fwhm': 16.0,
-    'speed': 3.0,
+    'speed': 6.0,
 }
 
 
@@ -347,18 +348,20 @@ class TestLoadSetupErrors(unittest.TestCase):
 
 class TestSpeedTierTable(unittest.TestCase):
     """SPEED_TIERS is the ONE ordered name -> A/s table (plan 5.1-02).
-    Draft values; owner-finalized at the 5.1 feel-check — this EXACT
-    tuple pin is the visible reviewable diff for those value tweaks.
-    Insertion order is pinned because it drives the GUI combo order."""
+    Owner-finalized at the 5.1-06 feel-check (2026-09-25): relaxed 3.0 /
+    normal 6.0 FINAL, fast 7.5 / expert 9.0 owner "try" values pending a
+    feel round at the new speeds. This EXACT tuple pin is the visible
+    reviewable diff for any further value tweaks. Insertion order is
+    pinned because it drives the GUI combo order."""
 
     def test_speed_tiers_exact_ordered_table(self):
         self.assertEqual(
             SPEED_TIERS,
-            (('relaxed', 2.0), ('normal', 3.0), ('fast', 4.5),
-             ('expert', 6.0)))
+            (('relaxed', 3.0), ('normal', 6.0), ('fast', 7.5),
+             ('expert', 9.0)))
 
     def test_default_speed_is_a_tier_value(self):
-        # The numeric default (3.0) IS one of the tier values, so a
+        # The numeric default (6.0) IS one of the tier values, so a
         # fresh setup resolves to a named tier ('normal'), not 'custom'.
         tier_values = [aps for _name, aps in SPEED_TIERS]
         self.assertIn(DEFAULTS['speed'], tier_values)
@@ -383,9 +386,10 @@ class TestMergeDefaults(unittest.TestCase):
 
     def test_absent_speed_merges_to_default_and_validates_clean(self):
         # The backcompat scenario: a dict missing 'speed' merges to the
-        # default tier (3.0) instead of failing validation.
+        # default tier (6.0 = 'normal' since the 5.1-06 retune) instead
+        # of failing validation.
         merged = merge_defaults({'schema_version': 1})
-        self.assertEqual(merged['speed'], 3.0)
+        self.assertEqual(merged['speed'], 6.0)
         self.assertEqual(validate(merged), ([], []))
 
     def test_input_dict_not_mutated(self):
@@ -409,13 +413,18 @@ class TestSpeedTierFor(unittest.TestCase):
     used to tighten validate() — no nearest-match guessing."""
 
     def test_exact_tier_values_resolve_to_names(self):
-        self.assertEqual(speed_tier_for(2.0), 'relaxed')
-        self.assertEqual(speed_tier_for(3.0), 'normal')
-        self.assertEqual(speed_tier_for(4.5), 'fast')
-        self.assertEqual(speed_tier_for(6.0), 'expert')
+        # Exact-match only (owner-finalized table, 5.1-06 feel-check).
+        self.assertEqual(speed_tier_for(3.0), 'relaxed')
+        self.assertEqual(speed_tier_for(6.0), 'normal')
+        self.assertEqual(speed_tier_for(7.5), 'fast')
+        self.assertEqual(speed_tier_for(9.0), 'expert')
 
     def test_off_tier_speed_is_custom(self):
+        # 3.1 sits between relaxed (3.0) and normal (6.0) — off-tier.
         self.assertEqual(speed_tier_for(3.1), 'custom')
+        # The pre-retune draft values are now off-tier too.
+        self.assertEqual(speed_tier_for(2.0), 'custom')
+        self.assertEqual(speed_tier_for(4.5), 'custom')
 
     def test_non_number_inputs_are_custom(self):
         self.assertEqual(speed_tier_for(None), 'custom')

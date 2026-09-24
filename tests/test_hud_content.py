@@ -598,18 +598,19 @@ class TestSpeedNote(unittest.TestCase):
     SUFFIX = ' - steering cadence and turn time are unchanged'
 
     def test_normal_tier_exact(self):
+        # Owner-finalized values (5.1-06 feel-check): normal = 6.0.
         self.assertEqual(
-            hud_logic.speed_note('normal', 3.0),
-            'speed: normal (3.0 A/s)' + self.SUFFIX)
+            hud_logic.speed_note('normal', 6.0),
+            'speed: normal (6.0 A/s)' + self.SUFFIX)
 
     def test_fast_and_expert_tiers_exact(self):
         self.assertEqual(
-            hud_logic.speed_note('fast', 4.5),
-            'speed: fast (4.5 A/s)' + self.SUFFIX)
-        # %.1f always renders one decimal: expert 6.0 -> '6.0'.
+            hud_logic.speed_note('fast', 7.5),
+            'speed: fast (7.5 A/s)' + self.SUFFIX)
+        # %.1f always renders one decimal: expert 9.0 -> '9.0'.
         self.assertEqual(
-            hud_logic.speed_note('expert', 6.0),
-            'speed: expert (6.0 A/s)' + self.SUFFIX)
+            hud_logic.speed_note('expert', 9.0),
+            'speed: expert (9.0 A/s)' + self.SUFFIX)
 
     def test_custom_speed_surfaces_honestly(self):
         # Hand-tuned speeds render with the 'custom' tier name.
@@ -618,10 +619,10 @@ class TestSpeedNote(unittest.TestCase):
             'speed: custom (3.2 A/s)' + self.SUFFIX)
 
     def test_trailing_decimal_always_rendered(self):
-        # '2.0', never '2' (the relaxed tier's round value).
-        line = hud_logic.speed_note('relaxed', 2.0)
-        self.assertIn('(2.0 A/s)', line)
-        self.assertNotIn('(2 A/s)', line)
+        # '3.0', never '3' (the relaxed tier's round value).
+        line = hud_logic.speed_note('relaxed', 3.0)
+        self.assertIn('(3.0 A/s)', line)
+        self.assertNotIn('(3 A/s)', line)
 
     def test_count_free_game_04_guard(self):
         # GAME-04 guard: every line matches the exact template with
@@ -630,8 +631,8 @@ class TestSpeedNote(unittest.TestCase):
         shape = re.compile(
             r'^speed: [a-z]+ \([0-9]+\.[0-9] A/s\)'
             r' - steering cadence and turn time are unchanged$')
-        for tier, speed in [('relaxed', 2.0), ('normal', 3.0),
-                            ('fast', 4.5), ('expert', 6.0),
+        for tier, speed in [('relaxed', 3.0), ('normal', 6.0),
+                            ('fast', 7.5), ('expert', 9.0),
                             ('custom', 3.2)]:
             line = hud_logic.speed_note(tier, speed)
             self.assertIsNotNone(shape.match(line), line)
