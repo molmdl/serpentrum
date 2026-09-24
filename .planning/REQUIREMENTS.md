@@ -34,7 +34,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **GAME-08**: Snake speed is constant for v1
 - [x] **GAME-09**: On completion (win or crash): viewer clears, camera focuses the completed snake, info box shows snake length + total score (molecule count), and "Get Spectra" activates
 - [x] **GAME-10**: Turning rotates the entire chain as a rigid body (stacking geometry immutable at all times); a turn whose sweep would collide with the boundary or body is refused; 180° reversal is forbidden *(shipped owner-amended 2026-09-20: rigid sweep + train-follow tail, immutable 3.60 Å spacing; turn pre-check refuses 180° only)*
-- [ ] **GAME-11**: Setup tab offers a game speed/difficulty selector with named tiers (speed constant within a run per GAME-08); the choice persists via Save/Load Setup; default = the v1 baseline speed (3.0 Å/s) *(inserted 2026-09-20 with Phase 5.1 — owner playtesting feedback)*
+- [x] **GAME-11**: Setup tab offers a game speed/difficulty selector with named tiers (speed constant within a run per GAME-08); the choice persists via Save/Load Setup; default = the v1 baseline speed (3.0 Å/s) *(inserted 2026-09-20 with Phase 5.1 — owner playtesting feedback)* — **DELIVERED Phase 5.1 (verified 2026-09-25)**: 4-tier selector shipped; owner feel-check AMENDED the values (all drafts too slow — "only expert feel like playing"): relaxed 3.0 / normal 6.0 / fast 7.5 / expert 9.0 A/s, default tier 'normal' = 6.0; v1 baseline 3.0 survives as 'relaxed' + engine kwarg fallback; persistence via schema backcompat proven pure-layer (Save/Load buttons are Phase 8)
 
 ### Molecular Stacking
 
@@ -142,7 +142,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GAME-08 | Phase 4 | Complete |
 | GAME-09 | Phase 5 | Complete |
 | GAME-10 | Phase 5 | Complete (owner-amended contract — see note) |
-| GAME-11 | Phase 5.1 | Pending |
+| GAME-11 | Phase 5.1 | Complete |
 | STACK-01 | Phase 5 | Complete |
 | STACK-02 | Phase 2 | Complete |
 | STACK-03 | Phase 5 | Complete |

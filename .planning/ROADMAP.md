@@ -21,7 +21,7 @@ A PyMOL plugin game: steer a molecular head around a bounded box, stack real sma
 - [x] **Phase 3: Molecules in the Viewer & Setup Tab** - Configure a game in the Setup tab; box + head molecule materialize in the viewer; uploads gated *(research C)*
 - [x] **Phase 4: Game Loop & Input** - Arrow-key steered movement on a 2D locked-camera plane with countdown, HUD, pause/restart *(research D — input spike)*
 - [x] **Phase 5: Stacking & Game Rules Complete** - Pickups stack at cited geometry; rigid-pivot turns; collisions end runs; win/crash both reach spectra *(research E)*
-- [ ] **Phase 5.1: Game Speed / Difficulty (INSERTED 2026-09-20)** - Setup-selectable constant speed tier (difficulty), persisted; baseline 3.0 Å/s unchanged *(owner insertion — playtesting feedback)*
+- [x] **Phase 5.1: Game Speed / Difficulty (INSERTED 2026-09-20)** - Setup-selectable constant speed tier (difficulty), persisted; owner feel-check amended the tier values (3.0/6.0/7.5/9.0 A/s, default 'normal' 6.0 — drafts all "too slow") *(owner insertion — playtesting feedback)*
 - [ ] **Phase 5.2: Generic Upload Stacking Consent (INSERTED 2026-09-20)** - Opt-in generic π-stack geometry for ring-bearing uploads (illustrative, labeled); upload-only games become winnable *(owner insertion — promotes v2 STACK-06)* *(STACK-03 integrity guards: non-silent, labeled, human-approved geometry)*
 - [ ] **Phase 6: xtb Pipeline** - Async cancellable `xtb --ohess` with verified success contract and calibrated atom-budget guard *(research F — parallel track)*
 - [ ] **Phase 7: Spectra UI** - Broadened IR plot, clickable frequency table → static mode vectors, streaming log, saveable plot *(research G)*
@@ -176,15 +176,15 @@ Notes: The clash gate is a game rule, not a spectra afterthought (a clashing app
   2. The selected speed applies at GO! and stays constant for the whole run; Restart keeps the selection. [GAME-11]
   3. Save Setup → Load Setup reproduces the chosen speed; setup files written before this feature load with the default tier (schema backcompat). [GAME-11]
   4. A live human feel-check approves the final tier values (checkpoint). [GAME-11]
-**Plans**: 6 plans (3 waves; 2026-09-20 — planned per owner directive; STATE's "plan 5.2 first" superseded by the owner's explicit /gsd-plan-phase 5.1)
+**Plans**: 6 plans (3 waves; 2026-09-20 — planned per owner directive; STATE's "plan 5.2 first" superseded by the owner's explicit /gsd-plan-phase 5.1) — EXECUTED 2026-09-25 (owner moved 5.1 ahead of 5.2)
 
 Plans:
-- [ ] 5.1-01-PLAN.md — TDD engine `speed_a_per_s` trailing kwarg + per-tier/determinism tests (Wave 1, parallel)
-- [ ] 5.1-02-PLAN.md — TDD SPEED_TIERS table + merge_defaults backcompat + speed_tier_for (Wave 1, parallel)
-- [ ] 5.1-03-PLAN.md — TDD hud_logic.speed_note pure builder (Wave 1, parallel)
-- [ ] 5.1-04-PLAN.md — Setup-tab Speed QGroupBox + tier combo, box_combo pattern (Wave 2, parallel)
-- [ ] 5.1-05-PLAN.md — _build_engine injection + once-per-run speed note (Wave 2, parallel)
-- [ ] 5.1-06-PLAN.md — pure integration chain + gates + owner feel-check checkpoint (Wave 3, blocking)
+- [x] 5.1-01-PLAN.md — TDD engine `speed_a_per_s` trailing kwarg + per-tier/determinism tests (Wave 1, parallel)
+- [x] 5.1-02-PLAN.md — TDD SPEED_TIERS table + merge_defaults backcompat + speed_tier_for (Wave 1, parallel)
+- [x] 5.1-03-PLAN.md — TDD hud_logic.speed_note pure builder (Wave 1, parallel)
+- [x] 5.1-04-PLAN.md — Setup-tab Speed QGroupBox + tier combo, box_combo pattern (Wave 2, parallel)
+- [x] 5.1-05-PLAN.md — _build_engine injection + once-per-run speed note (Wave 2, parallel)
+- [x] 5.1-06-PLAN.md — pure integration chain + gates + owner feel-check checkpoint (Wave 3, blocking)
 
 Notes: Inserted per owner playtesting feedback 2026-09-20 ("current speed is easy, kinda slow even with small box"). Draft tiers for planning (at the 100 ms tick): relaxed ≈ 2.0 Å/s, normal = 3.0 Å/s (current), fast ≈ 4.5 Å/s, expert ≈ 6.0 Å/s — final values approved by the owner at the feel-check (5.1-06 Task 2; values are data-only edits in setup_logic.SPEED_TIERS). Distinct from v2 GAME-10-v2 (speed increasing with snake length — still deferred). Planned 2026-09-20 after Phase 5 wrap-up via 2 parallel researchers (engine-speed plumbing / Setup-UI persistence) → 6 focused plans; shared-file sequencing with 5.2 handled by symbol-anchored plans + merge_defaults reuse-or-add executor note. Execution order with 5.2 remains sequential (no parallel waves across 5.2/5.1).
 
@@ -328,7 +328,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. Molecules in the Viewer & Setup Tab | 8/8 | Complete (verified 5/5 must-haves) | 2026-09-12 |
 | 4. Game Loop & Input | 9/9 | Complete (verified 5/5 must-haves) | 2026-09-14 |
 | 5. Stacking & Game Rules Complete | 16/16 | Complete (verified 48/48 plan truths, 3 owner-amended; 5/5 criteria; 9/9 reqs; 7-round human checkpoint) | 2026-09-20 |
-| 5.1. Game Speed / Difficulty (INSERTED 2026-09-20) | 5/6 | In flight — 5.1-06 feel-check APPROVED 2026-09-25 (tiers retuned 3.0/6.0/7.5/9.0, default normal 6.0); Task-3 retune + wrap pending | - |
+| 5.1. Game Speed / Difficulty (INSERTED 2026-09-20) | 6/6 | Complete (verified 17/17 plan truths, 3 owner-amended; 4/4 criteria; GAME-11 Complete; owner retuned tiers 3.0/6.0/7.5/9.0, default 'normal' 6.0) | 2026-09-25 |
 | 5.2. Generic Upload Stacking Consent (INSERTED 2026-09-20) | 0/9 | In progress (plans executing) | - |
 | 6. xtb Pipeline | 0/12 | Planned (2026-09-24; 12 plans in 4 waves) | - |
 | 7. Spectra UI | 0/10 | Planned (2026-09-25; 10 plans in 6 waves) | - |
