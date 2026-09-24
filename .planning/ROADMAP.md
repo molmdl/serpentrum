@@ -250,9 +250,21 @@ Notes: PyMOL-free; the only gameplay touchpoint is the final-snake xyz handoff �
   1. User clicks "Get Spectra", the dialog switches to the Spectra tab, and the calculation's progress streams live into the log panel. [SPECTRA-01, SPECTRA-04]
   2. User sees a Gaussian-broadened IR spectrum with axis labels and adjustable size, and Save Plot writes a PNG viewable outside PyMOL. [SPECTRA-03]
   3. The frequency table lists every mode (negatives shown as imaginary, e.g. −31.9i; zero-intensity included), and clicking a row draws that mode's static displacement vectors on the snake in the viewer. [SPECTRA-05]
-**Plans**: TBD (expected 3; plot widget ∥ table+vectors ∥ log/save are independent UI pieces — parallelizable)
+**Plans**: 10 plans in 6 waves (planned 2026-09-25 from 07-RESEARCH-qt-plot/-spectra-seam; owner directive: fine-grained focused plans)
 
-Notes: Pure parser already tested in Phase 2; UI is wiring plus the two verified QPainter precedents (`dynoplot.py`, `pmg_qt/volume.py`). Human-verify: plot-to-PNG save (`QWidget.grab()` unverified in PyMOL's Qt build; fallback QPainter→QImage). Avoids Pitfalls 12 (table↔vector index match), 2 (streaming + cancel UX), 5.
+Plans:
+- [ ] 07-01-PLAN.md — TDD spectra_ui pure half: shared freq_label (-31.9i convention), table_rows (every mode, zero-intensity included), mode_arrow_primitives, run_status_lines (Wave 1, parallel)
+- [ ] 07-02-PLAN.md — TDD plot_logic pure half: Scene builder over broaden + nice_ticks + size presets + caption; ascending axis pinned (Wave 1, parallel)
+- [ ] 07-03-PLAN.md — bridge mode-vector seams (load_mode_arrows/load_xtbopt/zoom_mode_frame) + REQUIRED smoke 13 with always-on g98≡xtbopt overlay assertion (Wave 1, parallel)
+- [ ] 07-04-PLAN.md — research-flagged seam gaps: XtbRunController.log_tail() public accessor + spectra_runner anchor field declaration (Wave 1, parallel)
+- [ ] 07-05-PLAN.md — gui_plot.py: IrPlotWidget + paint_scene seam + SpectraPlotPanel + render_image save route + REQUIRED smoke 12 + single-writer GUI_MODULES registration (Wave 2)
+- [ ] 07-06-PLAN.md — CHECKPOINT: early plot human-verify via real-GUI harness (fail cheap, 04-07 precedent) (Wave 3, blocking)
+- [ ] 07-07-PLAN.md — SpectraTab shell + gui.py placeholder replacement: streaming log, status, Cancel/Run-again delegation; all 06-09 behaviors preserved (SPECTRA-01/04) (Wave 3, parallel)
+- [ ] 07-08-PLAN.md — plot panel embed + run_finished → parse → build_scene → set_scene (SPECTRA-03 on-screen) (Wave 4)
+- [ ] 07-09-PLAN.md — frequency table + row-click mode vectors on srp_xtbopt (OPTIMIZED frame — owner sign-off at 07-10) (SPECTRA-05) (Wave 5)
+- [ ] 07-10-PLAN.md — phase-closing gates + consolidated human-verify checkpoint (live flow + optimized-frame sign-off + [TRAIN] discharges) (Wave 6, blocking)
+
+Notes: Pure parser already tested in Phase 2; UI is wiring plus the two verified QPainter precedents (`dynoplot.py`, `pmg_qt/volume.py`) and the probe-verified QImage save route (route A; `QWidget.grab()` demoted to documented fallback). Mode vectors draw on the OPTIMIZED frame (`srp_xtbopt` from record['xtbopt_path']; g98 ≡ xtbopt within 1e-6 Å probed; game frame wrong by up to 0.14 Å) — owner sign-off at the 07-10 checkpoint. Shared imaginary formatter lives in `spectra_ui.freq_label` (single convention; plot shows no raw frequency labels in v1). Avoids Pitfalls 12 (table↔vector index match), 2 (streaming + cancel UX), 5.
 
 ### Phase 8: Demo Data, Docs & Release Audit *(research phase H)*
 
@@ -319,5 +331,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5.1. Game Speed / Difficulty (INSERTED 2026-09-20) | 0/TBD | Not started (plan after Phase 5.2) | - |
 | 5.2. Generic Upload Stacking Consent (INSERTED 2026-09-20) | 0/TBD | Next (owner chose plan-first) | - |
 | 6. xtb Pipeline | 0/12 | Planned (2026-09-24; 12 plans in 4 waves) | - |
-| 7. Spectra UI | 0/TBD | Not started | - |
+| 7. Spectra UI | 0/10 | Planned (2026-09-25; 10 plans in 6 waves) | - |
 | 8. Demo Data, Docs & Release Audit | 0/TBD | Not started | - |
