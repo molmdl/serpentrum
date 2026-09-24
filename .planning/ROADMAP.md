@@ -328,8 +328,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. Molecules in the Viewer & Setup Tab | 8/8 | Complete (verified 5/5 must-haves) | 2026-09-12 |
 | 4. Game Loop & Input | 9/9 | Complete (verified 5/5 must-haves) | 2026-09-14 |
 | 5. Stacking & Game Rules Complete | 16/16 | Complete (verified 48/48 plan truths, 3 owner-amended; 5/5 criteria; 9/9 reqs; 7-round human checkpoint) | 2026-09-20 |
-| 5.1. Game Speed / Difficulty (INSERTED 2026-09-20) | 0/TBD | Not started (plan after Phase 5.2) | - |
-| 5.2. Generic Upload Stacking Consent (INSERTED 2026-09-20) | 0/TBD | Next (owner chose plan-first) | - |
+| 5.1. Game Speed / Difficulty (INSERTED 2026-09-20) | 5/6 | In flight — 5.1-06 feel-check APPROVED 2026-09-25 (tiers retuned 3.0/6.0/7.5/9.0, default normal 6.0); Task-3 retune + wrap pending | - |
+| 5.2. Generic Upload Stacking Consent (INSERTED 2026-09-20) | 0/9 | In progress (plans executing) | - |
 | 6. xtb Pipeline | 0/12 | Planned (2026-09-24; 12 plans in 4 waves) | - |
 | 7. Spectra UI | 0/10 | Planned (2026-09-25; 10 plans in 6 waves) | - |
 | 8. Demo Data, Docs & Release Audit | 0/TBD | Not started | - |
