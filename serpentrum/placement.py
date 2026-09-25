@@ -20,10 +20,14 @@ every placement decision of Phase 5 is WSL-unit-testable here
      ``interaction_for`` alone is NOT approval-filtered)
    - SKIP_MODE: the found interaction's mode != 'pi_stack' (v1 supports
      pi_stack only)
-   - SKIP_NO_RING: the record carries no ``stack_ring`` (no canonical
-     planar 6-ring extractable at load time)
-   - SKIP_NONPLANAR: ``stacking.ring_frame`` raises ValueError at
-     placement time (non-planar or degenerate ring geometry)
+    - SKIP_NO_RING: the record carries no ``stack_ring`` (no canonical
+      planar 6-ring extractable at load time)
+    - SKIP_GENERIC_NO_RING: Phase 5.2 (STACK-06) — consent-ON generic
+      upload entry matched but the upload carries no canonical planar
+      6-ring (sibling of SKIP_NO_RING at the same ring-check step,
+      chosen by WHICH entry matched; unreachable when consent is OFF)
+    - SKIP_NONPLANAR: ``stacking.ring_frame`` raises ValueError at
+      placement time (non-planar or degenerate ring geometry)
 
 2. **Tail/growth policy (research G6 — the linear staircase):**
    - Chain empty -> the tail is the HEAD's ring frame; the growth normal
@@ -71,6 +75,7 @@ every placement decision of Phase 5 is WSL-unit-testable here
 """
 from . import stacking
 from . import molecule_data
+from . import generic_stack
 
 # Outcome codes — string constants imported by hud_logic (plan 05-09) to
 # compose the info-box text. The names are the contract.
@@ -78,6 +83,13 @@ SKIP_NO_ENTRY = 'SKIP_NO_ENTRY'
 SKIP_NOT_APPROVED = 'SKIP_NOT_APPROVED'
 SKIP_MODE = 'SKIP_MODE'
 SKIP_NO_RING = 'SKIP_NO_RING'
+SKIP_GENERIC_NO_RING = 'SKIP_GENERIC_NO_RING'
+# Phase 5.2 (STACK-06): consent-ON generic entry matched (the overlay
+# anchored at Apply) but the upload carries no canonical planar
+# 6-ring. Sibling of SKIP_NO_RING at the SAME taxonomy step — chosen
+# by WHICH entry matched, so the ORDER is unchanged. Unreachable when
+# consent is OFF: uploads never pass the has_stack_entry pre-guard
+# below (load-time False via the '__upload__' keying).
 SKIP_NONPLANAR = 'SKIP_NONPLANAR'
 # REFUSE_WALL retired 2026-09-20c (owner directive): the wall leg of the
 # clash gate is gone — only atom clashes refuse. The placement taxonomy
@@ -107,7 +119,9 @@ def resolve_skip(record, stacking_data):
     1. SKIP_NO_ENTRY     -- no dataset entry applies to this molecule
     2. SKIP_NOT_APPROVED -- entry exists but is not APPROVED (DATA-02)
     3. SKIP_MODE         -- entry mode is not 'pi_stack'
-    4. SKIP_NO_RING      -- record carries no 'stack_ring'
+    4. SKIP_NO_RING / SKIP_GENERIC_NO_RING -- record carries no
+       'stack_ring' (the generic code when the FOUND entry is the 5.2
+       generic upload entry)
 
     SKIP_NONPLANAR is NOT detected here: it surfaces at placement time when
     stacking.ring_frame raises (resolve() catches ValueError).
@@ -125,6 +139,8 @@ def resolve_skip(record, stacking_data):
     if interaction['mode'] != _SUPPORTED_MODE:
         return SKIP_MODE
     if 'stack_ring' not in record:
+        if interaction['id'] == generic_stack.GENERIC_INTERACTION['id']:
+            return SKIP_GENERIC_NO_RING
         return SKIP_NO_RING
     return None
 
