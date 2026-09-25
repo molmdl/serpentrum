@@ -57,8 +57,9 @@ _UPLOAD_SENTINEL = '__upload__'
 class SetupTab(QtWidgets.QWidget):
     """The Setup configuration form.
 
-    Six QGroupBox sections (Molecule set, Box, Head molecule, xtb, Win
-    cap, Speed) + a persistent status QLabel + three temporary buttons
+    Seven QGroupBox sections (Molecule set, Box, Head molecule, xtb,
+    Win cap, Speed, Generic stacking) + a persistent status QLabel +
+    three temporary buttons
     (Apply / Show in Viewer, Cleanup, Start). collect_state()/apply_state()
     round-trip is the established pattern: collect_state reads widgets
     into the setup dict; apply_state populates widgets from the dict. A
@@ -132,6 +133,20 @@ class SetupTab(QtWidgets.QWidget):
         for name, aps in setup_logic.SPEED_TIERS:
             self.speed_combo.addItem('%s (%.1f A/s)' % (name, aps), aps)
 
+        # --- Generic stacking consent section (Phase 5.2, plan 5.2-05;
+        #     1:1 xtb_auto_check QCheckBox pattern copy; sub-line is a
+        #     plain ALWAYS-VISIBLE word-wrapped QLabel -- the
+        #     hessian-label pattern WITHOUT hide()/color; DRAFT wording
+        #     owner-amendable at 5.2-09) ---
+        self.generic_stack_check = QtWidgets.QCheckBox(
+            'Allow generic pi-stack for uploads '
+            '(illustrative geometry - user-approved)', self)
+        self.generic_stack_note_label = QtWidgets.QLabel(
+            'reuses the approved Set A pi-stack geometry '
+            '(3.60 A @ 20 deg off-normal) for uploads carrying a '
+            'planar aromatic 6-ring', self)
+        self.generic_stack_note_label.setWordWrap(True)
+
         # --- Status label ---
         self.status_label = QtWidgets.QLabel('ready', self)
         self.status_label.setWordWrap(True)
@@ -144,7 +159,7 @@ class SetupTab(QtWidgets.QWidget):
         self.start_btn = QtWidgets.QPushButton('Start', self)
 
     def _build_layout(self):
-        """Arrange widgets into 6 QGroupBox sections + status + buttons."""
+        """Arrange widgets into 7 QGroupBox sections + status + buttons."""
         layout = QtWidgets.QVBoxLayout(self)
 
         # --- Molecule set group (QVBoxLayout: upload row needs
@@ -203,6 +218,15 @@ class SetupTab(QtWidgets.QWidget):
         speed_form.addRow('Tier:', self.speed_combo)
         layout.addWidget(speed_group)
 
+        # --- Generic stacking group (Phase 5.2, plan 5.2-05; appended
+        #     AFTER the Speed group as a new sibling section, before
+        #     the status label -- 5.1-04 sibling-section precedent) ---
+        generic_group = QtWidgets.QGroupBox('Generic stacking', self)
+        generic_form = QtWidgets.QFormLayout(generic_group)
+        generic_form.addRow('', self.generic_stack_check)
+        generic_form.addRow('', self.generic_stack_note_label)
+        layout.addWidget(generic_group)
+
         # --- Status label ---
         layout.addWidget(self.status_label)
 
@@ -228,6 +252,9 @@ class SetupTab(QtWidgets.QWidget):
         self.win_cap_spin.valueChanged.connect(self._on_cap_changed)
         self.win_cap_spin.valueChanged.connect(self._refresh_status)
         self.speed_combo.currentIndexChanged.connect(self._refresh_status)
+        # House-minimum wire: _refresh_status's own _loading guard
+        # covers apply_state restores, so no dedicated handler.
+        self.generic_stack_check.stateChanged.connect(self._refresh_status)
         self.apply_btn.clicked.connect(self._on_apply)
         self.cleanup_btn.clicked.connect(self._on_cleanup)
         self.start_btn.clicked.connect(self._on_start)
@@ -241,10 +268,11 @@ class SetupTab(QtWidgets.QWidget):
 
         The demo combo's '__upload__' sentinel maps to the last real set
         (self._last_real_set) so the dict stays valid. Speed is
-        widget-written via the tier combo (Phase 5.1, plan 5.1-04). The
-        remaining non-widget fields (schema_version, atom_budget,
-        broadening_fwhm) are preserved from the existing dict via a
-        shallow copy.
+        widget-written via the tier combo (Phase 5.1, plan 5.1-04);
+        generic_stack_consent is widget-written via the consent
+        checkbox (Phase 5.2, plan 5.2-05). The remaining non-widget
+        fields (schema_version, atom_budget, broadening_fwhm) are
+        preserved from the existing dict via a shallow copy.
         """
         setup = dict(self._setup)
         source = self.demo_combo.currentData()
@@ -267,6 +295,7 @@ class SetupTab(QtWidgets.QWidget):
         else:
             setup['xtb_path'] = self.xtb_path_field.text().strip()
         setup['win_cap_molecules'] = self.win_cap_spin.value()
+        setup['generic_stack_consent'] = self.generic_stack_check.isChecked()
         self._setup = setup
         if self._anchor is not None:
             self._anchor.setup = setup
@@ -303,6 +332,13 @@ class SetupTab(QtWidgets.QWidget):
         if idx < 0:
             idx = 0
         self.speed_combo.setCurrentIndex(idx)
+        # Generic stacking consent checkbox (Phase 5.2, plan 5.2-05;
+        # absent key = OFF via the DEFAULTS fallback -- mirrors the
+        # speed restore pattern; under the _loading guard so the
+        # setChecked signal does not recompute).
+        self.generic_stack_check.setChecked(bool(setup.get(
+            'generic_stack_consent',
+            setup_logic.DEFAULTS['generic_stack_consent'])))
         # Head molecule (fallback Random if not in the combo).
         head = setup.get('head_molecule', 'random')
         idx = self.head_combo.findData(head)
