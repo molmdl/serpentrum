@@ -37,13 +37,15 @@ python3.6 syntax (%-formatting).
 
 from pymol.Qt import QtWidgets, QtCore
 
-from . import setup_logic
-from . import setloader
+from . import generic_stack
+from . import hud_logic
 from . import molecule_data
 from . import molfile
 from . import orientation
-from . import xtbenv
 from . import pymol_bridge
+from . import setloader
+from . import setup_logic
+from . import xtbenv
 
 # Sentinel userData for the demo-combo Upload entry (UI routing ONLY).
 # The setup dict's demo_set field only ever holds KNOWN_SETS values
@@ -484,12 +486,17 @@ class SetupTab(QtWidgets.QWidget):
           3. Anchor records + the stacking dataset on _serpentrum
              (Phase 5, plan 05-06: begin_game, Restart determinism,
              the skip policy, and the info-box builders consume them).
+             Phase 5.2 (plan 5.2-05): the anchored dataset is the
+             consent-gated overlay -- OFF anchors the original object,
+             ON appends the generic upload entry.
           4. Head combo repopulation from loaded records.
           5. Edge-on head matrix computed PURE-ly (Phase 5, plan 05-10)
              + pymol_bridge.materialize(head_m16=...) -> bridge errors
              stop with a 'Load failed' modal.
-          6. Success: status message + xtb detect note + validate
-             warnings; write the dict back to the anchor.
+          6. Success: status message + absorbed C2 zero-stackable
+             clause (consent-aware, reusing hud_logic.stack_mode_note)
+             + xtb detect note + validate warnings; write the dict
+             back to the anchor.
         All dialogs are static QMessageBox.warning(self, title, body).
         Returns True when the scene materialized; False otherwise
         (Start suppresses its emit on any False path).
@@ -501,6 +508,14 @@ class SetupTab(QtWidgets.QWidget):
                 self, 'Cannot apply', '\n'.join(errors))
             self.status_label.setText('errors: ' + '; '.join(errors))
             return False
+
+        # Generic upload stacking consent (Phase 5.2, plan 5.2-05):
+        # read once here so BOTH the overlay anchor below and the
+        # absorbed C2 soft warning in the success parts consume the
+        # same flag (absent key = OFF via the DEFAULTS fallback).
+        consent = setup.get(
+            'generic_stack_consent',
+            setup_logic.DEFAULTS['generic_stack_consent'])
 
         # Record building: route by the demo combo's currentData().
         # Phase 5, plan 05-06: both load paths get the stacking dataset
@@ -544,7 +559,19 @@ class SetupTab(QtWidgets.QWidget):
                     'stacking dataset unavailable - '
                     'pickups will be skipped')
             self._anchor.records = records
-            self._anchor.stacking_data = stacking_data
+            # Consent-gated overlay anchor (Phase 5.2, plan 5.2-05;
+            # EQ-engine-3: anchored AT APPLY -- Start always Applies
+            # first (model-A handoff), so the Capture resolve read-site
+            # (gui_game) consumes the consent decision with ZERO
+            # per-capture plumbing). The overlay is the consent
+            # carrier: OFF anchors the ORIGINAL dataset object (same
+            # object identity = byte-identical capture path); ON
+            # appends the generic upload entry LAST so first-match
+            # lookup order shadows nothing. overlay_stacking_data is
+            # None-safe: stacking_data None -> None anchored (unchanged
+            # dataset-unavailable degradation).
+            self._anchor.stacking_data = generic_stack.overlay_stacking_data(
+                stacking_data, consent)
 
         # Repopulate head combo from loaded records, then re-read state.
         # _loading guard (defense-in-depth alongside _populate_head_combo's
@@ -599,6 +626,16 @@ class SetupTab(QtWidgets.QWidget):
             parts.append(stacking_note)
         if setup.get('head_molecule') == 'random':
             parts.append('head will be randomized at game start')
+        # Absorbed C2 soft warning (debug session 05-upload-only,
+        # resolved 2026-09-21; absorbed Phase 5.2, plan 5.2-05): SOFT
+        # status clause (HARD block REJECTED -- demo mode is
+        # legitimate). Reuses hud_logic.stack_mode_note so the Apply
+        # warning and the begin_game note share ONE wording source
+        # (consent-aware predicate: under consent ON ring-bearing
+        # uploads keep a zero-stackable set stackable).
+        zero_stackable = hud_logic.stack_mode_note(records, consent)
+        if zero_stackable is not None:
+            parts.append(zero_stackable)
         # xtb detection (advisory in Phase 3; blocking is Phase 6).
         resolved = xtbenv.detect_binary(
             configured_path=setup.get('xtb_path'))
