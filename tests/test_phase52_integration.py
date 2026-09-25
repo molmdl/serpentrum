@@ -36,23 +36,34 @@ setloader / generic_stack / placement / hud_logic). No __init__.py here
 
 import copy
 import json
+import math
 import os
 import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from serpentrum import game_engine  # noqa: E402
 from serpentrum import generic_stack  # noqa: E402
 from serpentrum import hud_logic  # noqa: E402
+from serpentrum import molfile  # noqa: E402
 from serpentrum import molecule_data  # noqa: E402
+from serpentrum import orientation  # noqa: E402
 from serpentrum import placement  # noqa: E402
 from serpentrum import setloader  # noqa: E402
 from serpentrum import setup_logic  # noqa: E402
 from serpentrum import spawn  # noqa: E402
+from serpentrum import stacking  # noqa: E402
 
 # Fixed step dt (mirrors gui_game.TICK_DT = 0.1; used by the engine
 # sections of this chain).
 DT = 0.1
+# pymol_bridge.BOX_DISPLAY_Z mirrored as a PURE constant (never imported
+# — pymol_bridge is viewer-side; the same constant test_phase5_integration
+# carries).
+DISPLAY_Z = 5.0
+# 'right' heading (engine DIRS unit).
+HEADING = (1.0, 0.0)
 
 # Exact contract literals (5.2-04 landed wording; pinned here as the
 # COMPOSED contract — the per-builder pins live in test_hud_content.py).
@@ -233,6 +244,268 @@ class TestNotesChain(unittest.TestCase):
         self.assertIs(hud_logic.generic_consent_note(False), None)
         self.assertEqual(hud_logic.generic_consent_note(True),
                          CONSENT_NOTE)
+
+
+class TestGenericPlacementOutcome(unittest.TestCase):
+    """SC2 pure half: a ring-bearing upload PLACES at the reused
+    approved geometry through resolve() against the overlay, and the
+    placed step DECODES to the approved 3.60 A / 3.383 A / 1.231 A (the
+    DBG capture-line math, proven purely — the 5.2-09 feel-check
+    live-verifies the same decode inside the GUI)."""
+
+    def setUp(self):
+        self.record = _load_upload_record()
+        parsed = molfile.read_sdf(self.record['file'])[0]
+        self.atoms = orientation.edge_on_atoms(
+            parsed['elements'], parsed['coords'], self.record['stack_ring'])
+        self.records_by_id = {self.record['id']: self.record}
+        self.data = molecule_data.load_stacking(
+            setloader.default_stacking_path())
+        self.overlay = generic_stack.overlay_stacking_data(self.data, True)
+
+    def _resolve_rec(self, stacking_data):
+        # The plan 5.2-06 restamp shape, pure layer: consent-aware
+        # has_stack_entry over the ANCHORED dataset (the overlay for
+        # consent ON; the original dataset for the OFF control).
+        return {'id': self.record['id'],
+                'molecule_id': self.record['id'],
+                'set': self.record['set'],
+                'has_stack_entry': generic_stack.has_stack_entry_for(
+                    self.record, stacking_data),
+                'stack_ring': list(self.record['stack_ring']),
+                'atoms': list(self.atoms)}
+
+    def _resolve(self, stacking_data):
+        box_min, box_max = setup_logic.BOX_PRESETS['medium']
+        return placement.resolve(
+            self._resolve_rec(stacking_data), self.records_by_id,
+            stacking_data,
+            list(self.atoms), self.record['stack_ring'], HEADING,
+            [], list(self.atoms),
+            box_min, box_max, DISPLAY_Z)
+
+    def test_resolve_places_generic(self):
+        outcome = self._resolve(self.overlay)
+        self.assertEqual(outcome['status'], 'placed')
+        self.assertEqual(outcome['interaction']['id'], 'pi_stack_generic')
+        self.assertEqual(outcome['interaction']['distance_a'], 3.383)
+        self.assertEqual(outcome['citation_short'], 'Janiak 2000')
+
+    def test_placed_step_decodes_approved_geometry(self):
+        # First-capture tail frame (placement.tail_frame over the SAME
+        # inputs resolve consumed) vs placed ring frame (stacking.ring_frame
+        # over outcome['placed_atoms'] + the record's stack_ring): the DBG
+        # capture-line inputs, recomputed PURELY.
+        tail_c, tail_n, _tail_ref = placement.tail_frame(
+            [], self.records_by_id, list(self.atoms),
+            self.record['stack_ring'], HEADING)
+        outcome = self._resolve(self.overlay)
+        placed_c, placed_n, _pref = stacking.ring_frame(
+            _xyz(outcome['placed_atoms']), self.record['stack_ring'])
+        step = tuple(placed_c[k] - tail_c[k] for k in range(3))
+        distance = math.sqrt(sum(v * v for v in step))
+        plane = (step[0] * tail_n[0] + step[1] * tail_n[1] +
+                 step[2] * tail_n[2])
+        lateral = math.sqrt(distance * distance - plane * plane)
+        # The DBG decode: d = 3.60, plane gap = 3.383, lateral = 1.231.
+        self.assertAlmostEqual(distance, 3.60, places=3)
+        self.assertAlmostEqual(plane, 3.383, places=3)
+        self.assertAlmostEqual(lateral, 1.231, places=3)
+        # Parallel-displaced: the two ring normals stay parallel.
+        dot = sum(placed_n[k] * tail_n[k] for k in range(3))
+        self.assertAlmostEqual(abs(dot), 1.0, places=6)
+
+    def test_off_same_record_still_skips(self):
+        # Identical geometry chain against the ORIGINAL dataset: the
+        # restamp there resolves nothing (interaction_for '__upload__'
+        # -> None), so the same record takes the byte-identical OFF skip.
+        self.assertEqual(
+            self._resolve(self.data),
+            {'status': 'skipped', 'code': placement.SKIP_NO_ENTRY})
+
+
+# ---------------------------------------------------------------------------
+# Shared fixture builder + the capture()/drive() controller-seam spec
+# (module-local mirrors of test_phase5_integration's s4 helpers — tests
+# never import each other; house pattern).
+# ---------------------------------------------------------------------------
+
+
+def _xyz(atoms):
+    """(x, y, z) floats from (sym, x, y, z) 4-tuples."""
+    return [(float(a[1]), float(a[2]), float(a[3])) for a in atoms]
+
+
+def _head_atoms(state, head_xy):
+    """Origin-centered edge-on head atoms translated to the engine head
+    (the 05-11/05-13 controller mirror model)."""
+    hx, hy = head_xy
+    return [(sym, x + hx, y + hy, z)
+            for (sym, x, y, z) in state['atoms']]
+
+
+def _pickup_seed(state, pid, centroid):
+    """One engine pickup record: build_pickup_seed + the record fields
+    the consent-ON skip taxonomy consumes (unknown keys survive engine
+    copies)."""
+    record = state['record']
+    seed = spawn.build_pickup_seed(record, pid, centroid, state['atoms'])
+    seed['stack_ring'] = list(record['stack_ring'])
+    seed['set'] = record['set']
+    return seed
+
+
+def _existing_atoms(engine, captured_id, head_atoms):
+    """Locked gate set: head + all segments + OTHER live pickups."""
+    out = list(head_atoms)
+    for seg in engine.segments:
+        out.extend(seg['atoms'])
+    for pickup in engine.pickups:
+        if (pickup['id'] in engine.live_pickup_ids
+                and pickup['id'] != captured_id):
+            out.extend(pickup['atoms'])
+    return out
+
+
+def capture(engine, pickup_rec, state):
+    """THE controller seam, consent-ON (the 5.2-06 transcription at the
+    pure layer): restamp has_stack_entry consent-aware via
+    has_stack_entry_for(record, overlay), then placement.resolve in
+    skip -> tail -> place -> gate order; attach_segment on 'placed',
+    reject_pickup on anything else. Returns the outcome dict.
+    """
+    resolve_rec = dict(pickup_rec)
+    resolve_rec['has_stack_entry'] = generic_stack.has_stack_entry_for(
+        state['record'], state['stacking_data'])
+    head_atoms = _head_atoms(state, engine.head)
+    outcome = placement.resolve(
+        resolve_rec, state['records_by_id'], state['stacking_data'],
+        head_atoms, state['record']['stack_ring'], engine.heading,
+        engine.segments,
+        _existing_atoms(engine, pickup_rec['id'], head_atoms),
+        engine.box_min, engine.box_max, state['display_z'])
+    if outcome['status'] == 'placed':
+        engine.attach_segment(pickup_rec['molecule_id'],
+                              outcome['ring_centroid_xy'],
+                              outcome['placed_atoms'])
+    else:
+        engine.reject_pickup(pickup_rec['id'], outcome['code'])
+    return outcome
+
+
+def drive(engine, state, max_ticks, stop=None):
+    """Step the engine (dt = 0.1), running capture() per ('stacked',)
+    event exactly as the GameTab 'stacked' branch does. Optional
+    stop(events, engine) breaks. Returns the per-tick capture tuples."""
+    frames = []
+    for tick in range(max_ticks):
+        events = engine.step(DT)
+        captures = []
+        for event in events:
+            if event[0] == 'stacked':
+                outcome = capture(engine, event[1], state)
+                captures.append((event[1], outcome))
+        frames.append({'tick': tick, 'events': events,
+                       'captures': captures})
+        if stop is not None and stop(events, engine):
+            break
+    return frames
+
+
+class TestUploadOnlyWinPath(unittest.TestCase):
+    """SC2/SC4 pure half: ONE ring-bearing upload species, cap=2, wins
+    an upload-only game under consent ON with the composed placed
+    outcome + decorated labeled recap (mirroring the plan 5.2-06/07
+    history enrollment: interaction_id 'pi_stack_generic' +
+    generic_stack.history_name decoration)."""
+
+    def setUp(self):
+        record = _load_upload_record()
+        parsed = molfile.read_sdf(record['file'])[0]
+        box_min, box_max = setup_logic.BOX_PRESETS['medium']
+        self.state = {
+            'record': record,
+            'records_by_id': {record['id']: record},
+            'atoms': orientation.edge_on_atoms(
+                parsed['elements'], parsed['coords'],
+                record['stack_ring']),
+            'stacking_data': generic_stack.overlay_stacking_data(
+                molecule_data.load_stacking(
+                    setloader.default_stacking_path()), True),
+            'box_min': box_min,
+            'box_max': box_max,
+            'display_z': DISPLAY_Z,
+        }
+
+    def test_upload_only_game_wins_under_consent(self):
+        state = self.state
+        picks = [_pickup_seed(state, 'pick_0001', (4.0, 0.0)),
+                 _pickup_seed(state, 'pick_0002', (10.0, 0.0))]
+        engine = game_engine.GameEngine(
+            head=(0.0, 0.0), heading='right',
+            box_min=state['box_min'], box_max=state['box_max'],
+            pickups=picks, cap=2)
+        frames = drive(engine, state, 400,
+                       stop=lambda events, eng: eng.finished)
+        captures = [c for frame in frames for c in frame['captures']]
+        self.assertEqual(len(captures), 2)
+        for (_pickup_rec, outcome) in captures:
+            self.assertEqual(outcome['status'], 'placed')
+            self.assertEqual(outcome['interaction']['id'],
+                             'pi_stack_generic')
+        # The win: 'won' at cap on the final capture tick, result won,
+        # exact counters, chain complete.
+        self.assertIn(('won',), frames[-1]['events'])
+        self.assertEqual(engine.result, 'won')
+        self.assertEqual(engine.molecules_stacked, 2)
+        self.assertEqual(len(engine.segments), 2)
+        # Composed stacked_history the way gui_game enrolls stacked
+        # entries (plan 5.2-06/07: name decorated by
+        # generic_stack.history_name, interaction_id recorded).
+        name = state['record']['name']
+        history = [{'name': generic_stack.history_name(
+                        name, outcome['interaction']),
+                    'outcome': 'stacked',
+                    'distance_a': outcome['interaction']['distance_a'],
+                    'citation_short': outcome['citation_short'],
+                    'interaction_id': outcome['interaction']['id']}
+                   for (_pickup_rec, outcome) in captures]
+        for entry in history:
+            self.assertEqual(entry['interaction_id'], 'pi_stack_generic')
+            self.assertTrue(entry['name'].endswith(' (generic pi-stack)'),
+                            entry['name'])
+        # The composed labeled recap group (SC4): one line, '2x', the
+        # decorated name, the plane gap, the citation.
+        expected = ('stacked 2x %s (generic pi-stack) at 3.38 A plane '
+                    'gap [Janiak 2000]' % name)
+        self.assertEqual(hud_logic.breakdown_lines(history), [expected])
+
+    def test_recap_distinct_from_dataset_group(self):
+        # SC4's distinctness: the same molecule NAME stacked via the
+        # shipped dataset entry AND the generic consent entry renders
+        # TWO distinct labeled recap groups — generic carries
+        # '(generic pi-stack)', both carry '[Janiak 2000]'.
+        pd_entry = molecule_data.interaction_for(
+            {'set': 'set_a'}, molecule_data.load_stacking(
+                setloader.default_stacking_path()))
+        name = self.state['record']['name']
+        generic = generic_stack.GENERIC_INTERACTION
+        history = [
+            {'name': name, 'outcome': 'stacked',
+             'distance_a': pd_entry['distance_a'],
+             'citation_short': 'Janiak 2000',
+             'interaction_id': pd_entry['id']},
+            {'name': generic_stack.history_name(name, generic),
+             'outcome': 'stacked',
+             'distance_a': generic['distance_a'],
+             'citation_short': 'Janiak 2000',
+             'interaction_id': generic['id']},
+        ]
+        lines = hud_logic.breakdown_lines(history)
+        self.assertEqual(lines, [
+            'stacked 1x %s at 3.38 A plane gap [Janiak 2000]' % name,
+            'stacked 1x %s (generic pi-stack) at 3.38 A plane gap '
+            '[Janiak 2000]' % name])
 
 
 if __name__ == '__main__':
