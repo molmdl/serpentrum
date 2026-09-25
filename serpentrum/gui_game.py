@@ -59,6 +59,7 @@ import time
 from pymol.Qt import QtWidgets, QtCore, QtGui
 
 from . import game_engine
+from . import generic_stack
 from . import hud_logic
 from . import pymol_bridge
 from . import setup_logic
@@ -366,11 +367,23 @@ class GameTab(QtWidgets.QWidget):
         pickup object edge-on as sticks, frames ONCE (the 03-06
         one-shot contract - NEVER per-tick), logs the C1 zero-stackable
         demonstration-mode note ONCE per run when the active set has no
-        stacking entries (upload-endless debug session, 2026-09-21),
-        logs the once-per-run speed note (tier + A/s, GAME-11 plan
-        5.1-05) right beside it,
+        stacking entries under the CONSENT-AWARE predicate (Phase 5.2:
+        the consent flag is read ONCE here and passed to
+        stack_mode_note; with consent ON, ring-bearing uploads count as
+        stackable), logs the once-per-run generic-consent disclosure
+        line (STACK-06 SC2: explicit, non-silent consent made visible
+        in-game) BETWEEN the mode note and the speed note - None when
+        OFF, so OFF runs gain ZERO lines and the log order stays
+        byte-identical to today, logs the once-per-run speed note
+        (tier + A/s, GAME-11 plan 5.1-05) right beside it,
         then runs the epoch-guarded countdown. The movement tick starts
         at _begin_play (after GO!).
+
+        Restart (:1245-1263) replays the ANCHOR's setup dict through
+        begin_game - consent included - so the consent state and the
+        anchored stacking_data (the overlay or the original dataset,
+        anchored at Apply) stay in sync run after run; Restart needs
+        ZERO new wiring (the 5.1 speed-note precedent).
         """
         self._teardown_round()  # timers, epoch, input, camera (ONE helper)
         self.info_box.clear()
@@ -419,13 +432,26 @@ class GameTab(QtWidgets.QWidget):
                 self._pickup_m16(record, seed['centroid']))
             self._session['live_pickup_names'].append(name)
         pymol_bridge.frame_scene()  # ONE-SHOT framing (03-06 contract)
+        # STACK-06 (Phase 5.2): the generic upload stacking consent flag
+        # is read ONCE per run here and threads into the mode note (the
+        # consent-aware stackable predicate) + the capture restamp (the
+        # anchored dataset is the consent carrier).
+        consent = setup.get(
+            'generic_stack_consent',
+            setup_logic.DEFAULTS['generic_stack_consent'])
         # C1 (upload-endless debug session, 2026-09-21): a set with ZERO
         # stackable records can never win (STACK-03 skips every capture);
         # say so ONCE per run, up front, or the run is silently endless.
         # Empty records take the 'no records anchored' branch instead.
-        note = hud_logic.stack_mode_note(records)
+        note = hud_logic.stack_mode_note(records, consent)
         if note is not None:
             self._log(note)
+        # STACK-06 (Phase 5.2): the once-per-run generic-consent
+        # disclosure - explicit, non-silent consent made visible in-game.
+        # None when OFF: OFF runs gain ZERO lines (log order byte-identical).
+        consent_line = hud_logic.generic_consent_note(consent)
+        if consent_line is not None:
+            self._log(consent_line)
         # GAME-11 (plan 5.1-05): the once-per-run speed line, beside the
         # stack_mode_note precedent, BEFORE 'Get ready...'. Once per
         # begin_game == once per run (Start or Restart), never per tick.
@@ -899,6 +925,22 @@ class GameTab(QtWidgets.QWidget):
         Viewer-read discipline: placement decides in PURE math from
         the session/engine mirrors; the ONLY cmd calls here are
         transform/rename/materialize WRITES (research Never-do list).
+
+        Phase 5.2 (STACK-06): the has_stack_entry RESTAMP in the
+        enrichment block below is the ONE consent-awareness touchpoint
+        in the capture path (EQ-engine-2, option i) - placement.py
+        stays untouched, so every taxonomy pin stays green by
+        construction. With consent ON, a ring-less upload whose
+        has_stack_entry restamps True (the anchored overlay carries
+        the generic entry) falls through to SKIP_GENERIC_NO_RING, the
+        consent-ON ring-less outcome (taxonomy ORDER unchanged); with
+        consent OFF the restamp is a provable no-op and uploads still
+        take SKIP_NO_ENTRY exactly as today. The generic interaction
+        carries its own labels (name/explanation/citation riding the
+        entry dict into pickup_block unedited); the DECORATED history
+        name (generic_stack.history_name) feeds the end-of-run recap
+        so generic placements group under '<molecule> (generic
+        pi-stack)', distinct from dataset groups (SC4).
         """
         session = self._session
         attached = False
@@ -916,12 +958,32 @@ class GameTab(QtWidgets.QWidget):
             # (the test seam's pickup_seed carries them on the seed;
             # enriching here from records_by_id keeps ONE truth and
             # covers begin_game-seeded pickups identically).
+            # Phase 5.2 (STACK-06): the has_stack_entry stamp is
+            # CONSENT-AWARE - it is recomputed from the anchored
+            # stacking_data via the pure generic_stack helper (the
+            # anchored dataset is the consent carrier: Apply anchored
+            # the overlay when consent is ON). OFF reduces to the
+            # load-time value by definition (interaction_for(
+            # {'set': '__upload__'}) -> None on the unmodified
+            # dataset); a None dataset (gui_setup's degradation
+            # contract) falls back to the load-time flag inside the
+            # helper. Order matters: 'set' is stamped BEFORE the
+            # recompute because the helper keys the lookup on the
+            # record's set field.
             record = records_by_id[pickup_rec['molecule_id']]
             resolve_rec = dict(pickup_rec)
             if 'stack_ring' in record:
                 resolve_rec['stack_ring'] = list(record['stack_ring'])
-            resolve_rec['has_stack_entry'] = record.get('has_stack_entry')
             resolve_rec['set'] = record.get('set')
+            # Phase 5.2 (STACK-06): consent-aware stackability. The
+            # ANCHORED dataset is the consent carrier (Apply anchored
+            # the overlay when consent is ON), so recompute from it:
+            # OFF reduces to the load-time value by definition
+            # (interaction_for('__upload__') -> None on the unmodified
+            # dataset); the None-dataset degradation falls back to the
+            # load-time flag inside the helper.
+            resolve_rec['has_stack_entry'] = generic_stack.has_stack_entry_for(
+                record, stacking_data)
             # 2026-09-20c fix G1: pre-resolve the skip taxonomy BEFORE
             # any geometry runs (the SRP_DEBUG tail frame included).
             # Records without a dataset entry (the '__upload__' keying --
@@ -977,7 +1039,15 @@ class GameTab(QtWidgets.QWidget):
                 if old_name in session['live_pickup_names']:
                     session['live_pickup_names'].remove(old_name)
                 session['stacked_history'].append({
-                    'name': name,
+                    # Phase 5.2 (STACK-06 SC4): the recap-group label
+                    # decoration - generic placements group under
+                    # '<molecule> (generic pi-stack)', distinct from
+                    # dataset groups even for shared molecule names;
+                    # breakdown_lines untouched (first-appearance
+                    # grouping keys on the name string). interaction_id
+                    # stays stored unchanged.
+                    'name': generic_stack.history_name(
+                        name, outcome['interaction']),
                     'outcome': 'stacked',
                     'distance_a': outcome['interaction']['distance_a'],
                     'citation_short': outcome['citation_short'],
