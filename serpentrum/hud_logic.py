@@ -63,6 +63,11 @@ _REASON_TEXT = {
         'interaction mode not supported in v1',
     placement.SKIP_NO_RING:
         'no planar aromatic 6-ring found',
+    # Phase 5.2 consent-ON class — DRAFT wording, owner-amendable at the
+    # feel-check. Unreachable when consent is OFF (the placement guard
+    # never emits the code: uploads fail the has_stack_entry pre-guard).
+    placement.SKIP_GENERIC_NO_RING:
+        'no aromatic ring for generic pi-stack',
     placement.SKIP_NONPLANAR:
         'ring geometry not planar',
     # REFUSE_WALL retired 2026-09-20c (owner directive: placements may
@@ -131,9 +136,26 @@ def budget_text():
     return 'atom budget exceeded - spectra on this snake may be slow'
 
 
-def stack_mode_note(records):
+def _any_stackable(records, consent):
+    """Consent-aware stackability over records (Phase 5.2).
+
+    has_stack_entry (load-time dataset match) OR — when generic
+    consent is ON — record-level 'stack_ring' presence (the
+    canonical planar 6-ring eligibility signal; setloader
+    _upload_stack_ring). Pure data; no setup_logic import.
+    """
+    for record in records:
+        if record.get('has_stack_entry'):
+            return True
+        if consent and 'stack_ring' in record:
+            return True
+    return False
+
+
+def stack_mode_note(records, consent=False):
     """The C1 begin_game zero-stackable explanation
-    (upload-endless debug session, resolved 2026-09-21).
+    (upload-endless debug session, resolved 2026-09-21; consent-aware
+    Phase 5.2, plan 5.2-04).
 
     A set whose EVERY record carries ``has_stack_entry`` False can never
     stack: the STACK-03 skip policy guarantees a SKIP_NO_ENTRY outcome
@@ -142,16 +164,44 @@ def stack_mode_note(records):
     stacking entries) and HOW the run ends; the GUI logs it once per
     begin_game (once per run -- Start or Restart).
 
-    None when at least one record can stack, or when the list is empty
-    (no records at all is a different state with its own begin_game
-    line, 'no records anchored - play without pickups'). A record
-    missing the key counts as not stackable -- the capture-time skip
-    policy reads the same key.
+    consent (Phase 5.2, default False): when the generic upload stacking
+    consent is ON, 'stack_ring'-bearing uploads also count as stackable
+    (predicate shifts to _any_stackable(records, consent)), and the
+    zero-stackable line is reworded -- under consent ON the note must
+    NEVER claim 'no stacking entries' when the generic entry simply
+    matched no ring-bearing upload: the DRAFT variant names the real
+    disqualifier instead (wording owner-amendable at the 5.2-09
+    feel-check). With consent False (or omitted) the output is
+    BYTE-IDENTICAL for every input: the C1 line and the None matrix.
+
+    ONE wording source for C1/C2 (EQ-setup-3 + EQ-setup-6): plan
+    5.2-05's Setup-side Apply soft warning REUSES this builder
+    (stack_mode_note(records, consent)), so the Apply-time warning and
+    the begin_game note can never contradict.
+
+    Accepted edge (documented, not re-detected here): under consent ON
+    with a dataset-unavailable Apply, ring-bearing uploads satisfy the
+    predicate (stack_ring present) but nothing can actually stack --
+    the Apply-time 'stacking dataset unavailable' warning already
+    covers that degraded state; the note is not the right place to
+    re-detect it.
+
+    None when at least one record can stack (under the consent-aware
+    predicate), or when the list is empty (no records at all is a
+    different state with its own begin_game line, 'no records anchored
+    - play without pickups'). A record missing 'has_stack_entry' counts
+    as not stackable -- the capture-time skip policy reads the same
+    key; 'stack_ring' counts by key PRESENCE (setloader omits the key
+    on ineligibility -- never a False value).
     """
     if not records:
         return None
-    if any(record.get('has_stack_entry') for record in records):
+    if _any_stackable(records, consent):
         return None
+    if consent:
+        return ('no molecule has a planar aromatic 6-ring for generic '
+                'pi-stack - demonstration mode: practice steering; '
+                'only a crash ends the run')
     return ('this set has no stacking entries - demonstration mode: '
             'practice steering; only a crash ends the run')
 
@@ -175,6 +225,23 @@ def speed_note(tier_name, speed):
     """
     return ('speed: %s (%.1f A/s) - steering cadence and turn time '
             'are unchanged' % (tier_name, speed))
+
+
+def generic_consent_note(consent):
+    """The once-per-run generic-consent disclosure line (Phase 5.2).
+
+    Logged ONCE per begin_game when generic upload stacking is ON
+    (STACK-06: explicit, non-silent consent). None when consent is
+    OFF — the stack_mode_note None-contract, NOT speed_note's
+    always-line contract: OFF runs must gain ZERO log lines so the
+    once-per-run log order stays byte-identical. ASCII wording;
+    the label is consent framing, not chemistry (hud_logic never
+    writes chemistry). Caller gates on the setup flag (plan 5.2-06).
+    """
+    if not consent:
+        return None
+    return ('generic pi-stack enabled: illustrative geometry - '
+            'user-approved [Janiak 2000]')
 
 
 def completion_lines(result, molecules, snake_molecules, atoms_total):

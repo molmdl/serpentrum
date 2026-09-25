@@ -735,14 +735,14 @@ class TestGenericSkipClass(_FixtureBase):
             placement.resolve_skip(self._upload_ringless(), off_overlay),
             placement.SKIP_NO_ENTRY)
 
-    def test_new_reason_code_not_yet_in_reason_text_is_fine(self):
-        # The human-readable reason text lands in plan 5.2-04
-        # (hud_logic._REASON_TEXT); TODAY the fallback renders. This
-        # pins the interim behavior so 5.2-04's text addition is a
-        # clean diff against it.
+    def test_new_reason_code_now_in_reason_text(self):
+        # Plan 5.2-04 landed the hud_logic._REASON_TEXT entry (this was
+        # the interim 'unclassified outcome SKIP_GENERIC_NO_RING'
+        # fallback, pinned here by 5.2-03 as a clean-diff marker and
+        # amended when the literal arrived).
         self.assertEqual(
             hud_logic._reason(placement.SKIP_GENERIC_NO_RING, None),
-            'unclassified outcome SKIP_GENERIC_NO_RING')
+            'no aromatic ring for generic pi-stack')
 
     def test_full_resolve_generic_placement_outcome_shape(self):
         # The SC3 placed half end-to-end through resolve(): overlay +
