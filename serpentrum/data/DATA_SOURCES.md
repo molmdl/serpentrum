@@ -75,6 +75,32 @@ statement. Human approval covers this license note.
   study or an explicit crystalline-state framing in the UI text).
 - License: © Royal Society of Chemistry. Cited, not redistributed.
 
+### Generic upload stacking mode (Phase 5.2, consent-gated)
+- What it does: when the user explicitly opts in on the Setup tab (the
+  'Generic stacking' group), user-uploaded molecules carrying a canonical
+  planar six-membered aromatic ring may stack at the idealized Set-A
+  geometry. Consent is OFF by default; the opt-in is an explicit,
+  deliberate user action. OFF behavior is unchanged in every respect.
+- Geometry REUSED, not re-measured: the mode reuses the approved
+  [JAN2000]-anchored encoding verbatim — 3.383 / 1.231 Å (perpendicular /
+  lateral), i.e. 3.60 Å at 20 deg off-normal — exactly as shipped in the
+  Set-A entry. No new number, measurement, or claim is introduced.
+- Labeling: every in-game surface produced by this mode carries the
+  'illustrative geometry - user-approved' label — the interaction line
+  literal 'generic pi-stack (illustrative geometry - user-approved)' —
+  so generic placements are always distinguishable from dataset-verified
+  ones. The once-per-run consent note carries the same label:
+  'generic pi-stack enabled: illustrative geometry - user-approved [Janiak 2000]'
+- Ring-less uploads: an upload with no qualifying aromatic ring still
+  skips with an explicit reason, consent ON or OFF (skip reason literal
+  'no aromatic ring for generic pi-stack').
+- Scope: the [JAN2000] SCOPE CAVEAT above applies unchanged — the
+  geometry derives from a crystalline-context corpus (metal-complex
+  crystal structures, plus the CC0 COD organic crystals above);
+  transferability to solution-phase conditions is NOT verified. The
+  consent + 'user-approved' labeling IS the explicit crystalline-state
+  framing requested for Phase 8, landed early in this mode's disclosure.
+
 ### [COD4003564] Phenanthrene·TCNB cocrystal — measured mixed π-stack  [VERIFIED]
 - COD entry 4003564 (CC0 / public domain; COD header: "placed in the public
   domain by the contributors"). https://www.crystallography.net/cod/4003564.cif
