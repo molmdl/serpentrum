@@ -65,6 +65,8 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
+from serpentrum import generic_stack  # noqa: E402  (plan 5.2-02)
+from serpentrum import hud_logic  # noqa: E402  (interim reason-text pin)
 from serpentrum import molfile  # noqa: E402
 from serpentrum import molecule_data  # noqa: E402
 from serpentrum import placement  # noqa: E402  -- RED: module does not exist yet
@@ -224,7 +226,8 @@ class TestSkipTaxonomy(_FixtureBase):
     def test_outcome_code_constants_are_strings(self):
         # hud_logic (plan 05-09) imports these constants to map codes to text.
         for name in ('SKIP_NO_ENTRY', 'SKIP_NOT_APPROVED', 'SKIP_MODE',
-                     'SKIP_NO_RING', 'SKIP_NONPLANAR',
+                     'SKIP_NO_RING', 'SKIP_GENERIC_NO_RING',
+                     'SKIP_NONPLANAR',
                      'REFUSE_ATOM'):
             self.assertIsInstance(getattr(placement, name), str, name)
 
@@ -655,6 +658,112 @@ class TestResolveOrchestrator(_FixtureBase):
         # honesty: this same geometry used to refuse REFUSE_WALL).
         min_x = min(a[1] for a in outcome['placed_atoms'])
         self.assertLess(min_x, _BOX_SMALL[0][0])
+
+
+class TestGenericSkipClass(_FixtureBase):
+    """Plan 5.2-03 pins (STACK-06 SC3): the consent-ON generic ring-less
+    skip taxonomy branch.
+
+    The shape under test is the plan 5.2-06 consent-ON restamp: the GUI
+    controller stamps the captured upload record's 'has_stack_entry'
+    consent-aware (True when the OVERLAY resolves an entry for it) and
+    resolve_skip runs against the overlay dataset. The taxonomy ORDER is
+    unchanged — SKIP_GENERIC_NO_RING is a sibling of SKIP_NO_RING at the
+    SAME ring-check step, chosen by WHICH entry matched (the generic
+    upload entry vs the shipped set_a entry). Consent OFF remains
+    byte-identical: uploads carry load-time has_stack_entry=False, the
+    :116 pre-guard short-circuits to SKIP_NO_ENTRY, and the new branch
+    is unreachable without the overlay AND the restamp together.
+    """
+
+    def _overlay(self):
+        return generic_stack.overlay_stacking_data(self.stacking_data, True)
+
+    def _upload_ringless(self):
+        # The consent-ON restamp shape (plan 5.2-06): entry flag flipped
+        # True by has_stack_entry_for; NO 'stack_ring' key (ring-less
+        # upload — setloader._upload_stack_ring omitted it at load).
+        return {'set': '__upload__', 'has_stack_entry': True,
+                'atoms': self.benzene_raw}
+
+    def _upload_ring_bearing(self):
+        rec = dict(self._upload_ringless())
+        rec['stack_ring'] = list(_BENZENE_RING)
+        return rec
+
+    def test_upload_ringless_under_consent_skips_generic_no_ring(self):
+        self.assertNotIn('stack_ring', self._upload_ringless())
+        self.assertEqual(
+            placement.resolve_skip(self._upload_ringless(), self._overlay()),
+            placement.SKIP_GENERIC_NO_RING)
+
+    def test_upload_ring_bearing_under_consent_is_stackable(self):
+        self.assertIsNone(
+            placement.resolve_skip(self._upload_ring_bearing(),
+                                   self._overlay()))
+
+    def test_upload_off_still_skips_no_entry(self):
+        # The guard path re-asserted next to the new branch: OFF restamp
+        # (load-time False) + the ORIGINAL dataset = SKIP_NO_ENTRY, the
+        # byte-identical core (the new branch never runs without the
+        # overlay naming the generic entry).
+        rec = self._upload_ringless()
+        rec['has_stack_entry'] = False
+        self.assertEqual(
+            placement.resolve_skip(rec, self.stacking_data),
+            placement.SKIP_NO_ENTRY)
+
+    def test_generic_branch_requires_generic_entry_id(self):
+        # A set_a record missing 'stack_ring' resolves pi_stack_pd (id !=
+        # the generic id) and must still take the plain SKIP_NO_RING
+        # branch — the generic code is keyed to WHICH entry matched.
+        rec = {'set': 'set_a', 'has_stack_entry': True,
+               'atoms': self.benzene_raw}
+        self.assertEqual(
+            placement.resolve_skip(rec, self.stacking_data),
+            placement.SKIP_NO_RING)
+
+    def test_generic_branch_off_overlay_identity(self):
+        # Consent OFF overlay is the SAME dataset object (zero-copy OFF
+        # path): even a restamped has_stack_entry=True upload still
+        # finds NO matching entry -> SKIP_NO_ENTRY via the lookup, not
+        # the guard. The DATASET alone cannot flip the taxonomy.
+        off_overlay = generic_stack.overlay_stacking_data(
+            self.stacking_data, False)
+        self.assertIs(off_overlay, self.stacking_data)
+        self.assertEqual(
+            placement.resolve_skip(self._upload_ringless(), off_overlay),
+            placement.SKIP_NO_ENTRY)
+
+    def test_new_reason_code_not_yet_in_reason_text_is_fine(self):
+        # The human-readable reason text lands in plan 5.2-04
+        # (hud_logic._REASON_TEXT); TODAY the fallback renders. This
+        # pins the interim behavior so 5.2-04's text addition is a
+        # clean diff against it.
+        self.assertEqual(
+            hud_logic._reason(placement.SKIP_GENERIC_NO_RING, None),
+            'unclassified outcome SKIP_GENERIC_NO_RING')
+
+    def test_full_resolve_generic_placement_outcome_shape(self):
+        # The SC3 placed half end-to-end through resolve(): overlay +
+        # the ring-bearing restamped upload -> 'placed' via the generic
+        # entry at the REUSED approved geometry, citation 'Janiak 2000'.
+        outcome = placement.resolve(
+            self._upload_ring_bearing(), self.records_by_id,
+            self._overlay(),
+            self.head, _BENZENE_RING, _HEADING_EAST,
+            [], _xyz(self.head),
+            _BOX_SMALL[0], _BOX_SMALL[1], _DISPLAY_Z)
+        self.assertEqual(outcome['status'], 'placed')
+        self.assertEqual(outcome['interaction']['id'], 'pi_stack_generic')
+        self.assertEqual(outcome['citation_short'], 'Janiak 2000')
+        # Geometry fidelity: the placed ring centroid sits the composed
+        # dataset step (3.383/1.231 -> 3.6000 A) from the head ring.
+        placed_c = stacking.ring_frame(
+            _xyz(outcome['placed_atoms']), _BENZENE_RING)[0]
+        delta = tuple(placed_c[k] - self.head_c[k] for k in range(3))
+        dist = math.sqrt(sum(v * v for v in delta))
+        self.assertAlmostEqual(dist, 3.6000, places=4)
 
 
 if __name__ == '__main__':
