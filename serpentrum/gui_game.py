@@ -59,6 +59,7 @@ import time
 from pymol.Qt import QtWidgets, QtCore, QtGui
 
 from . import game_engine
+from . import generic_stack
 from . import hud_logic
 from . import pymol_bridge
 from . import setup_logic
@@ -366,11 +367,23 @@ class GameTab(QtWidgets.QWidget):
         pickup object edge-on as sticks, frames ONCE (the 03-06
         one-shot contract - NEVER per-tick), logs the C1 zero-stackable
         demonstration-mode note ONCE per run when the active set has no
-        stacking entries (upload-endless debug session, 2026-09-21),
-        logs the once-per-run speed note (tier + A/s, GAME-11 plan
-        5.1-05) right beside it,
+        stacking entries under the CONSENT-AWARE predicate (Phase 5.2:
+        the consent flag is read ONCE here and passed to
+        stack_mode_note; with consent ON, ring-bearing uploads count as
+        stackable), logs the once-per-run generic-consent disclosure
+        line (STACK-06 SC2: explicit, non-silent consent made visible
+        in-game) BETWEEN the mode note and the speed note - None when
+        OFF, so OFF runs gain ZERO lines and the log order stays
+        byte-identical to today, logs the once-per-run speed note
+        (tier + A/s, GAME-11 plan 5.1-05) right beside it,
         then runs the epoch-guarded countdown. The movement tick starts
         at _begin_play (after GO!).
+
+        Restart (:1245-1263) replays the ANCHOR's setup dict through
+        begin_game - consent included - so the consent state and the
+        anchored stacking_data (the overlay or the original dataset,
+        anchored at Apply) stay in sync run after run; Restart needs
+        ZERO new wiring (the 5.1 speed-note precedent).
         """
         self._teardown_round()  # timers, epoch, input, camera (ONE helper)
         self.info_box.clear()
@@ -419,13 +432,26 @@ class GameTab(QtWidgets.QWidget):
                 self._pickup_m16(record, seed['centroid']))
             self._session['live_pickup_names'].append(name)
         pymol_bridge.frame_scene()  # ONE-SHOT framing (03-06 contract)
+        # STACK-06 (Phase 5.2): the generic upload stacking consent flag
+        # is read ONCE per run here and threads into the mode note (the
+        # consent-aware stackable predicate) + the capture restamp (the
+        # anchored dataset is the consent carrier).
+        consent = setup.get(
+            'generic_stack_consent',
+            setup_logic.DEFAULTS['generic_stack_consent'])
         # C1 (upload-endless debug session, 2026-09-21): a set with ZERO
         # stackable records can never win (STACK-03 skips every capture);
         # say so ONCE per run, up front, or the run is silently endless.
         # Empty records take the 'no records anchored' branch instead.
-        note = hud_logic.stack_mode_note(records)
+        note = hud_logic.stack_mode_note(records, consent)
         if note is not None:
             self._log(note)
+        # STACK-06 (Phase 5.2): the once-per-run generic-consent
+        # disclosure - explicit, non-silent consent made visible in-game.
+        # None when OFF: OFF runs gain ZERO lines (log order byte-identical).
+        consent_line = hud_logic.generic_consent_note(consent)
+        if consent_line is not None:
+            self._log(consent_line)
         # GAME-11 (plan 5.1-05): the once-per-run speed line, beside the
         # stack_mode_note precedent, BEFORE 'Get ready...'. Once per
         # begin_game == once per run (Start or Restart), never per tick.

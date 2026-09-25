@@ -711,6 +711,21 @@ class TestGenericConsentNote(unittest.TestCase):
         # ASCII-only wording (house label style).
         self.assertTrue(all(ord(ch) < 128 for ch in line), line)
 
+    def test_begin_game_has_exactly_one_generic_consent_call_site(self):
+        # One-shot-ness pin (plan 5.2-06, mirrors the stack_mode_note /
+        # speed_note pins): the disclosure line is logged by begin_game
+        # EXACTLY ONCE per run (never per tick, never per capture). A
+        # second call site would duplicate the line; none would drop
+        # the disclosure.
+        source_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'serpentrum', 'gui_game.py')
+        with open(source_path) as handle:
+            source = handle.read()
+        self.assertEqual(source.count('generic_consent_note('), 1,
+                         'exactly one generic_consent_note call site '
+                         '(begin_game, once per run)')
+
 
 class TestSpeedNote(unittest.TestCase):
     """speed_note: the once-per-run speed info-box line (plan 5.1-03).
