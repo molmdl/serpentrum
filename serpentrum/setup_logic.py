@@ -59,6 +59,10 @@ DEFAULTS = {
                                    # 2026-09-25 feel-check; game_engine's
                                    # SPEED_A_PER_S stays 3.0 as the v1
                                    # baseline + kwarg fallback only)
+    'generic_stack_consent': False,  # STACK-06 (Phase 5.2): generic upload
+                                     # pi-stack consent; OFF by default —
+                                     # absent key = OFF via merge_defaults
+                                     # (docstring below).
 }
 
 # Box xy-extents in Angstrom (research R7). Consumed by
@@ -223,6 +227,11 @@ def validate(setup):
       speed           not a number, or <= 0
       broadening_fwhm not a number, or <= 0
       head_molecule   not a non-empty str
+      generic_stack_consent  present but not a bool (missing key
+                        PASSES — absent = OFF backcompat; an EXPLICIT
+                        non-bool like 'yes' or None errors: consent is
+                        a safety-relevant opt-in and must never be
+                        silently enabled by a truthy non-bool)
 
     WARNINGS (at most ONE — fires once if EITHER trigger exceeds its
     safe default): win_cap_molecules > 10 OR atom_budget > 100 ->
@@ -274,6 +283,16 @@ def validate(setup):
     if not isinstance(head_molecule, str) or not head_molecule:
         errors.append('head_molecule %r must be a non-empty string'
                       % (head_molecule,))
+
+    # STACK-06 (Phase 5.2, plan 5.2-01): consent is a safety-relevant
+    # opt-in — a truthy non-bool from a hand-edited file must NOT
+    # silently enable it. Missing key passes (absent = OFF backcompat);
+    # an explicit None (or any non-bool) errors. INVERSE of the
+    # _is_number bool trap: here the value must BE a bool.
+    consent = setup.get('generic_stack_consent', False)
+    if not isinstance(consent, bool):
+        errors.append('generic_stack_consent %r must be a boolean'
+                      % (consent,))
 
     # --- warnings (at most one: the N-cubed hessian cost) ---
     # Guarded by _is_number so a non-numeric cap/budget never crashes the
