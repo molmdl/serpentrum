@@ -1,6 +1,7 @@
 """setup_logic contract tests: defaults, validation matrix, save/load
 round-trip, seeded head randomize (plan 02-07), speed tiers +
-defaults-merge backcompat (plan 5.1-02).
+defaults-merge backcompat (plan 5.1-02), generic upload pi-stack
+consent schema key (plan 5.2-01).
 
 Covers the pure half of SETUP-03/04/05/06 and SPECTRA-06's pre-xtb
 warning. validate() produces per-key errors and the single exact N-cubed
@@ -50,6 +51,9 @@ EXPECTED_DEFAULTS = {
     'atom_budget': 100,
     'broadening_fwhm': 16.0,
     'speed': 6.0,
+    # STACK-06 consent (Phase 5.2): OFF by default; absent key = OFF via
+    # merge_defaults.
+    'generic_stack_consent': False,
 }
 
 
@@ -439,6 +443,75 @@ class TestCustomSpeedAccepted(unittest.TestCase):
     def test_custom_speed_validates_with_no_speed_error(self):
         errors, _warnings = validate(_mutated(speed=50.0))
         self.assertEqual([e for e in errors if 'speed' in e], [])
+
+
+class TestGenericStackConsent(unittest.TestCase):
+    """generic_stack_consent schema key (plan 5.2-01, STACK-06 SC1).
+
+    OFF by default (bool False); absent key = OFF via merge_defaults
+    (the 5.1-02 seam explicitly names this reuse); validate() enforces
+    a bool type-check with missing-key-passes semantics (a truthy
+    non-bool like 'yes' from a hand-edited file must NOT silently
+    enable a safety-relevant opt-in). No SCHEMA_VERSION bump."""
+
+    def _consent_errors(self, setup):
+        errors, _warnings = validate(setup)
+        return [e for e in errors if 'generic_stack_consent' in e]
+
+    def test_default_is_off(self):
+        self.assertIs(new_setup()['generic_stack_consent'], False)
+
+    def test_validate_accepts_bool_true_and_false(self):
+        self.assertEqual(self._consent_errors(
+            _mutated(generic_stack_consent=True)), [])
+        self.assertEqual(self._consent_errors(
+            _mutated(generic_stack_consent=False)), [])
+
+    def test_validate_rejects_non_bool(self):
+        for value in ('yes', 1, None, 0):
+            cerrors = self._consent_errors(
+                _mutated(generic_stack_consent=value))
+            self.assertEqual(len(cerrors), 1,
+                             'expected exactly one consent error for %r'
+                             % (value,))
+            self.assertIn('boolean', cerrors[0])
+
+    def test_missing_key_passes_explicit_none_fails(self):
+        # Missing-key-passes semantics: a dict WITHOUT the key gets no
+        # consent error (backcompat), but an EXPLICIT None does (it is
+        # not a bool).
+        old_setup = dict(new_setup())
+        del old_setup['generic_stack_consent']
+        self.assertEqual(self._consent_errors(old_setup), [])
+        cerrors = self._consent_errors(_mutated(generic_stack_consent=None))
+        self.assertEqual(len(cerrors), 1)
+        self.assertIn('boolean', cerrors[0])
+
+    def test_missing_key_merges_to_off(self):
+        # The 9 OLD keys only (no consent key) -> merged consent is
+        # False and the merged dict validates clean.
+        old_setup = {k: v for k, v in new_setup().items()
+                     if k != 'generic_stack_consent'}
+        self.assertEqual(len(old_setup), 9)
+        merged = merge_defaults(old_setup)
+        self.assertIs(merged['generic_stack_consent'], False)
+        self.assertEqual(validate(merged), ([], []))
+
+    def test_round_trip_preserves_true(self):
+        # Consent-ON persists through save/load (pure layer; load_setup
+        # keeps its no-merge contract).
+        s = new_setup()
+        s['generic_stack_consent'] = True
+        loaded = load_setup(save_setup(s))
+        self.assertIs(loaded['generic_stack_consent'], True)
+
+    def test_validate_never_raises_on_weird_consent(self):
+        # validate() never raises — even an unserializable/weird value
+        # is data, producing an error instead of an exception.
+        s = new_setup()
+        s['generic_stack_consent'] = object()
+        errors, _warnings = validate(s)  # must not raise
+        self.assertTrue(any('generic_stack_consent' in e for e in errors))
 
 
 class TestRandomizeHead(unittest.TestCase):
