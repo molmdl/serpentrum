@@ -86,11 +86,14 @@ statement. Human approval covers this license note.
   lateral), i.e. 3.60 Å at 20 deg off-normal — exactly as shipped in the
   Set-A entry. No new number, measurement, or claim is introduced.
 - Labeling: every in-game surface produced by this mode carries the
-  'illustrative geometry - user-approved' label (interaction line literal
-  'generic pi-stack (illustrative geometry - user-approved)'), so generic
-  placements are always distinguishable from dataset-verified ones.
+  'illustrative geometry - user-approved' label — the interaction line
+  literal 'generic pi-stack (illustrative geometry - user-approved)' —
+  so generic placements are always distinguishable from dataset-verified
+  ones. The once-per-run consent note carries the same label:
+  'generic pi-stack enabled: illustrative geometry - user-approved [Janiak 2000]'
 - Ring-less uploads: an upload with no qualifying aromatic ring still
-  skips, with an explicit reason, consent ON or OFF.
+  skips with an explicit reason, consent ON or OFF (skip reason literal
+  'no aromatic ring for generic pi-stack').
 - Scope: the [JAN2000] SCOPE CAVEAT above applies unchanged — the
   geometry derives from a crystalline-context corpus (metal-complex
   crystal structures, plus the CC0 COD organic crystals above);
