@@ -36,6 +36,12 @@ it never writes chemistry:
   hud_logic.resume_note(name) -> the G2 un-finish info line.
   hud_logic.reason_text(code, detail, name) -> placement.py outcome
       code -> educator-readable reason, rendered through skip_text.
+      Phase 5.2 (STACK-06) adds the consent-ON SKIP_GENERIC_NO_RING
+      reason literal; the recap 'skipped Nx' prefix labels it for free.
+  Phase 5.2 (STACK-06): stack_mode_note gains a consent keyword
+      (consent=False default keeps the C1 line byte-identical), and
+      generic_consent_note(consent) is the once-per-run generic-consent
+      disclosure (None when OFF; DRAFT wording pending the feel-check).
   hud_logic.ReasonCoalescer -> the 05-16 anti-spam state (2026-09-20):
       consecutive identical skip/refuse lines coalesce into a '(xN)'
       suffix rewrite; the first of a run always appends.
@@ -580,6 +586,130 @@ class TestStackModeNote(unittest.TestCase):
         self.assertEqual(source.count('stack_mode_note('), 1,
                          'exactly one stack_mode_note call site '
                          '(begin_game, once per run)')
+
+
+class TestGenericReasonText(unittest.TestCase):
+    """Phase 5.2 (STACK-06, plan 5.2-04): the SKIP_GENERIC_NO_RING
+    reason literal renders through the ONE _REASON_TEXT taxonomy
+    surface (placement.SKIP_GENERIC_NO_RING exists since 5.2-03).
+    DRAFT wording pinned as proposed — owner approves at 5.2-09."""
+
+    def test_generic_no_ring_reason_text(self):
+        # Consent-ON generic entry matched but the upload carries no
+        # canonical planar 6-ring -> the specific generic skip reason.
+        line = hud_logic.reason_text(placement.SKIP_GENERIC_NO_RING,
+                                     None, 'cyclohexane')
+        self.assertEqual(
+            line,
+            'skipped cyclohexane: no aromatic ring for generic pi-stack')
+
+    def test_recap_prefix_labels_generic_skip(self):
+        # The recap prefix labeling (startswith('SKIP_') -> 'skipped
+        # Nx') needs NO change — the new code auto-renders; pin it.
+        history = [{'name': 'cyclohexane',
+                    'outcome': placement.SKIP_GENERIC_NO_RING}]
+        self.assertEqual(
+            hud_logic.breakdown_lines(history),
+            ['skipped 1x cyclohexane: no aromatic ring for generic '
+             'pi-stack'])
+
+
+class TestStackModeNoteConsent(unittest.TestCase):
+    """Phase 5.2 (STACK-06, plan 5.2-04): the consent-aware
+    stack_mode_note. The consent kwarg defaults to False so the C1
+    line stays BYTE-IDENTICAL OFF (TestStackModeNote pins untouched);
+    consent ON shifts the stackable predicate to also count records
+    carrying 'stack_ring' (the canonical planar 6-ring eligibility
+    signal), and rewords the zero-stackable variant so the note never
+    claims 'no stacking entries' when generic consent matched no
+    ring-bearing upload. DRAFT variant wording pending 5.2-09."""
+
+    NOTE = TestStackModeNote.NOTE  # the C1 OFF line (unchanged)
+    VARIANT = ('no molecule has a planar aromatic 6-ring for generic '
+               'pi-stack - demonstration mode: practice steering; '
+               'only a crash ends the run')
+
+    def test_off_default_byte_identical(self):
+        # Consent omitted == explicit False == the pinned C1 literal.
+        records = [{'id': 'upload_0', 'has_stack_entry': False},
+                   {'id': 'upload_1', 'has_stack_entry': False}]
+        self.assertEqual(hud_logic.stack_mode_note(records), self.NOTE)
+        self.assertEqual(hud_logic.stack_mode_note(records, False),
+                         self.NOTE)
+
+    def test_consent_on_ring_bearing_upload_pool_suppresses(self):
+        # Consent ON + an upload carrying 'stack_ring' IS stackable via
+        # the generic entry -> None (the false-positive fix: the note
+        # must not claim demonstration mode).
+        records = [{'id': 'upload_0', 'has_stack_entry': False,
+                    'stack_ring': [0, 1, 2, 3, 4, 5]}]
+        self.assertIs(hud_logic.stack_mode_note(records, True), None)
+
+    def test_consent_on_ringless_upload_pool_variant(self):
+        # Consent ON but NOTHING is stackable (no ring) -> the DRAFT
+        # variant line, NEVER the 'no stacking entries' C1 line.
+        records = [{'id': 'upload_0', 'has_stack_entry': False}]
+        line = hud_logic.stack_mode_note(records, True)
+        self.assertEqual(line, self.VARIANT)
+        self.assertNotIn('\n', line)
+
+    def test_consent_on_demo_pool_suppresses(self):
+        # A stackable demo record still suppresses the note (the
+        # has_stack_entry leg of the predicate, consent-independent).
+        records = [{'id': 'benzene', 'has_stack_entry': True}]
+        self.assertIs(hud_logic.stack_mode_note(records, True), None)
+
+    def test_consent_on_mixed_pool_suppresses(self):
+        records = [{'id': 'benzene', 'has_stack_entry': True},
+                   {'id': 'upload_0'}]
+        self.assertIs(hud_logic.stack_mode_note(records, True), None)
+
+    def test_consent_on_empty_records_none(self):
+        # The empty-records branch is unchanged by consent (no records
+        # at all is a different state with its own begin_game line).
+        self.assertIs(hud_logic.stack_mode_note([], True), None)
+
+    def test_consent_on_missing_stack_ring_key_counts_unstackable(self):
+        # Key ABSENT (setloader's omit-on-ineligible contract), not
+        # False: the predicate reads key PRESENCE for 'stack_ring'.
+        records = [{'id': 'upload_0'}]
+        self.assertEqual(hud_logic.stack_mode_note(records, True),
+                         self.VARIANT)
+
+    def test_real_upload_set_off_note_unchanged(self):
+        # Real-data OFF re-pin: the uploaded naphthalene file loads
+        # ring-bearing, but with consent omitted the C1 line is the
+        # byte-identical OFF answer (consent gate ignores stack_ring).
+        path = os.path.join(setloader.package_data_dir(),
+                            'naphthalene.sdf')
+        records, errors = setloader.load_upload(
+            path, stacking_path=setloader.default_stacking_path())
+        self.assertEqual(errors, [])
+        self.assertTrue(records)
+        self.assertEqual(hud_logic.stack_mode_note(records), self.NOTE)
+
+
+class TestGenericConsentNote(unittest.TestCase):
+    """Phase 5.2 (STACK-06, plan 5.2-04): the once-per-run
+    generic-consent disclosure line. None when consent is falsy (the
+    stack_mode_note None-contract, NOT speed_note's always-line
+    contract — OFF runs gain ZERO log lines). DRAFT wording pending
+    the 5.2-09 feel-check; caller gates (plan 5.2-06)."""
+
+    def test_off_is_none(self):
+        self.assertIs(hud_logic.generic_consent_note(False), None)
+        self.assertIs(hud_logic.generic_consent_note(0), None)
+        self.assertIs(hud_logic.generic_consent_note(None), None)
+
+    def test_on_exact_wording(self):
+        line = hud_logic.generic_consent_note(True)
+        self.assertEqual(
+            line,
+            'generic pi-stack enabled: illustrative geometry - '
+            'user-approved [Janiak 2000]')
+        self.assertNotIn('\n', line)
+        # ASCII-only wording (house label style).
+        self.assertTrue(all(ord(ch) < 128 for ch in line), line)
 
 
 class TestSpeedNote(unittest.TestCase):
