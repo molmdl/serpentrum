@@ -215,18 +215,25 @@ Notes: Inserted per owner question 2026-09-20 ("possible to have user accept a p
 
 ### Phase 5.3: Randomized Pickup Spawning *(INSERTED 2026-09-26 — urgent insertion, owner request)*
 
-**Goal**: [Urgent work - to be planned] — pickups (molecules-to-be-eaten) currently spawn too close to the snake's current position, making the game too simple; spawn positions must be randomized across the box.
-**Depends on**: Phase 5 (COMPLETE) — executes after 5.2, before Phase 6
-**Requirements**: (none new — refines Phase 5 pickup spawn behavior)
-**Plans**: 0 plans
+**Goal**: Pickup spawn positions are seeded-randomized uniformly across the game box (instead of a LOOKAHEAD-anchored 10 Å bubble ahead of the heading) with a box-proportional minimum head distance — every capture demands real navigation while GAME-07 seeded determinism (same setup + same call sequence ⇒ identical positions) and the 2026-09-19b/c demote/cooldown machinery stay intact.
+**Depends on**: Phase 5 (COMPLETE) — executes after Phase 5.2, before Phase 6
+**Requirements**: (none new — refines the Phase 5 pickup spawn policy; coverage stays 46/46)
+**Success Criteria** (what must be TRUE):
+  1. New pickups spawn anywhere in the wall-margined box (seeded uniform sampling) — no longer confined to a bubble ahead of the snake's head.
+  2. Every spawn is at least a box-proportional minimum head distance away (≈0.35 × shrunk half-span ⇒ ≈11/18/28.5 Å on small/medium/large; clamp ≤ 0.8 × half-span), tunable via the `min_head_dist_a` ctor kwarg and the `MIN_HEAD_DIST_FACTOR` constant.
+  3. GAME-07 determinism holds: same setup + same call sequence ⇒ identical spawn positions (crc32 seeding, private random.Random); all clearance legs (wall margin, head floor, chain atoms, live pickups) intact; degenerate-box exhaustion semantics unchanged.
+  4. `PickupSpawner.__init__`/`first`/`next_after` signatures unchanged — gui_game.py/game_engine.py need ZERO edits; the demote-after-refuse + resumable exhaust-cooldown machinery and all non-geometry spawn pins stay green UNMODIFIED.
+  5. A live human feel-check approves the spawn randomness (checkpoint).
+**Plans**: 5 plans (3 waves; planned 2026-09-26):
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 5.3 to break down)
+- [ ] 5.3-01-PLAN.md — TDD uniform box-sampling candidate generator + min-head-distance floor (Wave 1)
+- [ ] 5.3-02-PLAN.md — TDD seeded grid-fallback scan offset (kills corner-bias clustering) (Wave 2, sequential)
+- [ ] 5.3-03-PLAN.md — s9 spawn+engine integration re-proof (randomized capture chain, derived expectations) (Wave 2, parallel)
+- [ ] 5.3-04-PLAN.md — gui spawn call-site source-scan pins + zero-edit compatibility verdict (Wave 2, parallel)
+- [ ] 5.3-05-PLAN.md — full gates + smokes + owner feel-check checkpoint (+ conditional factor retune) (Wave 3, blocking)
 
-**Details:**
-[To be added during planning]
-
-Notes: Inserted per owner playtesting feedback 2026-09-26 ("the new mol to be eaten spawn too close to the current position, so its likely too simple. make it more random in the box"). Likely touches the seeded spawn policy (05-03 spawn.py, incl. the 2026-09-19c cooldown machinery) and possibly its GameTab/bridge spawn wiring (05-11 begin_game); no new requirement ID — coverage stays 46/46. Planning note: check file overlap with Phase 6's gui-touching plans (06-05, 06-09 carry `depends_on: ["5.2-09"]` for shared Phase-5.2 files) — 5.3 must slot into that shared-file ordering if it touches gui_game.
+Notes: Inserted per owner playtesting feedback 2026-09-26 ("the new mol to be eaten spawn too close to the current position, so its likely too simple. make it more random in the box"). Scope lives in 05-03's spawn.py — candidate-generator swap retiring LOOKAHEAD_A/LATERAL_MAX_A/LATERAL_QUANTUM_A/_draw_lateral while keeping MAX_DRAWS, GRID_STEP_A, the clearance legs, crc32 seeding, and the 2026-09-19b/c demote/cooldown machinery; no new requirement ID — coverage stays 46/46. Executes after 5.2 (planned first), before Phase 6; 5.3 touches NO 5.2/06-shared source file — gui_game.py is verified zero-edit by 5.3-04 (signatures preserved; symbol-anchored; disjoint from 06-06's `_present_completion`/`log_external` surface, so the 06 `depends_on: ["5.2-09"]` edges stay valid unchanged). Existing spawn determinism/position pins in tests/test_spawn.py are rewritten by the policy change; all other suites must stay green UNMODIFIED (5.1-01 convention). Owner-retunable: MIN_HEAD_DIST_FACTOR (0.35 default) via the min_head_dist_a ctor kwarg — precedent 5.1 tier retune (2026-09-25).
 
 ### Phase 6: xtb Pipeline *(research phase F — parallel track, largely de-risked)*
 
@@ -346,7 +353,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Stacking & Game Rules Complete | 16/16 | Complete (verified 48/48 plan truths, 3 owner-amended; 5/5 criteria; 9/9 reqs; 7-round human checkpoint) | 2026-09-20 |
 | 5.1. Game Speed / Difficulty (INSERTED 2026-09-20) | 6/6 | Complete (verified 17/17 plan truths, 3 owner-amended; 4/4 criteria; GAME-11 Complete; owner retuned tiers 3.0/6.0/7.5/9.0, default 'normal' 6.0) | 2026-09-25 |
 | 5.2. Generic Upload Stacking Consent (INSERTED 2026-09-20) | 0/9 | In progress (plans executing) | - |
-| 5.3. Randomized Pickup Spawning (INSERTED 2026-09-26) | 0/TBD | Inserted (not planned) | - |
+| 5.3. Randomized Pickup Spawning (INSERTED 2026-09-26) | 0/5 | Planned (2026-09-26; 5 plans in 3 waves) | - |
 | 6. xtb Pipeline | 0/12 | Planned (2026-09-24; 12 plans in 4 waves) | - |
 | 7. Spectra UI | 0/10 | Planned (2026-09-25; 10 plans in 6 waves) | - |
 | 8. Demo Data, Docs & Release Audit | 0/TBD | Not started | - |
