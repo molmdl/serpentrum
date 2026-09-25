@@ -23,6 +23,7 @@ A PyMOL plugin game: steer a molecular head around a bounded box, stack real sma
 - [x] **Phase 5: Stacking & Game Rules Complete** - Pickups stack at cited geometry; rigid-pivot turns; collisions end runs; win/crash both reach spectra *(research E)*
 - [x] **Phase 5.1: Game Speed / Difficulty (INSERTED 2026-09-20)** - Setup-selectable constant speed tier (difficulty), persisted; owner feel-check amended the tier values (3.0/6.0/7.5/9.0 A/s, default 'normal' 6.0 — drafts all "too slow") *(owner insertion — playtesting feedback)*
 - [ ] **Phase 5.2: Generic Upload Stacking Consent (INSERTED 2026-09-20)** - Opt-in generic π-stack geometry for ring-bearing uploads (illustrative, labeled); upload-only games become winnable *(owner insertion — promotes v2 STACK-06)* *(STACK-03 integrity guards: non-silent, labeled, human-approved geometry)*
+- [ ] **Phase 5.3: Randomized Pickup Spawning (INSERTED 2026-09-26)** - Pickup spawn positions randomized across the box (owner: new molecules spawn too close to the snake = too simple) *(owner insertion — playtesting feedback)*
 - [ ] **Phase 6: xtb Pipeline** - Async cancellable `xtb --ohess` with verified success contract and calibrated atom-budget guard *(research F — parallel track)*
 - [ ] **Phase 7: Spectra UI** - Broadened IR plot, clickable frequency table → static mode vectors, streaming log, saveable plot *(research G)*
 - [ ] **Phase 8: Demo Data, Docs & Release Audit** - Human-approved Set A + attribution, 6-button setup persistence, help/docs, end-to-end audit *(research H)*
@@ -212,6 +213,21 @@ Notes: Inserted per owner playtesting feedback 2026-09-20 ("current speed is eas
 
 Notes: Inserted per owner question 2026-09-20 ("possible to have user accept a pre-defined stacking in a popup and allow play as usual?"). Repos rule honored: distance is NOT invented (reuses the human-approved DATA-02 geometry); consent is explicit and non-silent; labeling keeps educational integrity (the v2 "silent fallback" out-of-scope entry stays out of scope). Absorbs the debug-session's C2 soft-warning seam into the same Setup surface. **Plan BEFORE Phase 5.1 (owner choice 2026-09-20); execute Phase 5.2 → 5.1 sequentially** (both touch gui_setup/hud_logic — no parallel waves across the two phases). Eligibility reuses 05-01/05-19d machinery: canonical planar 6-ring extractor + edge-on parity.
 
+### Phase 5.3: Randomized Pickup Spawning *(INSERTED 2026-09-26 — urgent insertion, owner request)*
+
+**Goal**: [Urgent work - to be planned] — pickups (molecules-to-be-eaten) currently spawn too close to the snake's current position, making the game too simple; spawn positions must be randomized across the box.
+**Depends on**: Phase 5 (COMPLETE) — executes after 5.2, before Phase 6
+**Requirements**: (none new — refines Phase 5 pickup spawn behavior)
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 5.3 to break down)
+
+**Details:**
+[To be added during planning]
+
+Notes: Inserted per owner playtesting feedback 2026-09-26 ("the new mol to be eaten spawn too close to the current position, so its likely too simple. make it more random in the box"). Likely touches the seeded spawn policy (05-03 spawn.py, incl. the 2026-09-19c cooldown machinery) and possibly its GameTab/bridge spawn wiring (05-11 begin_game); no new requirement ID — coverage stays 46/46. Planning note: check file overlap with Phase 6's gui-touching plans (06-05, 06-09 carry `depends_on: ["5.2-09"]` for shared Phase-5.2 files) — 5.3 must slot into that shared-file ordering if it touches gui_game.
+
 ### Phase 6: xtb Pipeline *(research phase F — parallel track, largely de-risked)*
 
 **Goal**: The final snake can be handed to a real, cancellable, async `xtb --ohess` run with a verified success contract and a calibrated atom-budget guard — while the UI never blocks.
@@ -330,6 +346,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Stacking & Game Rules Complete | 16/16 | Complete (verified 48/48 plan truths, 3 owner-amended; 5/5 criteria; 9/9 reqs; 7-round human checkpoint) | 2026-09-20 |
 | 5.1. Game Speed / Difficulty (INSERTED 2026-09-20) | 6/6 | Complete (verified 17/17 plan truths, 3 owner-amended; 4/4 criteria; GAME-11 Complete; owner retuned tiers 3.0/6.0/7.5/9.0, default 'normal' 6.0) | 2026-09-25 |
 | 5.2. Generic Upload Stacking Consent (INSERTED 2026-09-20) | 0/9 | In progress (plans executing) | - |
+| 5.3. Randomized Pickup Spawning (INSERTED 2026-09-26) | 0/TBD | Inserted (not planned) | - |
 | 6. xtb Pipeline | 0/12 | Planned (2026-09-24; 12 plans in 4 waves) | - |
 | 7. Spectra UI | 0/10 | Planned (2026-09-25; 10 plans in 6 waves) | - |
 | 8. Demo Data, Docs & Release Audit | 0/TBD | Not started | - |

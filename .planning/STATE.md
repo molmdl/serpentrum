@@ -84,6 +84,7 @@ Recent decisions affecting current work:
 
 - 2026-09-20: **Phase 5.1 (Game Speed / Difficulty, GAME-11) inserted after Phase 5** (URGENT — owner playtesting feedback "current speed is easy, kinda slow even with small box"); directory .planning/phases/5.1-game-speed-difficulty/; coverage 44 -> 45; draft tiers relaxed ~2.0 / normal 3.0 (default) / fast ~4.5 / expert ~6.0 A/s — owner feel-check finalizes. Distinct from v2 GAME-10-v2 (speed-vs-length, still deferred).
 - 2026-09-20: **Phase 5.2 (Generic Upload Stacking Consent, STACK-06 promoted v2->v1) inserted after 5.1** (owner request 2026-09-20, planning choice = plan-first before 5.1); directory .planning/phases/5.2-generic-upload-stacking-consent/; coverage 45 -> 46; consent via inline Setup control (modal popup purity-banned — .exec_() gate), OFF default, persisted; generic entry = already-approved idealized 3.60 A @ 20 geometry for canonical-planar-6-ring uploads, labeled "generic (illustrative — user-approved)" everywhere; ring-less uploads still skip; absorbs debug C2 seam; execute 5.2 -> 5.1 sequentially (shared gui_setup/hud_logic files).
+- 2026-09-26: **Phase 5.3 (Randomized Pickup Spawning) inserted after Phase 5.2** (URGENT — owner playtesting feedback: "the new mol to be eaten spawn too close to the current position, so its likely too simple. make it more random in the box"); directory .planning/phases/5.3-randomized-pickup-spawning/; no new requirement ID (refines the Phase 5 pickup spawn policy — 05-03 spawn.py + 2026-09-19c cooldown family) — coverage stays 46/46; executes after 5.2, before Phase 6.
 
 ### Pending Todos
 
@@ -109,5 +110,5 @@ Recent decisions affecting current work:
 Last session: 2026-09-25 (execute-phase orchestrator — Phase 5.1 executed in 3 waves via worktree protocol: wave 1 = 3 parallel TDD executors, wave 2 = 2 parallel executors, wave 3 = 5.1-06 Task 1 + BLOCKING owner feel-check -> APPROVED with tier retune; orchestrator applied Task 3 (4502143); gsd-verifier PASSED 17/17; phase wrap committed)
 Stopped at: Phase 5.1 COMPLETE + VERIFIED; Phase 5.2 (9+ plans on disk) and Phase 6 (12 plans on disk) both already planned by parallel sessions
 Resume file: None needed
-Next action: /gsd-execute-phase 5.2 (Generic Upload Stacking Consent — plans ready; shares gui_setup/hud_logic with the just-shipped 5.1 speed work, so executors must locate seams by symbol); then /gsd-execute-phase 6 (xtb Pipeline)
+Next action: /gsd-execute-phase 5.2 (Generic Upload Stacking Consent — plans ready; shares gui_setup/hud_logic with the just-shipped 5.1 speed work, so executors must locate seams by symbol); then Phase 5.3 (Randomized Pickup Spawning — INSERTED 2026-09-26, needs /gsd-plan-phase 5.3 first); then /gsd-execute-phase 6 (xtb Pipeline)
 Date convention: planning-doc dates are UTC (git commit dates authoritative) — the dev shell is HKT (UTC+8); never stamp from the local date.
