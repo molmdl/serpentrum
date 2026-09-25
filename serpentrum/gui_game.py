@@ -925,6 +925,22 @@ class GameTab(QtWidgets.QWidget):
         Viewer-read discipline: placement decides in PURE math from
         the session/engine mirrors; the ONLY cmd calls here are
         transform/rename/materialize WRITES (research Never-do list).
+
+        Phase 5.2 (STACK-06): the has_stack_entry RESTAMP in the
+        enrichment block below is the ONE consent-awareness touchpoint
+        in the capture path (EQ-engine-2, option i) - placement.py
+        stays untouched, so every taxonomy pin stays green by
+        construction. With consent ON, a ring-less upload whose
+        has_stack_entry restamps True (the anchored overlay carries
+        the generic entry) falls through to SKIP_GENERIC_NO_RING, the
+        consent-ON ring-less outcome (taxonomy ORDER unchanged); with
+        consent OFF the restamp is a provable no-op and uploads still
+        take SKIP_NO_ENTRY exactly as today. The generic interaction
+        carries its own labels (name/explanation/citation riding the
+        entry dict into pickup_block unedited); the DECORATED history
+        name (generic_stack.history_name) feeds the end-of-run recap
+        so generic placements group under '<molecule> (generic
+        pi-stack)', distinct from dataset groups (SC4).
         """
         session = self._session
         attached = False
@@ -942,12 +958,32 @@ class GameTab(QtWidgets.QWidget):
             # (the test seam's pickup_seed carries them on the seed;
             # enriching here from records_by_id keeps ONE truth and
             # covers begin_game-seeded pickups identically).
+            # Phase 5.2 (STACK-06): the has_stack_entry stamp is
+            # CONSENT-AWARE - it is recomputed from the anchored
+            # stacking_data via the pure generic_stack helper (the
+            # anchored dataset is the consent carrier: Apply anchored
+            # the overlay when consent is ON). OFF reduces to the
+            # load-time value by definition (interaction_for(
+            # {'set': '__upload__'}) -> None on the unmodified
+            # dataset); a None dataset (gui_setup's degradation
+            # contract) falls back to the load-time flag inside the
+            # helper. Order matters: 'set' is stamped BEFORE the
+            # recompute because the helper keys the lookup on the
+            # record's set field.
             record = records_by_id[pickup_rec['molecule_id']]
             resolve_rec = dict(pickup_rec)
             if 'stack_ring' in record:
                 resolve_rec['stack_ring'] = list(record['stack_ring'])
-            resolve_rec['has_stack_entry'] = record.get('has_stack_entry')
             resolve_rec['set'] = record.get('set')
+            # Phase 5.2 (STACK-06): consent-aware stackability. The
+            # ANCHORED dataset is the consent carrier (Apply anchored
+            # the overlay when consent is ON), so recompute from it:
+            # OFF reduces to the load-time value by definition
+            # (interaction_for('__upload__') -> None on the unmodified
+            # dataset); the None-dataset degradation falls back to the
+            # load-time flag inside the helper.
+            resolve_rec['has_stack_entry'] = generic_stack.has_stack_entry_for(
+                record, stacking_data)
             # 2026-09-20c fix G1: pre-resolve the skip taxonomy BEFORE
             # any geometry runs (the SRP_DEBUG tail frame included).
             # Records without a dataset entry (the '__upload__' keying --
@@ -1003,7 +1039,15 @@ class GameTab(QtWidgets.QWidget):
                 if old_name in session['live_pickup_names']:
                     session['live_pickup_names'].remove(old_name)
                 session['stacked_history'].append({
-                    'name': name,
+                    # Phase 5.2 (STACK-06 SC4): the recap-group label
+                    # decoration - generic placements group under
+                    # '<molecule> (generic pi-stack)', distinct from
+                    # dataset groups even for shared molecule names;
+                    # breakdown_lines untouched (first-appearance
+                    # grouping keys on the name string). interaction_id
+                    # stays stored unchanged.
+                    'name': generic_stack.history_name(
+                        name, outcome['interaction']),
                     'outcome': 'stacked',
                     'distance_a': outcome['interaction']['distance_a'],
                     'citation_short': outcome['citation_short'],
