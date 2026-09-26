@@ -61,6 +61,11 @@ REQUIRED_SMOKES = ('smoke/01_skeleton_smoke.py',
                     'smoke/08_stack_place_smoke.py',
                     # (Phase 6, plan 06-04 — bridge chain atom-count channel)
                     'smoke/10_chain_count_smoke.py',
+                    # 12 = plot renderer via the paint_scene seam (Phase 7,
+                    # plan 07-05) — needs the guarded QApplication([])
+                    # construct (probe RUN A: fonts without an app
+                    # hard-kill the process)
+                    'smoke/12_plot_smoke.py',
                     # 13 = mode arrows + g98/xtbopt overlay identity (Phase 7,
                     # plan 07-03) — re-asserts the OPTIMIZED-frame assumption
                     # on every gate run
