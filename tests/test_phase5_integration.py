@@ -40,7 +40,12 @@ spacing > 6 A"; the spawner's seeded laterals (up to +/-6.0 A) can exceed
 the 3.0 A capture radius, which would hang a no-turn scripted run -- exact
 capture timing is load-bearing for the counter pins. The spawner itself is
 exercised for BYTE-IDENTICAL restart determinism in scenario 8 against a
-scenario-1-shaped call sequence (the GAME-07 restart contract).
+scenario-1-shaped call sequence (the GAME-07 restart contract). Scenario 9
+(Phase 5.3) re-proves the same spawn seam end-to-end under the uniform
+box-sampling policy: a randomized nine-spawn capture chain (growing chain
+atoms, accumulating live centroids) returns no Nones, keeps every
+clearance leg at every step, spreads across the box, and re-runs
+byte-identically.
 
 python3.6 only (%-formatting, no f-strings). tests/ has NO __init__.py (the
 dev plugin path IS the repo root). Discovery:
@@ -697,6 +702,116 @@ class TestPhase5IntegrationChain(unittest.TestCase):
         self.assertEqual(len(run_a), 4)
         for entry in run_a:
             self.assertIsNotNone(entry)
+
+    # ---- SCENARIO 9 (Phase 5.3) --------------------------------------------
+
+    def test_s9_randomized_spawn_capture_chain(self):
+        """GAME-07 end-to-end under the Phase 5.3 uniform box-sampling
+        policy (owner 2026-09-26: 'make it more random in the box'): a
+        REAL set_a spawner drives a nine-spawn capture chain -- first()
+        then 8x next_after() with chain_atoms growing by each spawn's
+        TRANSLATED atoms (the executable capture spec: the eaten
+        molecule's atoms join the chain at the spawn centroid, per
+        spawn.build_pickup_seed) and live centroids accumulating (the
+        spawner does NOT gate on MAX_LIVE itself -- can_spawn is
+        caller-side). At every step the result is non-None and every
+        clearance leg holds: shrunk-box wall margin, head-centroid >=
+        the spawner's box-proportional min_head_dist, translated atoms
+        >= CHAIN_ATOM_CLEARANCE_A from every prior chain atom, and
+        centroid >= LIVE_PICKUP_CLEARANCE_A from every prior live
+        centroid. The nine spawns spread across the box (>= 3 of the 4
+        quadrants; max head distance > 30 A -- far beyond the retired
+        10 A lookahead bubble), and the entire drive re-runs
+        byte-identically on a fresh same-seed spawner. Every bound is
+        DERIVED from the module constants (WALL_MARGIN_A,
+        CHAIN_ATOM_CLEARANCE_A, LIVE_PICKUP_CLEARANCE_A, the
+        spawner.min_head_dist property) -- no hardcoded positions, so
+        owner retunes of the 5.3-01 constants cannot silently break
+        this scenario (5.1-06 derivation habit)."""
+        state = self.state
+
+        def run_once():
+            spawner = spawn.PickupSpawner(
+                state['records'], state['box_min'], state['box_max'],
+                spawn.seed_from_setup({'phase': '5.3', 'scenario': 's9'}),
+                state['atoms_by_id'])
+            log = []
+            live = []
+            chain_atoms = []
+            head = (0.0, 0.0)
+            # One spawn per step; the head sits at the begin_game
+            # origin throughout (this is a spawner-seam drive, not an
+            # engine run) -- randomization is position-neutral, so the
+            # boxed spread comes from the uniform draws, not head drift.
+            for step in range(9):
+                if step == 0:
+                    result = spawner.first(head, 'right')
+                else:
+                    result = spawner.next_after(head, 'right',
+                                                list(chain_atoms),
+                                                list(live))
+                self.assertIsNotNone(
+                    result, 'spawn %d of 9 must succeed' % (step + 1))
+                record, pid, centroid = result
+                cx, cy = centroid
+                # Leg 1: shrunk-box containment (wall margin, inclusive).
+                self.assertGreaterEqual(
+                    cx, state['box_min'][0] + spawn.WALL_MARGIN_A - DELTA)
+                self.assertLessEqual(
+                    cx, state['box_max'][0] - spawn.WALL_MARGIN_A + DELTA)
+                self.assertGreaterEqual(
+                    cy, state['box_min'][1] + spawn.WALL_MARGIN_A - DELTA)
+                self.assertLessEqual(
+                    cy, state['box_max'][1] - spawn.WALL_MARGIN_A + DELTA)
+                # Leg 2: box-proportional min-head floor (5.3-01 policy;
+                # DERIVED from the spawner property, never hardcoded).
+                self.assertGreaterEqual(
+                    math.sqrt(cx * cx + cy * cy),
+                    spawner.min_head_dist - DELTA)
+                # The eaten molecule's translated atoms (the executable
+                # capture spec) join the chain AFTER the clearance
+                # assertions against every PRIOR chain atom.
+                seed = spawn.build_pickup_seed(
+                    record, pid, centroid,
+                    state['atoms_by_id'][record['id']])
+                translated = seed['atoms']
+                # Leg 3: every translated atom clears every prior chain
+                # atom by CHAIN_ATOM_CLEARANCE_A (xy plane).
+                for atom in translated:
+                    for chain_atom in chain_atoms:
+                        self.assertGreaterEqual(
+                            math.sqrt((atom[1] - chain_atom[1]) ** 2
+                                      + (atom[2] - chain_atom[2]) ** 2),
+                            spawn.CHAIN_ATOM_CLEARANCE_A - DELTA)
+                # Leg 4: centroid clears every prior live centroid by
+                # LIVE_PICKUP_CLEARANCE_A.
+                for (lx, ly) in live:
+                    self.assertGreaterEqual(
+                        math.sqrt((cx - lx) ** 2 + (cy - ly) ** 2),
+                        spawn.LIVE_PICKUP_CLEARANCE_A - DELTA)
+                chain_atoms.extend(translated)
+                live.append(centroid)
+                log.append((record['id'], pid, centroid))
+            return log
+
+        run_a = run_once()
+        self.assertEqual(len(run_a), 9)
+        # Box-wide spread: >= 3 quadrants AND a far-out draw (the
+        # retired lookahead bubble capped every spawn at ~10 A; 30 A is
+        # three times that reach).
+        quadrants = set()
+        max_head_distance = 0.0
+        for (_mid, _pid, (cx, cy)) in run_a:
+            quadrants.add((cx > 0.0, cy > 0.0))
+            head_distance = math.sqrt(cx * cx + cy * cy)
+            if head_distance > max_head_distance:
+                max_head_distance = head_distance
+        self.assertGreaterEqual(len(quadrants), 3)
+        self.assertGreater(max_head_distance, 30.0)
+        # Byte-identical re-run of the whole drive (GAME-07
+        # end-to-end): same record ids, pids, and centroid floats.
+        run_b = run_once()
+        self.assertEqual(run_a, run_b)
 
 
 if __name__ == '__main__':
