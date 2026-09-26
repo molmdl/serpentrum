@@ -41,6 +41,7 @@ G98_PATH = os.path.join(ROOT, 'tests', 'fixtures', 'xtb', 'g98.out')
 
 # Verified fixture anchors (02-12 plan load-bearing facts).
 PEAK_FREQ = 1150.6639
+PEAK_INTEN = 257.1018
 FWHM = 16.0
 
 
@@ -133,7 +134,13 @@ class TestBuildScene(unittest.TestCase):
         k = max(range(len(scene.ys)), key=lambda i: scene.ys[i])
         self.assertGreaterEqual(scene.xs[k], PEAK_FREQ - FWHM)
         self.assertLessEqual(scene.xs[k], PEAK_FREQ + FWHM)
-        self.assertGreaterEqual(scene.ys[k], 250.0)
+        # Amplitude anchor: grid step = 3600/799 ~ 4.506, so the argmax
+        # sits at most half a step (~2.25 cm-1) from 1150.6639; a
+        # Gaussian at sigma 6.794574 retains >= 0.946 of its center
+        # amplitude there (the 02-12-verified arithmetic; the committed
+        # broaden suite pins the same quantity at 0.9 * PEAK_INTEN with
+        # ~0.05 of neighbor lift). Measured 249.12 for this grid.
+        self.assertGreaterEqual(scene.ys[k], 0.9 * PEAK_INTEN)
 
     def test_y_max_headroom(self):
         scene = self.scene
