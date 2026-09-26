@@ -1,6 +1,6 @@
 """spawn tests: deterministic seeded pickup-spawn policy pins (G3, 05-03).
 
-Nine pin groups mirror the plan's behavior cases:
+Eleven pin groups mirror the plan's behavior cases:
 
   1. Determinism  -- two same-seed spawners produce identical
      first()/next_after() sequences (positions + ids); a different seed
@@ -37,6 +37,12 @@ Nine pin groups mirror the plan's behavior cases:
      excluded either); every-candidate-refused PAUSES spawning for a
      resumable exhaust cooldown (auto-resumes after K ticks; never a
      permanent latch).
+ 11. Fallback     -- the seeded grid-fallback scan offset (2026-09-26
+     Phase 5.3 plan 5.3-02): on a saturated pocket lattice a forced
+     fallback starts at a SEEDED cell index (randrange over the cell
+     count) and wraps, so different seeds land at DIFFERENT legal cells
+     (the corner-bias clustering is gone) while the same seed stays
+     byte-identical (GAME-07 holds on the fallback path too).
 
 Spawners are built from the REAL demo records (setloader.load_demo_set
 with the shipped stacking dataset) and origin-centered synthetic atoms (6
@@ -92,6 +98,24 @@ def _dummy_atoms(symbol):
 
 def _dist(ax, ay, bx, by):
     return math.hypot(ax - bx, ay - by)
+
+
+def _pocket_lattice(pocket=(24.0, 24.0)):
+    """Box-covering +/-35-preset chain-atom lattice with exactly ONE
+    pocket: points on a 2.0 A grid over [-32, 32]^2 (covers the shrunk
+    box [-31.5, 31.5]^2) EXCLUDING every point within 5.0 A of the
+    pocket center. Copy of the TestGeometry.test_chain_atom_clearance
+    lattice; downscaled to the +/-35 preset per the plan's cost note
+    (a full +/-55 cover lattice is ~2,680 atoms and the grid-scan
+    fallback would crawl)."""
+    lattice = []
+    for i in range(33):
+        for j in range(33):
+            qx = -32.0 + 2.0 * i
+            qy = -32.0 + 2.0 * j
+            if _dist(qx, qy, pocket[0], pocket[1]) >= 5.0:
+                lattice.append(('C', qx, qy, 0.0))
+    return lattice
 
 
 class SpawnTestBase(unittest.TestCase):
@@ -650,6 +674,82 @@ class TestExhaustion(SpawnTestBase):
         self.assertIsNone(spawner.first((0.0, 0.0), 'right'))
         # Repeat: still None, never an exception.
         self.assertIsNone(spawner.next_after((0.0, 0.0), 'right', [], []))
+
+
+class TestFallbackOffset(SpawnTestBase):
+    """Case 11: seeded grid-fallback scan offset (2026-09-26 Phase 5.3
+    plan 5.3-02) — a forced fallback must not always land at the same
+    most-negative-corner-first legal cell.
+
+    Fixture: the +/-35 pocket lattice (_pocket_lattice, downscaled per
+    the plan's cost note). Write-time probe (seed-independent, over the
+    exact chain leg, fixed seeds): EXACTLY two legal fallback cells
+    exist — grid index 892 = (24.5, 22.5) and grid index 924 =
+    (24.5, 24.5) with nx = ny = 32 over the shrunk box [-31.5, 31.5]^2
+    (GRID_STEP_A = 2.0); a continuous uniform draw landing legally in
+    the pocket has near-zero measure, so a single next_after almost
+    surely exhausts the MAX_DRAWS loop and forces the fallback. The
+    head at the origin keeps the min_head_dist (11.025 A) and head
+    clearance legs satisfied inside the pocket (pocket is 33.9 A away).
+    """
+
+    POCKET = (24.0, 24.0)
+
+    def _drive(self, seed):
+        """One forced-fallback spawn on the pocket lattice; returns the
+        full (record, pid, centroid) result."""
+        spawner = self.make_spawner(seed, box_min=(-35.0, -35.0),
+                                    box_max=(35.0, 35.0))
+        return spawner.next_after((0.0, 0.0), 'right',
+                                  _pocket_lattice(), [])
+
+    def _assert_in_pocket_with_clearance(self, result):
+        record, _pid, centroid = result
+        cx, cy = centroid
+        self.assertLessEqual(_dist(cx, cy, self.POCKET[0], self.POCKET[1]),
+                             6.0)
+        for sym, ax, ay, az in self.atoms_by_id[record['id']]:
+            tx, ty = ax + cx, ay + cy
+            for _csym, qx, qy, _qz in _pocket_lattice():
+                self.assertGreaterEqual(_dist(tx, ty, qx, qy), 3.0 - TOL)
+
+    def test_fallback_lands_in_only_legal_pocket(self):
+        # PIN (may pass under the pre-5.3-02 fallback either way — the
+        # MODE of arrival, lucky draw vs fallback, is deliberately NOT
+        # asserted): a saturated box with one legal pocket still spawns,
+        # in the pocket, with the full chain-atom clearance intact.
+        result = self._drive(4242)
+        self.assertIsNotNone(result)
+        self._assert_in_pocket_with_clearance(result)
+
+    def test_fallback_start_varies_by_seed(self):
+        # RED driver: under the pre-5.3-02 fallback (RNG-free x-major
+        # scan, first legal wins) EVERY seed lands at grid index 892 =
+        # (24.5, 22.5), so the two centroids are EQUAL and this
+        # assertNotEqual fails. Seed pair verified at write time: BOTH
+        # exhaust the 32-draw loop (no lucky uniform draw) — seed
+        # 4242's seeded randrange start reaches legal cell 892 while
+        # seed 163's start reaches legal cell 924 = (24.5, 24.5). (The
+        # plan's draft pair 4242/777 happened to agree — both reach
+        # 892 — so 163 was picked from the divergent pool and recorded
+        # here; deterministic thereafter.)
+        result_a = self._drive(4242)
+        result_b = self._drive(163)
+        self.assertIsNotNone(result_a)
+        self.assertIsNotNone(result_b)
+        self._assert_in_pocket_with_clearance(result_a)
+        self._assert_in_pocket_with_clearance(result_b)
+        self.assertNotEqual(result_a[2], result_b[2])
+
+    def test_fallback_deterministic_per_seed(self):
+        # PIN (GAME-07 on the fallback path): the same seed driven twice
+        # through a forced fallback reproduces the same spawn
+        # byte-identically — the seeded randrange start is consumed
+        # deterministically from the same stream position.
+        for seed in (4242, 163):
+            first = self.shape(self._drive(seed))
+            second = self.shape(self._drive(seed))
+            self.assertEqual(first, second)
 
 
 if __name__ == '__main__':
