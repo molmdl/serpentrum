@@ -4,15 +4,23 @@ Nine pin groups mirror the plan's behavior cases:
 
   1. Determinism  -- two same-seed spawners produce identical
      first()/next_after() sequences (positions + ids); a different seed
-     yields different lateral draws; seed_from_setup is stable across two
-     calls AND across processes (zlib.crc32, never hash()).
+     yields different full (record id, pid, centroid) shape sequences
+     (seeded per-axis uniform draws); seed_from_setup is stable across
+     two calls AND across processes (zlib.crc32, never hash()).
   2. Bounds       -- every returned centroid lies inside the wall-margined
-     box (|x|,|y| <= 18 - 3.5 + 1e-9 on the medium preset).
-  3. Head clear   -- first(head=(0,0), heading='right') lands >= 5.0 A from
-     the head and generally ahead (x > 0 under the LOOKAHEAD_A = 8.0 rule).
-  4. Chain atoms  -- with a dense chain-atom patch around the lookahead
-     point, every atom of the returned (translated) molecule is >= 3.0 A
-     from every chain atom.
+     box (|x|,|y| <= 55 - 3.5 + 1e-9 on the medium preset).
+  3. Head clear   -- every spawn lands >= min_head_dist from the head:
+     a box-proportional minimum (min(max(0.35*h, HEAD_CLEARANCE_A),
+     0.8*h) with h the shrunk half-span -> 18.025 A on the +/-55
+     fixtures, 11.025 on small +/-35, 28.525 on large +/-85; tiny boxes
+     fold the value <= 0.8*h so degenerate legs go vacuous), tunable
+     via the min_head_dist_a ctor kwarg and exposed as the read-only
+     min_head_dist property (2026-09-26 Phase 5.3 uniform policy --
+     the LOOKAHEAD 'ahead of heading' anchoring is RETIRED).
+  4. Chain atoms  -- a box-covering chain-atom lattice with exactly ONE
+     pocket (downscaled to the +/-35 preset per the plan's cost note):
+     the spawn must land in the pocket and every atom of the returned
+     (translated) molecule is >= 3.0 A from every lattice atom.
   5. Live pickups -- next_after keeps >= 6.0 A from a live centroid placed
      on the previous spawn.
   6. Cycle + ids  -- records come out in records-list order wrapping
@@ -48,7 +56,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from serpentrum import setloader  # noqa: E402
-from serpentrum import spawn  # noqa: E402  -- RED: module does not exist yet
+from serpentrum import spawn  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -160,18 +168,22 @@ class TestDeterminism(SpawnTestBase):
         self.assertEqual(first, second)
 
     def test_different_seed_diverges(self):
-        # Raw lateral draws (no clearance constraints beyond the always-
-        # satisfied head/box legs): heading 'right' => centroid y IS the
-        # quantized lateral draw. Two different seeds (almost surely)
-        # produce different sequences.
-        def laterals(seed):
+        # Uniform box-sampling policy (2026-09-26 Phase 5.3): there is no
+        # lateral channel to read back -- candidates are seeded per-axis
+        # uniform draws over the shrunk box. Two different seeds (almost
+        # surely) produce different FULL (record id, pid, centroid) shape
+        # sequences over the same call sequence. Determinism-semantics
+        # pin: the contract is 'same seed => identical', this asserts the
+        # complementary 'different seed => different'.
+        def shapes(seed):
             spawner = self.make_spawner(seed)
-            values = [spawner.first((0.0, 0.0), 'right')[2][1]]
+            out = [self.shape(spawner.first((0.0, 0.0), 'right'))]
             for _ in range(5):
                 result = spawner.next_after((0.0, 0.0), 'right', [], [])
-                values.append(result[2][1])
-            return values
-        self.assertNotEqual(laterals(1234), laterals(9999))
+                self.assertIsNotNone(result)
+                out.append(self.shape(result))
+            return out
+        self.assertNotEqual(shapes(1234), shapes(9999))
 
 
 class TestGeometry(SpawnTestBase):
@@ -194,26 +206,127 @@ class TestGeometry(SpawnTestBase):
             self.assertLessEqual(abs(cy), limit)
             live.append((cx, cy))
 
-    def test_first_is_ahead_and_clears_head(self):
-        result = self.make_spawner(42).first((0.0, 0.0), 'right')
+    def test_first_clears_head_by_min_dist(self):
+        # Renamed from test_first_is_ahead_and_clears_head (2026-09-26
+        # Phase 5.3): the LOOKAHEAD 'ahead of heading' semantics are
+        # RETIRED -- candidates are seeded-uniform over the shrunk box,
+        # so 'cx > 0' no longer holds. The surviving head constraint is
+        # the box-proportional min_head_dist floor (18.025 A on the
+        # module's +/-55 fixtures).
+        spawner = self.make_spawner(42)
+        result = spawner.first((0.0, 0.0), 'right')
         cx, cy = result[2]
-        self.assertGreaterEqual(_dist(cx, cy, 0.0, 0.0), 5.0 - TOL)
-        # LOOKAHEAD_A = 8.0 along the heading -> the first spawn is ahead.
-        self.assertGreater(cx, 0.0)
+        self.assertGreaterEqual(_dist(cx, cy, 0.0, 0.0),
+                                spawner.min_head_dist - TOL)
 
     def test_chain_atom_clearance(self):
-        # Dense chain-atom patch around the lookahead point (8, 0).
-        patch = [('C', 4.0 + i * 1.0, -4.0 + j * 1.0, 0.0)
-                 for i in range(9) for j in range(9)]
-        result = self.make_spawner(42).next_after((0.0, 0.0), 'right',
-                                                  patch, [])
+        # Uniform policy rewrite (2026-09-26 Phase 5.3): candidates can
+        # land ANYWHERE in the shrunk box, so the clearance probe is a
+        # box-covering lattice with exactly ONE pocket (TestExhaustion
+        # lattice style, downscaled to the +/-35 preset per the plan's
+        # cost note -- a full +/-55 cover lattice is ~2,680 atoms and
+        # the grid-scan fallback would crawl). Write-time verification
+        # (probe over the exact chain leg, seed-independent): the ONLY
+        # legal centroids lie within ~1.6 A of the pocket center and the
+        # fallback's first legal hit is (24.5, 22.5), 1.581 A away.
+        pocket = (24.0, 24.0)
+        lattice = []
+        for i in range(33):
+            for j in range(33):
+                qx = -32.0 + 2.0 * i
+                qy = -32.0 + 2.0 * j
+                if _dist(qx, qy, pocket[0], pocket[1]) >= 5.0:
+                    lattice.append(('C', qx, qy, 0.0))
+        spawner = self.make_spawner(42, box_min=(-35.0, -35.0),
+                                    box_max=(35.0, 35.0))
+        result = spawner.next_after((0.0, 0.0), 'right', lattice, [])
         self.assertIsNotNone(result)
         record, _pid, centroid = result
         cx, cy = centroid
+        # Generous pocket bound -- a later fallback-start change cannot
+        # break this; the MODE of arrival (32-draw loop vs grid fallback)
+        # is deliberately NOT asserted: either path proves the chain leg.
+        self.assertLessEqual(_dist(cx, cy, pocket[0], pocket[1]), 6.0)
         for sym, ax, ay, az in self.atoms_by_id[record['id']]:
             tx, ty = ax + cx, ay + cy
-            for _csym, qx, qy, _qz in patch:
+            for _csym, qx, qy, _qz in lattice:
                 self.assertGreaterEqual(_dist(tx, ty, qx, qy), 3.0 - TOL)
+
+    def _drive_spawns(self, spawner, count):
+        """Drive ``count`` next_after calls from a fixed head at the
+        origin with an accumulating live list; return the live list."""
+        live = []
+        for _ in range(count):
+            result = spawner.next_after((0.0, 0.0), 'right', [], live)
+            self.assertIsNotNone(result)
+            live.append(result[2])
+        return live
+
+    def test_min_head_dist_default_proportional(self):
+        # Default floor = min(max(0.35*h, 5.0), 0.8*h) with h the shrunk
+        # half-span (owner-scaled presets 2026-09-19b):
+        # small h=31.5 -> 11.025; medium h=51.5 -> 18.025;
+        # large h=81.5 -> 28.525.
+        cases = [(('small'), (-35.0, -35.0), (35.0, 35.0), 11.025),
+                 (('medium'), (-55.0, -55.0), (55.0, 55.0), 18.025),
+                 (('large'), (-85.0, -85.0), (85.0, 85.0), 28.525)]
+        for name, box_min, box_max, expected in cases:
+            with self.subTest(preset=name):
+                spawner = self.make_spawner(42, box_min=box_min,
+                                            box_max=box_max)
+                self.assertLessEqual(
+                    abs(spawner.min_head_dist - expected), TOL)
+
+    def test_min_head_dist_kwarg_override(self):
+        spawner = spawn.PickupSpawner(
+            self.records, BOX_MIN, BOX_MAX, 42, self.atoms_by_id,
+            min_head_dist_a=25.0)
+        self.assertEqual(spawner.min_head_dist, 25.0)
+        live = [spawner.first((0.0, 0.0), 'right')[2]]
+        live.extend(self._drive_spawns(spawner, 2))
+        for cx, cy in live:
+            self.assertGreaterEqual(_dist(cx, cy, 0.0, 0.0), 25.0 - TOL)
+
+    def test_min_head_dist_enforced_by_default(self):
+        # 10 consecutive spawns: every centroid >= min_head_dist (18.025)
+        # from the head. (RETIRED policy cap: the old LOOKAhead bubble
+        # kept every spawn within sqrt(8^2 + 6^2) = 10.0 A of the head.)
+        spawner = self.make_spawner(42)
+        for cx, cy in self._drive_spawns(spawner, 10):
+            self.assertGreaterEqual(_dist(cx, cy, 0.0, 0.0),
+                                    spawner.min_head_dist - TOL)
+
+    def test_spawns_spread_across_box(self):
+        # The 2026-09-26 owner complaint refuted by construction. Fixed
+        # seed 42 verified at write time: 10 spawns visit all 4
+        # quadrants, reach 60.0 A from the origin (old bubble cap:
+        # 10.0 A), and never violate the floor.
+        spawner = self.make_spawner(42)
+        live = self._drive_spawns(spawner, 10)
+        quadrants = set((cx > 0.0, cy > 0.0) for cx, cy in live)
+        # (a) spawns visit >= 3 of the 4 quadrants (exact zero coords
+        # impossible given the min-dist floor).
+        self.assertGreaterEqual(len(quadrants), 3)
+        # (b) at least one spawn lands far beyond the retired 10.0 A
+        # LOOKAHEAD bubble.
+        self.assertGreater(
+            max(_dist(cx, cy, 0.0, 0.0) for cx, cy in live), 30.0)
+        # (c) the floor still holds everywhere.
+        for cx, cy in live:
+            self.assertGreaterEqual(_dist(cx, cy, 0.0, 0.0),
+                                    spawner.min_head_dist - TOL)
+
+    def test_tiny_box_min_dist_folds_vacuous(self):
+        # Degenerate boxes: the 0.8*h cap folds min_head_dist down (and
+        # negative) so the head leg goes vacuous and TestExhaustion's
+        # +/-6 and (0,0)-(2,2) None semantics stay meaningful.
+        smallish = self.make_spawner(42, box_min=(-6.0, -6.0),
+                                     box_max=(6.0, 6.0))
+        # h = 2.5 -> min(max(0.875, 5.0), 0.8*2.5) = min(5.0, 2.0) = 2.0.
+        self.assertLessEqual(abs(smallish.min_head_dist - 2.0), TOL)
+        tiny = self.make_spawner(42, box_min=(0.0, 0.0), box_max=(2.0, 2.0))
+        # h = -2.5 -> min(max(-0.875, 5.0), 0.8*-2.5) = -2.0 -> vacuous.
+        self.assertLessEqual(tiny.min_head_dist, 0.0)
 
     def test_live_pickup_clearance(self):
         spawner = self.make_spawner(42)
