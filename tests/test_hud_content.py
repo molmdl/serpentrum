@@ -48,6 +48,14 @@ it never writes chemistry:
   hud_logic.debug_spawn_cooldown(pool_size, cooldown_ticks) ->
       one DBG line when the demote-after-refuse exhaust cooldown pauses
       spawning; debug_spawn_cooldown_over() -> the resume-edge line.
+  Phase 5.3 (randomized pickup spawning, plan 5.3-04): source-scan pins
+      on serpentrum/gui_game.py's spawn call sites (the 5.1-05/5.2-06
+      house pattern) — EXACTLY ONE PickupSpawner construction
+      (_build_engine), EXACTLY ONE spawner.first begin-time spawn,
+      EXACTLY ONE spawner.next_after respawn (_respawn_pickup), the
+      seed_from_setup wiring intact, and NO min_head_dist_a at the call
+      site (the proportional default applies; the owner retunes via
+      spawn.py's MIN_HEAD_DIST_FACTOR, never in the gui).
 
 The real shipped dataset is used (molecule_data.load_stacking over
 setloader.default_stacking_path()) so the pins track real data changes.
@@ -811,6 +819,73 @@ class TestDebugSpawnCooldown(unittest.TestCase):
     def test_resume_line_shape(self):
         self.assertEqual(hud_logic.debug_spawn_cooldown_over(),
                          'DBG spawn pool cooldown over - spawning resumed')
+
+
+class TestGuiSpawnCallSites(unittest.TestCase):
+    """Phase 5.3 (randomized pickup spawning, plan 5.3-04): the gui
+    spawn call-site source-scan pins.
+
+    The 5.3 policy change was designed so PickupSpawner.__init__ /
+    first / next_after keep IDENTICAL signatures (the heading args are
+    validated but now position-neutral), therefore gui_game.py needs
+    ZERO edits. These pins (the 5.1-05/5.2-06 house source-scan
+    pattern: open the module source and count call forms) make that
+    guarantee durable — any future drift in the wiring fails loudly
+    here, and the Phase-6 plan-check can cite the verdict instead of
+    re-deriving it.
+    """
+
+    def _gui_game_source(self):
+        source_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'serpentrum', 'gui_game.py')
+        with open(source_path) as handle:
+            return handle.read()
+
+    def test_single_spawner_construction_site(self):
+        # The spawner is built in EXACTLY ONE place (_build_engine);
+        # a second construction site would mean duplicate spawn state.
+        source = self._gui_game_source()
+        self.assertEqual(source.count('spawn_mod.PickupSpawner('), 1,
+                         'exactly one PickupSpawner construction site '
+                         '(_build_engine)')
+
+    def test_single_first_spawn_call(self):
+        # The begin-time first spawn fires EXACTLY ONCE per
+        # _build_engine (begin_game -> Start or Restart).
+        source = self._gui_game_source()
+        self.assertEqual(source.count('spawner.first('), 1,
+                         'exactly one begin-time spawner.first call')
+
+    def test_single_respawn_call(self):
+        # The _respawn_pickup path holds the ONE spawner.next_after
+        # call (the one-spawn-per-resolution respawn gate, 05-03).
+        source = self._gui_game_source()
+        self.assertEqual(source.count('spawner.next_after('), 1,
+                         'exactly one spawner.next_after respawn call '
+                         '(_respawn_pickup)')
+
+    def test_seed_wiring_unchanged(self):
+        # The crc32 setup seed still feeds the constructor (GAME-07);
+        # 5.3 changed the draw policy, never the seed wiring.
+        source = self._gui_game_source()
+        self.assertEqual(source.count('spawn_mod.seed_from_setup('), 1,
+                         'exactly one spawn_mod.seed_from_setup wiring '
+                         '(feeds the PickupSpawner constructor)')
+
+    def test_no_call_site_override_of_min_head_dist(self):
+        # The gui uses the proportional min-head-dist default; the
+        # owner retunes via spawn.py's MIN_HEAD_DIST_FACTOR (the 5.3-05
+        # feel-check knob), NEVER at the call site.
+        source = self._gui_game_source()
+        self.assertNotIn('min_head_dist_a', source)
+
+    def test_heading_still_supplied_to_respawn(self):
+        # The position-neutral heading arg remains supplied to
+        # next_after (validated by the spawner's _DIRS; dropping the
+        # wiring is a Phase-6+ decision, not a 5.3 one).
+        source = self._gui_game_source()
+        self.assertIn('_heading_name(engine.heading)', source)
 
 
 if __name__ == '__main__':
