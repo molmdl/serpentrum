@@ -148,7 +148,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STACK-03 | Phase 5 | Complete |
 | STACK-04 | Phase 5 | Complete |
 | STACK-05 | Phase 5 | Complete |
-| STACK-06 | Phase 5.2 | Pending |
+| STACK-06 | Phase 5.2 | Complete |
 | SPECTRA-01 | Phase 7 | Pending |
 | SPECTRA-02 | Phase 6 | Pending |
 | SPECTRA-03 | Phase 7 | Pending |

@@ -22,7 +22,7 @@ A PyMOL plugin game: steer a molecular head around a bounded box, stack real sma
 - [x] **Phase 4: Game Loop & Input** - Arrow-key steered movement on a 2D locked-camera plane with countdown, HUD, pause/restart *(research D — input spike)*
 - [x] **Phase 5: Stacking & Game Rules Complete** - Pickups stack at cited geometry; rigid-pivot turns; collisions end runs; win/crash both reach spectra *(research E)*
 - [x] **Phase 5.1: Game Speed / Difficulty (INSERTED 2026-09-20)** - Setup-selectable constant speed tier (difficulty), persisted; owner feel-check amended the tier values (3.0/6.0/7.5/9.0 A/s, default 'normal' 6.0 — drafts all "too slow") *(owner insertion — playtesting feedback)*
-- [ ] **Phase 5.2: Generic Upload Stacking Consent (INSERTED 2026-09-20)** - Opt-in generic π-stack geometry for ring-bearing uploads (illustrative, labeled); upload-only games become winnable *(owner insertion — promotes v2 STACK-06)* *(STACK-03 integrity guards: non-silent, labeled, human-approved geometry)*
+- [x] **Phase 5.2: Generic Upload Stacking Consent (INSERTED 2026-09-20)** - Opt-in generic π-stack geometry for ring-bearing uploads (illustrative, labeled); upload-only games become winnable *(owner insertion — promotes v2 STACK-06)* *(STACK-03 integrity guards: non-silent, labeled, human-approved geometry)*
 - [ ] **Phase 5.3: Randomized Pickup Spawning (INSERTED 2026-09-26)** - Pickup spawn positions randomized across the box (owner: new molecules spawn too close to the snake = too simple) *(owner insertion — playtesting feedback)*
 - [ ] **Phase 6: xtb Pipeline** - Async cancellable `xtb --ohess` with verified success contract and calibrated atom-budget guard *(research F — parallel track)*
 - [ ] **Phase 7: Spectra UI** - Broadened IR plot, clickable frequency table → static mode vectors, streaming log, saveable plot *(research G)*
@@ -352,7 +352,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. Game Loop & Input | 9/9 | Complete (verified 5/5 must-haves) | 2026-09-14 |
 | 5. Stacking & Game Rules Complete | 16/16 | Complete (verified 48/48 plan truths, 3 owner-amended; 5/5 criteria; 9/9 reqs; 7-round human checkpoint) | 2026-09-20 |
 | 5.1. Game Speed / Difficulty (INSERTED 2026-09-20) | 6/6 | Complete (verified 17/17 plan truths, 3 owner-amended; 4/4 criteria; GAME-11 Complete; owner retuned tiers 3.0/6.0/7.5/9.0, default 'normal' 6.0) | 2026-09-25 |
-| 5.2. Generic Upload Stacking Consent (INSERTED 2026-09-20) | 0/9 | In progress (plans executing) | - |
+| 5.2. Generic Upload Stacking Consent (INSERTED 2026-09-20) | 9/9 | Complete (verified 5/5 SCs; owner feel-check APPROVED 11/11, literals as drafted; DBG d=3.6000 live) | 2026-09-26 |
 | 5.3. Randomized Pickup Spawning (INSERTED 2026-09-26) | 0/5 | Planned (2026-09-26; 5 plans in 3 waves) | - |
 | 6. xtb Pipeline | 0/12 | Planned (2026-09-24; 12 plans in 4 waves) | - |
 | 7. Spectra UI | 0/10 | Planned (2026-09-25; 10 plans in 6 waves) | - |

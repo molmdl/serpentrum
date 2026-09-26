@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
-**Current focus:** Phase 5.1 COMPLETE + VERIFIED (2026-09-25, owner tier retune 3.0/6.0/7.5/9.0) — next: Phase 5.2 Generic Upload Stacking Consent (9+ plans already on disk from the parallel planning session), then Phase 6 xtb Pipeline (12 plans also already planned)
+**Current focus:** Phase 5.2 COMPLETE + VERIFIED (2026-09-26, owner feel-check 11/11 APPROVED) — next: Phase 5.3 Randomized Pickup Spawning (5 plans on disk, 2026-09-26), then Phase 6 xtb Pipeline (12 plans on disk)
 
 ## Current Position
 
-Phase: 5.1 of 8 (Game Speed / Difficulty, INSERTED) — COMPLETE + VERIFIED
-Plan: 6 of 6 complete (5.1-01..5.1-06); 5.1-VERIFICATION.md: **passed** (17/17 plan must-have truths, 3 verified-as-owner-amended; 4/4 success criteria; GAME-11 -> Complete; owner feel-check 2026-09-25)
-Status: 4-tier speed selector shipped (relaxed 3.0 / normal 6.0 / fast 7.5 / expert 9.0 A/s — owner retuned, drafts all "too slow"); default 'normal' = 6.0; GAME-08 constant-per-run holds by construction; 682+ unittests green at wrap (678 at verify + retune pins); worktree protocol ran waves 1 (3 parallel) + 2 (2 parallel)
-Last activity: 2026-09-25 — 5.1-06 feel-check APPROVED by owner -> Task-3 retune committed 4502143 -> gsd-verifier passed -> phase wrap-up commit
+Phase: 5.2 of 8 (Generic Upload Stacking Consent, INSERTED) — COMPLETE + VERIFIED
+Plan: 9 of 9 complete (5.2-01..5.2-09); 5.2-VERIFICATION.md: **passed** (5/5 success criteria; STACK-06 -> Complete; owner feel-check 2026-09-26: 11/11 PASS, all 9 DRAFT literals approved as drafted, DBG line exact dot=1.000000 d=3.6000 plane=3.3830 lat=1.2310)
+Status: consent checkbox shipped ('Generic stacking' group, OFF default); consent-ON ring-bearing uploads place at the approved 3.383/1.231 geometry with generic labeling everywhere; SKIP_GENERIC_NO_RING taxonomy class; upload-only games winnable (live: 10x win, recap 'stacked 10x 931 (generic pi-stack) at 3.38 A plane gap [Janiak 2000]'); OFF path byte-identical (230-test OFF-pin sweep green); 740 unittests green at wrap
+Last activity: 2026-09-26 — 5.2-09 feel-check APPROVED by owner (literals as drafted) -> SUMMARY finalized (5bc1ff1) -> gsd-verifier passed 5/5 -> phase wrap-up commit
 
-Progress: [█████████░] ~88% (59 plans executed — Phases 1-5 + 5.1 COMPLETE at 6+14+8+9+16+6; Phase 5.2 planned (9+ plans on disk); Phase 6 planned (12 plans); Phases 7-8 TBD)
+Progress: [█████████░] ~90% (68 plans executed — Phases 1-5 + 5.1 + 5.2 COMPLETE at 6+14+8+9+16+6+9; Phase 5.3 planned (5 plans on disk); Phase 6 planned (12 plans); Phases 7-8 TBD)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 59
-- Total execution time: ~680 executor min (Phase 1: 104; Phase 2: ~330; Phase 3: ~165 incl. smoke-04/fix/measure follow-up agents + verifier; Phase 4: ~41 incl. waves 1-2 + 04-06..04-09; Phase 5.1: ~40 incl. 3 waves of executors + orchestrator-applied Task-3 retune + verifier)
+- Total plans completed: 68
+- Total execution time: ~705 executor min (Phase 1: 104; Phase 2: ~330; Phase 3: ~165 incl. smoke-04/fix/measure follow-up agents + verifier; Phase 4: ~41 incl. waves 1-2 + 04-06..04-09; Phase 5.1: ~40 incl. 3 waves of executors + orchestrator-applied Task-3 retune + verifier; Phase 5.2: ~25 incl. 5 waves of executors + owner checkpoint rounds + verifier)
 
 **By Phase:**
 
@@ -32,6 +32,7 @@ Progress: [█████████░] ~88% (59 plans executed — Phases 1-
 | 4. Game Loop & Input | 9/9 | ~41 min (waves 1-2 merged by orchestrator; 04-06 = 7 min, 04-07 = ~5 min finalization, 04-08 = 6 min direct on main, 04-09 = ~15 min clean gate pass + checkpoint finalization) | ~4.6 min |
 | 5. Stacking & Game Rules Complete | 16/16 | waves 1-6 via worktree protocol (batch-capped at 4 parallel) + wave 7 checkpoint still open; live-checkpoint fixes 2026-09-18/19 (perpendicular, tracer, ghost-point, owner overrides) | — not yet aggregated — |
 | 5.1. Game Speed / Difficulty | 6/6 | ~40 min — wave 1: 3 parallel TDD executors (~8 min each); wave 2: 2 parallel executors (5 + 12 min); wave 3: 5.1-06 Task 1 (~10 min) + owner checkpoint + orchestrator-applied Task-3 retune; verifier passed | ~7 min |
+| 5.2. Generic Upload Stacking Consent | 9/9 | ~25 min — wave 1: 2 parallel TDD executors (~4 min each); waves 2-3: single TDD executors (3 + 5 min); wave 4: 4 parallel executors (5-8 min each); wave 5: gates task (~1 min) + owner feel-check (2 rounds) + continuation finalize | ~3 min |
 
 **Recent Trend:**
 - Phase 3: 03-01 (7 min), 03-02 (22), 03-03 (~15 incl. respawn after /home-symlink permission rejection), 03-04 (10), 03-05 (~8, single-plan direct on main), 03-06 (~25, Windows smokes), 03-07 (20), 03-08 (35 + 3 follow-up agents ~25)
@@ -79,6 +80,7 @@ Recent decisions affecting current work:
 - **2026-09-25 (5.1-06 feel-check, owner verdicts):** (a) 4-tier MECHANISM APPROVED (steps 1-5, 7-9 PASS; step 6 wall-cross timing skipped by owner). (b) ALL draft values REJECTED as too slow ("only expert feel like playing") — FINAL tiers: relaxed 3.0 (= v1 baseline, now the floor) / normal 6.0 (= old expert, owner's playable anchor, now the fresh-setup default via DEFAULTS['speed']) / fast 7.5 / expert 9.0 ("try" values pending a feel round at the new speeds). (c) DEFAULTS['speed'] 3.0->6.0 (owner's primary directive kept 4 tiers; drop-relaxed alternative not needed); game_engine.SPEED_A_PER_S stays 3.0 as kwarg fallback + test pin (production always injects setup['speed']). (d) Wording unchanged; accept-as-is rule unobjected. Retune commit 4502143; single-table edits only (SPEED_TIERS), integration test needed zero edits (derives from the table).
 - **2026-09-19d (owner directive + upload-path fixes, 05-16 re-test round 4):** (a) REFUSE_WALL placement gate REMOVED entirely — stacked chain may extend past the box on any axis; only the HEAD is box-bound (GAME-05 crash intact); REFUSE_ATOM clash gate untouched and remains the STACK-05 demonstrator (biphenyl 1.87 A); cooldown now fires only on genuine clash streaks (near-wall deadlock class structurally gone). (b) Upload path fixed: skip taxonomy pre-resolved BEFORE any geometry (uploads never inherit dataset entries per 03-04 -> clean `skipped <name>: no verified stacking entry` + (xN) coalescing; the `NoneType has no len()` placement crash is structurally impossible now; skips never feed the exhaust streak) + upload molecules WITH a canonical planar 6-ring render EDGE-ON like the demo set (incl. upload head); ring-less/non-planar uploads fall back to as-stored. Round-4 human verdicts so far: Get Spectra PASS (win ending; crash ending approved round 3). (d33f74c/93f4b2b/22b7245/3f89779; 630 tests)
 - **2026-09-18 (checkpoint fixes within 05-16):** perpendicular-stack root cause = _reset_head_viewer double-applied edge_on_m16 (displayed head ring normal 90.00° off placed slabs while looking edge-on) → pymol_bridge.reload_head (fresh load + edge-on once); SPANOFFS/PLANEPAR smoke steps pin viewer spawn-offset algebra + plane parallelism (old checks were distance-only — why the bug was invisible; tracer added: SRP_DEBUG=1 capture lines `dot=1.000000 d=3.6000` + per-event steering lines; ghost-point cascade explained = same-dir + 180° silently dropped by design + one real chain-vs-wall veto (now overridden per (b) above); gates at the time: 575 → 593 → 603 unittests
+- **2026-09-26 (5.2-09 feel-check, owner verdicts — STACK-06 approved):** (a) 11/11 steps PASS; ALL 9 DRAFT literals approved AS DRAFTED (zero amendments): group title 'Generic stacking', checkbox label, disclosure sub-line, entry name 'generic pi-stack (illustrative geometry - user-approved)', entry explanation, consent note 'generic pi-stack enabled: illustrative geometry - user-approved [Janiak 2000]', variant line 'no molecule has a planar aromatic 6-ring for generic pi-stack - demonstration mode: ...', skip reason 'no aromatic ring for generic pi-stack', recap decoration ' (generic pi-stack)'. (b) Save/Load buttons confirmed Phase 8. (c) Live DBG geometry exact on every capture: dot=1.000000 d=3.6000 plane=3.3830 lat=1.2310; upload-only 10x win recap labeled correctly. (d) Owner-observed: the consent DISCLOSURE line also fires for the demo set when consent is ON — confirmed BY DESIGN (disclosure is consent-state-level; demo placement labels never become generic). (e) Acetate (owner-provided, tmp/upload_test/) was the ring-less fixture; re-seed on consent toggle acknowledged.
 
 ### Roadmap Evolution
 
@@ -107,8 +109,8 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-09-25 (execute-phase orchestrator — Phase 5.1 executed in 3 waves via worktree protocol: wave 1 = 3 parallel TDD executors, wave 2 = 2 parallel executors, wave 3 = 5.1-06 Task 1 + BLOCKING owner feel-check -> APPROVED with tier retune; orchestrator applied Task 3 (4502143); gsd-verifier PASSED 17/17; phase wrap committed)
-Stopped at: Phase 5.1 COMPLETE + VERIFIED; Phase 5.2 (9+ plans on disk) and Phase 6 (12 plans on disk) both already planned by parallel sessions
+Last session: 2026-09-26 (execute-phase orchestrator — Phase 5.2 executed in 5 waves via worktree protocol: wave 1 = 2 parallel TDD executors, waves 2-3 = single TDD executors, wave 4 = 4 parallel executors, wave 5 = gates task + BLOCKING owner feel-check -> APPROVED literals-as-drafted; continuation agent finalized 5.2-09; gsd-verifier PASSED 5/5; phase wrap committed)
+Stopped at: Phase 5.2 COMPLETE + VERIFIED; Phase 5.3 (5 plans on disk, 3 waves) and Phase 6 (12 plans on disk) both already planned
 Resume file: None needed
-Next action: /gsd-execute-phase 5.2 (Generic Upload Stacking Consent — plans ready; shares gui_setup/hud_logic with the just-shipped 5.1 speed work, so executors must locate seams by symbol); then Phase 5.3 (Randomized Pickup Spawning — plans ready 2026-09-26: 5 plans in 3 waves, zero gui_game/engine/hud edits); then /gsd-execute-phase 6 (xtb Pipeline)
+Next action: /gsd-execute-phase 5.3 (Randomized Pickup Spawning — plans ready 2026-09-26; spawn.py-only scope, zero gui_game/engine/hud edits); then /gsd-execute-phase 6 (xtb Pipeline; its depends_on: ["5.2-09"] edges are now satisfied)
 Date convention: planning-doc dates are UTC (git commit dates authoritative) — the dev shell is HKT (UTC+8); never stamp from the local date.
