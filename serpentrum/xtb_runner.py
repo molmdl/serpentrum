@@ -35,7 +35,6 @@ python3.6 syntax throughout (%-formatting, no f-strings/walrus).
 
 import os
 import shutil
-import tempfile
 
 from pymol.Qt import QtCore
 
@@ -44,6 +43,21 @@ from . import xtbenv
 
 # Bound on the in-memory log tail kept for the record's xtb.log file.
 _LOG_TAIL = 500
+
+
+def _stable_base():
+    """Root of the keep-until-replaced stable spectra dirs.
+
+    Owner-directed (06-12, EQ-artifact-1 amendment): the artifacts dir
+    is USER-SETTABLE via the SRP_SPECTRA_DIR env var; the default is
+    'srp_spectra' under the current working directory (NOT %TEMP% —
+    SCRATCH stays in %TEMP% via the srp_ spray dir, but the spectra the
+    user keeps live beside their session). The per-run snake_id subdir
+    and the keep-until-replaced policy are unchanged; both resolutions
+    of the prefix guard go through this one helper.
+    """
+    return os.environ.get('SRP_SPECTRA_DIR') or \
+        os.path.join(os.getcwd(), 'srp_spectra')
 
 
 def _ensure_app():
@@ -66,8 +80,10 @@ class XtbRunController(QtCore.QObject):
     xtbenv.new_run_dir spray dir -> readyRead streams log lines ->
     ONE terminal branch (_on_finished, or _on_error when the process
     never started) resolves status via xtb_run.resolve_status over the
-    3-leg verdict, copies artifacts into the stable srp_spectra
-    directory, DELETES the spray dir, writes _serpentrum.spectra_run,
+    3-leg verdict, copies artifacts into the stable spectra directory
+    (_stable_base: SRP_SPECTRA_DIR env or <cwd>/srp_spectra default,
+    owner-directed 06-12), DELETES the spray dir,
+    writes _serpentrum.spectra_run,
     clears the cancel flag, and emits run_finished — on EVERY terminal
     branch (bioCHEMeleon discipline). cancel() = proc.kill() only
     (06-RESEARCH-runner Q4); the killed run fails the contract on its
@@ -201,7 +217,8 @@ class XtbRunController(QtCore.QObject):
         EQ-artifact-1 keep-until-replaced: the NEW start removes the old
         run's stable dir so the previous spectra record's files never
         masquerade as the new run's. Prefix-guarded: NEVER rmtree an
-        arbitrary path — only a dir under <temp>/srp_spectra.
+        arbitrary path — only a dir under the resolved stable base
+        (_stable_base: SRP_SPECTRA_DIR or <cwd>/srp_spectra).
         """
         if self._anchor is None:
             return
@@ -211,7 +228,7 @@ class XtbRunController(QtCore.QObject):
         old_input = prior.get('input_path')
         if not old_input:
             return
-        stable_root = os.path.join(tempfile.gettempdir(), 'srp_spectra')
+        stable_root = _stable_base()
         old_dir = os.path.normpath(os.path.abspath(
             os.path.dirname(old_input)))
         root_norm = os.path.normpath(os.path.abspath(stable_root))
@@ -265,8 +282,9 @@ class XtbRunController(QtCore.QObject):
         # (b) cancel flag wins over the verdict (xtb_run.resolve_status).
         status_text = xtb_run.resolve_status(self._cancel_requested,
                                              verdict.ok)
-        # (c) copy-out into the stable srp_spectra/<snake_id> dir.
-        stable = os.path.join(tempfile.gettempdir(), 'srp_spectra',
+        # (c) copy-out into the stable <base>/<snake_id> dir
+        # (_stable_base: SRP_SPECTRA_DIR or <cwd>/srp_spectra).
+        stable = os.path.join(_stable_base(),
                               self._snake_id or 'unknown')
         os.makedirs(stable, exist_ok=True)
         copied = {}

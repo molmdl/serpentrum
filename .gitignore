@@ -23,3 +23,7 @@ tmp
 *.zip
 cache
 **/cache/**
+
+# CWD-default spectra artifacts dir (06-12 owner directive; users may
+# run PyMOL with the repo root as cwd — never commit xtb artifacts)
+srp_spectra/

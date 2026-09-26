@@ -6,9 +6,10 @@ Run (from repo root; cwd is /mnt/c-backed so cmd.exe inherits C:\\ cwd):
 inside — co2 ~0.25 s success, dimer2 runs killed at ~300 ms).
 
 Exit codes through the .bat are ALWAYS 0 — verdicts are flushed
-sentinels grepped by tests/run_gates.py --smoke (this smoke is
-INFORMATIONAL there per EQ-smoke-1: found by the [0-9][0-9]_*.py glob,
-run non-blocking, never fails the gate; promotion decided at 06-12):
+    sentinels grepped by tests/run_gates.py --smoke (this smoke is
+    INFORMATIONAL there per EQ-smoke-1: found by the [0-9][0-9]_*.py glob,
+    run non-blocking, never fails the gate; 06-12 recorded the decision
+    to KEEP it informational — no promotion was instructed):
     SMOKE-OK XTB-RUNNER    all steps passed
     SMOKE-FAIL <steps>     one or more steps failed
 
@@ -29,9 +30,10 @@ a FAILED run asserted as failed is legitimate testing):
                              fired, log lines streamed, run_finished
                              'ok' with problems==[]; anchor.spectra_run
                              'ok' with the frozen SPECTRA_RUN_KEYS shape
-                             and non-None paths; stable srp_spectra dir
-                             holds snake.xyz/xtb.log/g98.out/vibspectrum/
-                             xtbopt.xyz; the srp_ spray dir is GONE at
+                              and non-None paths; the stable dir (under
+                              STABLE_ROOT via SRP_SPECTRA_DIR, 06-12)
+                              holds snake.xyz/xtb.log/g98.out/vibspectrum/
+                              xtbopt.xyz; the srp_ spray dir is GONE at
                              terminal; AND a second run starts after
                              completion (guard releases, SC2)
   - s_responsiveness_tick    QTimer fires DURING a dimer2 run while
@@ -100,6 +102,14 @@ ROOT = _resolve_root()
 FIXTURES_DIR = os.path.join(ROOT, '.planning', 'research',
                             'xtb-spike-fixtures')
 
+# Owner-directed (06-12): the stable spectra dir is user-settable via
+# SRP_SPECTRA_DIR (default <cwd>/srp_spectra). Point it at a fresh
+# tempdir BEFORE any run step so the smoke never writes into the repo
+# tree regardless of PyMOL's cwd, and so the assertions below know the
+# exact stable root.
+STABLE_ROOT = tempfile.mkdtemp(prefix='srp_smoke11_stable_')
+os.environ['SRP_SPECTRA_DIR'] = STABLE_ROOT
+
 FAILURES = []
 APP = None       # ensured QCoreApplication, kept alive for the script
 XTB_EXE = None   # resolved by s_resolve_xtb for later steps
@@ -167,7 +177,8 @@ def _base_dir():
 
 
 def _stable_dir(snake_id):
-    return os.path.join(tempfile.gettempdir(), 'srp_spectra', snake_id)
+    """Stable dir for a snake id under the env-overridden STABLE_ROOT."""
+    return os.path.join(STABLE_ROOT, snake_id)
 
 
 def _clean_stable(snake_id):
@@ -188,9 +199,11 @@ def _srp_entries(base_dir):
     """srp_ SPRAY dirs in <base_dir> (leak scan).
 
     xtbenv.new_run_dir makes mkdtemp(prefix='srp_') spray dirs. The
-    stable artifact ROOT 'srp_spectra' also starts with 'srp_' but is
-    NOT spray — it is the keep-until-replaced artifact policy itself —
-    so it is excluded from the leak scan.
+    STABLE_ROOT ('srp_smoke11_stable_*', also under %TEMP%) starts with
+    'srp_' too but is NOT spray — it is the keep-until-replaced artifact
+    policy — and it predates every caller's baseline snapshot, so it is
+    never counted as a leak; the historical 'srp_spectra' name is
+    excluded for the same reason (pre-06-12 default layout).
     """
     return set(n for n in os.listdir(base_dir)
                if n.startswith('srp_') and n != 'srp_spectra')
