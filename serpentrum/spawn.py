@@ -37,18 +37,30 @@ PINNED POLICY (stated explicitly per the planning mandate):
     cooldown clock via ``tick()`` once per 100 ms movement tick; when
     it elapses, the refuse streak resets and spawning RESUMES
     automatically with the same slot policy as before.
-  - POSITION: LOOKAHEAD_A = 8.0 along the current heading plus a seeded
-    lateral offset in [-6.0, +6.0] quantized to 0.1 A, validated
-    against: wall margin 3.5 A (shrunk box), head-centroid clearance
-    5.0 A, chain-ATOM clearance 3.0 A (originally sized to keep the
-    since-REMOVED 2.5 A sweep pickup-leg pre-check satisfiable near
-    fresh spawns; kept 2026-09-20 as good placement hygiene), and
-    live-pickup-centroid clearance 6.0 A. Up to 32
-    seeded retries (MAX_DRAWS), then a DETERMINISTIC grid-scan fallback
-    (GRID_STEP_A = 2.0 over the shrunk box, x-major / y-minor order,
-    first legal wins), else None. On None there is NO state advance --
-    the same record is offered again on the next call, and the pid
-    counter is not consumed.
+  - POSITION: 2026-09-26 Phase 5.3 (owner: 'make it more random in the
+    box'): candidates are seeded-uniform over the shrunk box -- each of
+    MAX_DRAWS attempts draws cx, cy per axis via the private seeded RNG
+    over     [box_min + WALL_MARGIN_A, box_max - WALL_MARGIN_A]. The pre-5.3
+    lookahead/lateral policy (every spawn confined to a 10 A bubble:
+    8.0 A ahead of the head plus a seeded lateral in +/-6.0) is
+    RETIRED; heading is position-neutral -- still validated for API
+    compatibility, never referenced by the candidate math. Each
+    candidate must ALSO clear a box-proportional MINIMUM head distance
+    min(max(MIN_HEAD_DIST_FACTOR * h, HEAD_CLEARANCE_A),
+    MIN_HEAD_DIST_CAP_FACTOR * h) with h the shrunk half-span (18.025 A
+    on medium +/-55, so no unlucky draw lands 'too simple' close to the
+    snake; the min_head_dist_a ctor kwarg overrides; h <= 0 on
+    degenerate boxes folds the value <= 0 so the leg goes vacuous and
+    exhaustion behavior is unchanged), plus the surviving placement
+    hygiene legs: wall margin 3.5 A (shrunk box), chain-ATOM clearance
+    3.0 A (originally sized to keep the since-REMOVED 2.5 A sweep
+    pickup-leg pre-check satisfiable near fresh spawns; kept 2026-09-20
+    as good placement hygiene), and live-pickup-centroid clearance
+    6.0 A. Up to 32 seeded retries (MAX_DRAWS), then a DETERMINISTIC
+    grid-scan fallback (GRID_STEP_A = 2.0 over the shrunk box, x-major
+    / y-minor order, first legal wins), else None. On None there is NO
+    state advance -- the same record is offered again on the next call,
+    and the pid counter is not consumed.
   - SEED: zlib.crc32 over a canonical setup string (NEVER hash() --
     PYTHONHASHSEED randomizes str hashes across processes). crc32 is
     process-stable: restart with the same setup reproduces the same
@@ -84,9 +96,14 @@ import zlib
 # --- Pinned policy constants (plan 05-03; docstring above is the policy) ---
 
 MAX_LIVE_PICKUPS = 4          # live-pickup ceiling (can_spawn gate)
-LOOKAHEAD_A = 8.0             # candidate lead along the current heading
-LATERAL_MAX_A = 6.0           # seeded lateral offset in +/- this range
-LATERAL_QUANTUM_A = 0.1       # lateral quantization step
+MIN_HEAD_DIST_FACTOR = 0.35   # box-proportional min-head-distance factor
+                              # (2026-09-26 Phase 5.3; owner-retunable at
+                              # the feel-check, 5.1 SPEED_TIERS retune
+                              # precedent; the min_head_dist_a ctor kwarg
+                              # overrides)
+MIN_HEAD_DIST_CAP_FACTOR = 0.8  # upper clamp: min_dist < span guarantees
+                              # a legal point exists (and degenerate
+                              # boxes fold the leg vacuous)
 WALL_MARGIN_A = 3.5           # shrunk-box containment margin
 HEAD_CLEARANCE_A = 5.0        # centroid distance from the head
 CHAIN_ATOM_CLEARANCE_A = 3.0  # per-atom distance vs chain atoms (> 2.5 A
@@ -171,6 +188,12 @@ class PickupSpawner(object):
       exhaust_cooldown_ticks: the exhaust-pause window in movement
                    ticks (default EXHAUST_COOLDOWN_TICKS = 100, ~10 s at
                    the 100 ms tick). Tunable for tests / difficulty.
+      min_head_dist_a: minimum head-to-centroid distance enforced by
+                   _legal leg 2 (default None -> the box-proportional
+                   min(max(MIN_HEAD_DIST_FACTOR * h, HEAD_CLEARANCE_A),
+                   MIN_HEAD_DIST_CAP_FACTOR * h) with h the shrunk
+                   half-span; 2026-09-26 Phase 5.3). Tunable for tests /
+                   difficulty, same pattern as exhaust_cooldown_ticks.
 
     State: a round-robin serve ORDER over records + a spawn counter
     (pids 'pick_0001', 'pick_0002', ...). Both advance ONLY on a
@@ -184,11 +207,25 @@ class PickupSpawner(object):
     """
 
     def __init__(self, records, box_min, box_max, seed, atoms_by_id,
-                 exhaust_cooldown_ticks=EXHAUST_COOLDOWN_TICKS):
+                 exhaust_cooldown_ticks=EXHAUST_COOLDOWN_TICKS,
+                 min_head_dist_a=None):
         self._records = list(records)
         self._box_min = (float(box_min[0]), float(box_min[1]))
         self._box_max = (float(box_max[0]), float(box_max[1]))
         self._rng = random.Random(seed)
+        # Box-proportional minimum head distance (2026-09-26 Phase 5.3):
+        # h = shrunk half-span (min axis keeps non-square boxes safe;
+        # identical on the square presets). h <= 0 (degenerate boxes)
+        # folds the value <= 0 -- the leg goes vacuous and exhaustion
+        # behavior is unchanged.
+        if min_head_dist_a is not None:
+            self._min_head_dist = float(min_head_dist_a)
+        else:
+            x0, x1, y0, y1 = self._shrunk_bounds()
+            h = 0.5 * min(x1 - x0, y1 - y0)
+            self._min_head_dist = min(
+                max(MIN_HEAD_DIST_FACTOR * h, HEAD_CLEARANCE_A),
+                MIN_HEAD_DIST_CAP_FACTOR * h)
         self._atoms_by_id = atoms_by_id
         self._order = list(records)  # round-robin serve order (front first)
         self._issued = 0
@@ -220,6 +257,14 @@ class PickupSpawner(object):
         """The configured exhaust-pause window in movement ticks (for
         the GUI's cooldown DBG line)."""
         return self._exhaust_cooldown_ticks
+
+    @property
+    def min_head_dist(self):
+        """The minimum head-to-centroid distance enforced by _legal leg
+        2 (2026-09-26 Phase 5.3 uniform policy; box-proportional default
+        or the min_head_dist_a ctor override). Tests/GUI introspection,
+        mirrors exhaust_cooldown_ticks. Read-only."""
+        return self._min_head_dist
 
     @property
     def pool_size(self):
@@ -288,15 +333,22 @@ class PickupSpawner(object):
         return False
 
     def first(self, head_xy, heading):
-        """Spawn the initial pickup (begin_game): no chain, no live."""
+        """Spawn the initial pickup (begin_game): no chain, no live.
+
+        ``heading`` is accepted for API compatibility only (validated,
+        position-neutral): candidates are seeded-uniform over the
+        shrunk box (2026-09-26 Phase 5.3), never heading-anchored.
+        """
         return self._spawn(head_xy, heading, (), ())
 
     def next_after(self, head_xy, heading, chain_atoms, live_centroids):
         """Spawn the next pickup after one capture resolution.
 
-        ``chain_atoms``: every chain atom so far (head molecule atoms +
-        every attached segment's atoms, (sym, x, y, z) shape) -- the
-        per-atom clearance leg keeps fresh spawns out of the snake.
+        ``heading``: accepted for API compatibility only (validated,
+        position-neutral) -- see ``first``. ``chain_atoms``: every
+        chain atom so far (head molecule atoms + every attached
+        segment's atoms, (sym, x, y, z) shape) -- the per-atom
+        clearance leg keeps fresh spawns out of the snake.
         ``live_centroids``: (x, y) pairs of pickups currently live --
         the 6.0 A centroid spacing leg. Returns the same
         ``(record, pid, centroid)`` 3-tuple as ``first``, or None when
@@ -305,6 +357,17 @@ class PickupSpawner(object):
         return self._spawn(head_xy, heading, chain_atoms, live_centroids)
 
     # --- internals --------------------------------------------------
+
+    def _shrunk_bounds(self):
+        """(x0, x1, y0, y1) of the shrunk (wall-margined) box --
+        box_min + WALL_MARGIN_A / box_max - WALL_MARGIN_A. Shared by
+        the uniform sampling loop, the grid-scan fallback, and the
+        min_head_dist half-span computation."""
+        x0 = self._box_min[0] + WALL_MARGIN_A
+        x1 = self._box_max[0] - WALL_MARGIN_A
+        y0 = self._box_min[1] + WALL_MARGIN_A
+        y1 = self._box_max[1] - WALL_MARGIN_A
+        return (x0, x1, y0, y1)
 
     def _spawn(self, head_xy, heading, chain_atoms, live_centroids):
         if not self._order:
@@ -317,29 +380,25 @@ class PickupSpawner(object):
         if heading not in _DIRS:
             raise ValueError('unknown heading: %r (valid: %s)'
                              % (heading, ', '.join(sorted(_DIRS))))
-        ux, uy = _DIRS[heading]
-        # Perpendicular (CCW): for (ux, uy) -> (-uy, ux). 'right' gives
-        # (0, 1): laterals run along +y. One fixed convention, captured
-        # in the seed stream, is all determinism needs.
-        px, py = -uy, ux
+        # 2026-09-26 Phase 5.3 (owner: 'make it more random in the
+        # box'): candidates are seeded-UNIFORM over the shrunk box --
+        # per-axis rng.uniform draws, two seeded draws per attempt.
+        # Heading is otherwise UNUSED (position-neutral; validated
+        # above for API compatibility). Draw ORDER is fixed and
+        # captured in the seed stream, so same-seed sequences remain
+        # byte-identical (GAME-07).
+        x0, x1, y0, y1 = self._shrunk_bounds()
         record = self._order[0]
         atoms = self._atoms_by_id[record['id']]
-        base_x = head_xy[0] + ux * LOOKAHEAD_A
-        base_y = head_xy[1] + uy * LOOKAHEAD_A
         for _ in range(MAX_DRAWS):
-            lateral = self._draw_lateral()
-            cx = base_x + px * lateral
-            cy = base_y + py * lateral
+            cx = self._rng.uniform(x0, x1)
+            cy = self._rng.uniform(y0, y1)
             if self._legal(cx, cy, head_xy, atoms, chain_atoms,
                            live_centroids):
                 return self._issue(record, cx, cy)
         # Deterministic grid-scan fallback over the shrunk box, x-major /
         # y-minor order, FIRST legal wins. Fully deterministic for fixed
         # (head, chain, live) inputs -- no RNG involved.
-        x0 = self._box_min[0] + WALL_MARGIN_A
-        x1 = self._box_max[0] - WALL_MARGIN_A
-        y0 = self._box_min[1] + WALL_MARGIN_A
-        y1 = self._box_max[1] - WALL_MARGIN_A
         gx = x0
         while gx <= x1 + 1e-9:
             gy = y0
@@ -351,17 +410,17 @@ class PickupSpawner(object):
             gx += GRID_STEP_A
         return None
 
-    def _draw_lateral(self):
-        """One seeded lateral draw in [-6.0, +6.0], 0.1-quantized."""
-        raw = self._rng.uniform(-LATERAL_MAX_A, LATERAL_MAX_A)
-        return round(raw / LATERAL_QUANTUM_A) * LATERAL_QUANTUM_A
-
     def _legal(self, cx, cy, head_xy, atoms, chain_atoms, live_centroids):
         """All four clearance legs for one candidate centroid.
 
         Legs (a candidate failing ANY leg is rejected):
           1. shrunk-box containment (wall margin, inclusive bounds);
-          2. head-centroid distance >= HEAD_CLEARANCE_A (5.0 A);
+          2. head-centroid distance >= max(self._min_head_dist,
+             HEAD_CLEARANCE_A) -- the box-proportional floor (2026-09-26
+             Phase 5.3) subsumes the 5.0 A absolute hard floor on the
+             real presets; tiny boxes fold the proportional value down
+             so the floor stays HEAD_CLEARANCE_A (and h <= 0 folds it
+             <= 0 -> the leg goes vacuous);
           3. every translated candidate atom >= CHAIN_ATOM_CLEARANCE_A
              (3.0 A) from every chain atom (xy plane);
           4. centroid distance >= LIVE_PICKUP_CLEARANCE_A (6.0 A) from
@@ -374,11 +433,15 @@ class PickupSpawner(object):
         if not (self._box_min[1] + WALL_MARGIN_A <= cy
                 <= self._box_max[1] - WALL_MARGIN_A):
             return False
-        # 2. Head clearance.
+        # 2. Head clearance: the box-proportional minimum with
+        # HEAD_CLEARANCE_A as the absolute hard floor (max of the two).
+        head_limit = self._min_head_dist
+        if head_limit < HEAD_CLEARANCE_A:
+            head_limit = HEAD_CLEARANCE_A
         head_dx = cx - head_xy[0]
         head_dy = cy - head_xy[1]
         if (head_dx * head_dx + head_dy * head_dy
-                < HEAD_CLEARANCE_A * HEAD_CLEARANCE_A):
+                < head_limit * head_limit):
             return False
         # 3. Chain-atom clearance (candidate-translated atoms, xy).
         chain_sq = CHAIN_ATOM_CLEARANCE_A * CHAIN_ATOM_CLEARANCE_A
