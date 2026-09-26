@@ -75,6 +75,10 @@ from . import spawn as spawn_mod
 # stacking is consumed ONLY on the SRP_DEBUG=1 trace path (ring normals
 # recomputed for the live capture trace; a PURE sibling import).
 from . import stacking
+# xtb_run (plan 06-06, EQ-xyz-1): the completion seam assembles the
+# head-inclusive snake run-input xyz text from engine/session atoms -
+# a PURE sibling import (xyzio-backed, zero viewer access).
+from . import xtb_run
 # ROUTE-AGNOSTIC input seam (04-07 verdict APPROVED the wizard route).
 # Both routes expose identical install/set_active/teardown signatures,
 # so a fallback verdict would swap this ONE line to
@@ -1379,9 +1383,17 @@ class GameTab(QtWidgets.QWidget):
            distance + citation; refused/skip groups with reasons).
         d. Anchor the handoff record: _serpentrum.last_run =
            {'result', 'molecules_stacked', 'atoms_total',
-            'chain_objects', 'snake_id'} - chain_object_names() is the
-           completion-ONLY name read (never per-tick); Phases 6/7
-           consume this from the anchor (reload-safe by construction).
+            'chain_objects', 'snake_id', 'snake_xyz'} -
+           chain_object_names() is the completion-ONLY name read
+           (never per-tick); Phases 6/7 consume this from the anchor
+           (reload-safe by construction). The record now carries
+           'snake_xyz' (plan 06-06, EQ-xyz-1) - the head-inclusive
+           engine-atom run-input xyz text assembled HERE while the
+           engine is still alive, consumed by the Phase-6 runner;
+           None when the head mirror was unavailable (the launch API
+           refuses with a clear line instead of crashing); NEVER a
+           PyMOL re-read (05-RESEARCH-core-integration:151: do not
+           re-read PyMOL).
         e. Enable Get Spectra - the ONLY place the button goes live.
         """
         session = self._session
@@ -1392,6 +1404,20 @@ class GameTab(QtWidgets.QWidget):
             self._log(line)
         for line in hud_logic.breakdown_lines(session['stacked_history']):
             self._log(line)
+        # EQ-xyz-1 (plan 06-06): assemble the launch-ready run input
+        # HERE while the engine is still alive - head atoms from the
+        # session mirror, then each segment's live atoms in engine
+        # order; NEVER re-read from PyMOL (05-RESEARCH:151). build_run_
+        # input raises ValueError on head_atoms None - branch
+        # explicitly instead: the launch API (plan 06-09) refuses on
+        # None with a clear line, no try/except theater.
+        head_atoms = session['head_atoms'] if session is not None else None
+        if head_atoms is not None:
+            snake_xyz = xtb_run.build_run_input(
+                head_atoms, [seg['atoms'] for seg in engine.segments],
+                'run_%d' % session['epoch'])
+        else:
+            snake_xyz = None
         if self._anchor is not None:
             self._anchor.last_run = {
                 'result': engine.result,
@@ -1399,6 +1425,7 @@ class GameTab(QtWidgets.QWidget):
                 'atoms_total': engine.atoms_total,
                 'chain_objects': pymol_bridge.chain_object_names(),
                 'snake_id': 'run_%d' % session['epoch'],
+                'snake_xyz': snake_xyz,
             }
         self.get_spectra_btn.setEnabled(True)  # (e) presenter-only enable
 
@@ -1493,6 +1520,17 @@ class GameTab(QtWidgets.QWidget):
         cursor.movePosition(QtGui.QTextCursor.End)
         cursor.select(QtGui.QTextCursor.BlockUnderCursor)
         cursor.insertText(text)
+
+    def log_external(self, msg):
+        """Log one line from an EXTERNAL stage in the info box.
+
+        The Phase-6 launch API (gui.py, plan 06-09) surfaces launch
+        decisions here - counts/warnings/refuse verdicts - without
+        reaching into privates. Wraps _log: the coalescer break is
+        correct because these are NON-reason messages and the run is
+        already over when they arrive.
+        """
+        self._log(msg)
 
     def _set_idle_state(self):
         """Idle HUD: nothing to pause or restart until a game begins."""
