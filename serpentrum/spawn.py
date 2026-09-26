@@ -56,9 +56,15 @@ PINNED POLICY (stated explicitly per the planning mandate):
     3.0 A (originally sized to keep the since-REMOVED 2.5 A sweep
     pickup-leg pre-check satisfiable near fresh spawns; kept 2026-09-20
     as good placement hygiene), and live-pickup-centroid clearance
-    6.0 A. Up to 32 seeded retries (MAX_DRAWS), then a DETERMINISTIC
+    6.0 A. Up to 32 seeded retries (    MAX_DRAWS), then a DETERMINISTIC
     grid-scan fallback (GRID_STEP_A = 2.0 over the shrunk box, x-major
-    / y-minor order, first legal wins), else None. On None there is NO
+    / y-minor cell indexing, first legal wins), else None. 2026-09-26
+    Phase 5.3 plan 5.3-02: the scan starts at a seeded cell (one
+    randrange over the cell count) and wraps -- same coverage (every
+    cell checked exactly once, so None is returned only when genuinely
+    no legal cell exists), kills the corner-bias clustering when the
+    fallback fires on saturated boxes; still deterministic per seed.
+    On None there is NO
     state advance -- the same record is offered again on the next call,
     and the pid counter is not consumed.
   - SEED: zlib.crc32 over a canonical setup string (NEVER hash() --
@@ -396,18 +402,50 @@ class PickupSpawner(object):
             if self._legal(cx, cy, head_xy, atoms, chain_atoms,
                            live_centroids):
                 return self._issue(record, cx, cy)
-        # Deterministic grid-scan fallback over the shrunk box, x-major /
-        # y-minor order, FIRST legal wins. Fully deterministic for fixed
-        # (head, chain, live) inputs -- no RNG involved.
-        gx = x0
-        while gx <= x1 + 1e-9:
-            gy = y0
-            while gy <= y1 + 1e-9:
-                if self._legal(gx, gy, head_xy, atoms, chain_atoms,
-                               live_centroids):
-                    return self._issue(record, gx, gy)
-                gy += GRID_STEP_A
-            gx += GRID_STEP_A
+        # Grid-scan fallback over the shrunk box (factored helper,
+        # 2026-09-26 Phase 5.3 plan 5.3-02). Fully deterministic for
+        # fixed (head, chain, live, seed) inputs.
+        return self._grid_scan(record, atoms, head_xy, chain_atoms,
+                               live_centroids)
+
+    def _grid_scan(self, record, atoms, head_xy, chain_atoms,
+                   live_centroids):
+        """Deterministic grid-scan fallback over the shrunk box: every
+        cell is checked EXACTLY ONCE (x-major / y-minor cell indexing),
+        first legal wins, else None.
+
+        2026-09-26 Phase 5.3 plan 5.3-02: the scan starts at a SEEDED
+        cell -- ``self._rng.randrange(cell_count)`` -- and wraps
+        (``(start + i) % cell_count``), so identical coverage to the old
+        most-negative-corner-first scan but a per-seed start cell. The
+        pre-5.3-02 scan always landed at the same most-negative first
+        legal cell when it fired, clustering forced spawns late-game on
+        saturated small boxes; the seeded start kills that corner-bias
+        while staying deterministic per seed (GAME-07): the randrange
+        draw is consumed ONLY when the fallback fires (the MAX_DRAWS
+        uniform draws precede it), so successful 32-draw sequences keep
+        their exact pre-existing stream shape.
+
+        Degenerate-box guard: a non-positive axis count (shrunk span <=
+        0, e.g. the (0,0)-(2,2) test box: nx = ny = -1) returns None
+        BEFORE any rng draw -- guarded on the AXIS counts, not on
+        cell_count (nx*ny can be positive there, so a cell_count-only
+        guard would not intercept).
+        """
+        x0, x1, y0, y1 = self._shrunk_bounds()
+        nx = int((x1 - x0) / GRID_STEP_A + 1e-9) + 1
+        ny = int((y1 - y0) / GRID_STEP_A + 1e-9) + 1
+        if nx <= 0 or ny <= 0:
+            return None
+        cell_count = nx * ny
+        start = self._rng.randrange(cell_count)
+        for i in range(cell_count):
+            idx = (start + i) % cell_count
+            gx = x0 + (idx % nx) * GRID_STEP_A
+            gy = y0 + (idx // nx) * GRID_STEP_A
+            if self._legal(gx, gy, head_xy, atoms, chain_atoms,
+                           live_centroids):
+                return self._issue(record, gx, gy)
         return None
 
     def _legal(self, cx, cy, head_xy, atoms, chain_atoms, live_centroids):
