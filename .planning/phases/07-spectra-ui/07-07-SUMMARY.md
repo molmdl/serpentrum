@@ -73,7 +73,7 @@ Each task was committed atomically:
 1. **Task 1: SpectraTab — status, streaming log, run control, slots** - `37779b9` (feat)
 2. **Task 2: gui.py — placeholder page replaced, delegation rewired, 06-09 behaviors audited** - `eb059fa` (feat)
 
-**Plan metadata:** `8b4a3??` (docs: complete spectra-tab shell plan) — see final git log on branch `exec/07-07`.
+**Plan metadata:** `176abab` (docs: complete spectra-tab shell plan).
 
 ## Files Created/Modified
 - `serpentrum/gui_spectra.py` — SpectraTab GUI module: status/log/run-control surfaces, runner slots, `run_again_requested` signal, `reflect_run_state`, PINNED layout insert contract in docstrings
