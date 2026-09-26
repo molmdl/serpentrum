@@ -59,8 +59,12 @@ import sys
 # 04-RESEARCH-hud.md Q5 (edit mirrors gui_setup.py's entry). Entries for
 # not-yet-created files are INERT: check_tree walks existing files only,
 # so RealRepoCleanTest must stay green before AND after the file lands.
+# xtb_runner.py = async QProcess xtb runner (Phase 6, plan 06-05):
+# pymol.Qt only — 06-RESEARCH-runner.md Q2 (edit mirrors gui_game.py's
+# 04-05 entry). The runner NEVER imports pymol.cmd — the viewer is not
+# its concern.
 GUI_MODULES = {'serpentrum/gui.py', 'serpentrum/gui_setup.py',
-               'serpentrum/gui_game.py'}
+               'serpentrum/gui_game.py', 'serpentrum/xtb_runner.py'}
 
 # Explicit cmd-bridge allowlist — the ONLY modules (besides ENTRY-lazy)
 # that may import pymol.cmd. Allows pymol/pmg_tk at module level AND in

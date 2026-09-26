@@ -40,7 +40,18 @@ def _anchor():
                                  # 05-15): {'result', 'molecules_stacked',
                                  # 'atoms_total', 'chain_objects', 'snake_id'};
                                  # written at completion, consumed by the Spectra
-                                 # stage (Phases 6/7).
+                                 # stage (Phases 6/7). The record gains
+                                 # 'snake_xyz' (Phase 6, plan 06-06): the
+                                 # head-inclusive engine-atom xyz text built at
+                                 # completion via xtb_run.build_run_input; None
+                                 # when the head mirror was unavailable.
+            spectra_run = None   # the live xtb run record (Phase 6, plan 06-05):
+                                 # key set frozen by xtb_run.SPECTRA_RUN_KEYS
+                                 # ('snake_id', 'status', 'problems',
+                                 # 'input_path', 'g98_path', 'vibspectrum_path',
+                                 # 'xtbopt_path', 'log_path'); written ONLY by
+                                 # the xtb runner's terminal branch; consumed by
+                                 # the Spectra stage (Phase 7).
         state = _SerpentrumState()
         from . import setup_logic  # lazy relative import (ENTRY-legal)
         state.setup = setup_logic.new_setup()
