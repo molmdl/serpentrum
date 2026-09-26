@@ -48,11 +48,11 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Spectra
 
 - [ ] **SPECTRA-01**: "Get Spectra" switches to the Spectra tab
-- [ ] **SPECTRA-02**: Spectra tab runs `xtb --ohess` (optimization + numerical hessian) on the final snake asynchronously — UI stays responsive, run uses a fresh per-run temp dir, success = exit 0 + "normal termination" on stderr + expected output files, and the run can be cancelled
+- [x] **SPECTRA-02**: Spectra tab runs `xtb --ohess` (optimization + numerical hessian) on the final snake asynchronously — UI stays responsive, run uses a fresh per-run temp dir, success = exit 0 + "normal termination" on stderr + expected output files, and the run can be cancelled
 - [ ] **SPECTRA-03**: Spectra tab plots a broadened IR spectrum (frequencies + IR intensities, Gaussian broadening) with minimal adjustments (plot size, axis labels) and a save-plot button
 - [ ] **SPECTRA-04**: Spectra tab streams calculation progress into a log panel
 - [ ] **SPECTRA-05**: Spectra tab shows a frequency table; clicking a row draws that mode's displacement vectors on the snake in the OpenGL viewer (static vectors, no animation); negative frequencies display as imaginary (e.g. −31.9i) and zero-intensity modes are listed
-- [ ] **SPECTRA-06**: Before launching xtb, the hidden molecule/atom counts are re-checked against the configured cap with a warning if exceeded
+- [x] **SPECTRA-06**: Before launching xtb, the hidden molecule/atom counts are re-checked against the configured cap with a warning if exceeded
 
 ### Demo Data & Attribution
 
@@ -150,11 +150,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STACK-05 | Phase 5 | Complete |
 | STACK-06 | Phase 5.2 | Complete |
 | SPECTRA-01 | Phase 7 | Pending |
-| SPECTRA-02 | Phase 6 | Pending |
+| SPECTRA-02 | Phase 6 | Complete |
 | SPECTRA-03 | Phase 7 | Pending |
 | SPECTRA-04 | Phase 7 | Pending |
 | SPECTRA-05 | Phase 7 | Pending |
-| SPECTRA-06 | Phase 6 | Pending |
+| SPECTRA-06 | Phase 6 | Complete |
 | DATA-01 | Phase 8 | Pending |
 | DATA-02 | Phase 8 | Pending |
 | DATA-03 | Phase 3 | Complete |
