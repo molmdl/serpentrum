@@ -123,11 +123,16 @@ SPEED_TIERS = (
 )
 
 # Exact N-cubed hessian-cost warning (SETUP-06 / SPECTRA-06 pure half).
-# Rationale: PITFALLS 2 measured 13 atoms 0.28 s / 26 atoms 1.03 s
-# hessian wall; N^3 extrapolation puts a ~100-atom snake at 30-90 s. The
-# runtime pre-xtb re-check is Phase 6's runner; this is the static half.
+# CALIBRATED 2026-09-26 (06-CALIBRATION.md, plan 06-07) — this REPLACES
+# the old N^3-extrapolated '30-90 s' (PITFALLS 2: 13 atoms 0.28 s / 26
+# atoms 1.03 s): the measured 104-atom --ohess wall on a 4-core/8-thread
+# 1.3 GHz laptop (xtb 6.7.1pre) was 84-101 s uncapped and at -P 4, and
+# 268-281 s (~5 min) single-threaded. The runtime pre-xtb re-check is
+# Phase 6's runner; this is the static half.
 HESSIAN_WARNING = ('hessian cost scales ~N^3; '
-                   'a ~100-atom snake may take 30-90 s')
+                   'a ~100-atom snake takes about 1-2 min on a typical '
+                   '4-core/8-thread laptop (measured 84-101 s; thread-'
+                   'capped runs slower, up to ~5 min single-threaded)')
 
 
 class SetupError(ValueError):

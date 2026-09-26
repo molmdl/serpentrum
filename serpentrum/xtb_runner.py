@@ -113,8 +113,10 @@ class XtbRunController(QtCore.QObject):
         snake.xyz INTO a fresh xtbenv.new_run_dir spray dir, launches
         with cwd=that dir and bare-relative argv via xtbenv.build_argv,
         injects only xtb_run-approved env knobs, and never blocks waiting
-        on the child (signals only). extra_args None -> (xtbenv.XTB_OHESS,)
-        only; knobs None -> xtb_run.DEFAULT_RUN_KNOBS.
+        on the child (signals only). extra_args None ->
+        (xtbenv.XTB_OHESS,) + xtb_run.DEFAULT_THREAD_ARG (the SC5 '-P 4'
+        calibration cap, 06-CALIBRATION.md; an explicit caller-supplied
+        extra_args still wins); knobs None -> xtb_run.DEFAULT_RUN_KNOBS.
         """
         _ensure_app()
         if not xtb_run.can_start(self._status):
@@ -131,7 +133,7 @@ class XtbRunController(QtCore.QObject):
                 snake_id)
             return False
         args = (extra_args if extra_args is not None
-                else (xtbenv.XTB_OHESS,))
+                else (xtbenv.XTB_OHESS,) + xtb_run.DEFAULT_THREAD_ARG)
         try:
             argv = xtbenv.build_argv(exe_path, 'snake.xyz',
                                      extra_args=args)

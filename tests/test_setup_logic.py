@@ -110,9 +110,16 @@ class TestDefaults(unittest.TestCase):
             usable = 2.0 * half - 2.0  # minus BOUNDARY_MARGIN_A both ends
             self.assertGreaterEqual(usable, 36.0)
         self.assertGreaterEqual(2.0 * H['medium'] - 2.0, 3.0 * 36.0)
+        # Calibrated literal (06-CALIBRATION.md, plan 06-07; applied by
+        # plan 06-11 — REPLACES the old N^3-extrapolated '30-90 s' with
+        # the measured 104-atom numbers: 84-101 s uncapped/-P 4, up to
+        # ~5 min single-threaded, on a 4-core/8-thread 1.3 GHz laptop).
         self.assertEqual(
             HESSIAN_WARNING,
-            'hessian cost scales ~N^3; a ~100-atom snake may take 30-90 s')
+            'hessian cost scales ~N^3; '
+            'a ~100-atom snake takes about 1-2 min on a typical '
+            '4-core/8-thread laptop (measured 84-101 s; thread-'
+            'capped runs slower, up to ~5 min single-threaded)')
 
 
 class TestValidateClean(unittest.TestCase):
