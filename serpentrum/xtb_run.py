@@ -23,6 +23,10 @@ with zero stubs per the 02-02 xtbenv DI precedent):
   OMP_NUM_THREADS / MKL_NUM_THREADS / OMP_STACKSIZE). No invented knobs.
   WSL-set env does NOT reliably cross into Windows — env injection is
   the QProcess path's job (06-05); this module only merges dicts.
+  CALIBRATED default (SC5, 06-CALIBRATION.md 2026-09-26, applied by plan
+  06-11): DEFAULT_RUN_KNOBS stays {} (no default env overrides;
+  OMP_STACKSIZE dispositioned not needed at the ~104-atom scale) and the
+  measured thread cap ships argv-side as DEFAULT_THREAD_ARG ('-P 4').
 - Handoff seam (EQ-xyz-1): ``build_run_input`` assembles the final
   snake xyz at COMPLETION from engine/session atoms — head_atoms FIRST,
   then each segment's atoms in engine order (05-RESEARCH:151: do NOT
@@ -56,12 +60,25 @@ CANCELLED = 'cancelled'
 # path routes into one of these).
 TERMINAL_STATES = frozenset((DONE, FAILED, CANCELLED))
 
-# EQ-omp-1: the runner ships UNCAPPED until the calibration experiment
-# (plan 06-07) measures thread wall-time; plan 06-11 owns the default
-# edit from 06-CALIBRATION.md (e.g. {'OMP_NUM_THREADS': '2'}). The merge
-# MECHANISM ships now; the default is a later data edit — this ONE
-# literal is the only thing that changes.
+# EQ-omp-1 + SC5 outcome (06-CALIBRATION.md, plan 06-07; applied by plan
+# 06-11 — supersedes the 06-02 'uncapped until calibration' placeholder):
+# NO default env knobs. The measured thread cap lands ARGV-side as
+# DEFAULT_THREAD_ARG below (a -P argv flag is not an env knob; build_env's
+# verified set is the three OMP_* keys only), and OMP_STACKSIZE is
+# dispositioned NOT NEEDED at the ~104-atom scale (no uncapped run
+# crashed anywhere in the calibration sweep). {} = 'no env overrides by
+# default' is now the FINAL calibration-derived value.
 DEFAULT_RUN_KNOBS = {}
+
+# SC5 outcome (06-CALIBRATION.md decision input (b); applied by plan
+# 06-11): default argv-level thread cap '-P 4'. Measured on the
+# calibration machine (4 cores / 8 hardware threads, 2026-09-26): the cap
+# costs ~18% user-perceived wall (107.6 s vs 91.4 s at 104 atoms) while
+# leaving 4 hardware threads for PyMOL rendering — directly addressing
+# the uncapped-xtb UI-jank pitfall (PITFALLS.md:333,348). Consumed by the
+# CONTROLLER's extra_args default (XtbRunController.start, plan 06-05);
+# an explicit caller-supplied extra_args still overrides it.
+DEFAULT_THREAD_ARG = ('-P', '4')
 
 # xtb --help env knobs, VERIFIED verbatim from the help capture
 # (tmp/xtb_test/xtb_help.txt:229-231: MKL_NUM_THREADS, OMP_NUM_THREADS,

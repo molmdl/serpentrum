@@ -109,11 +109,26 @@ class TestBuildEnv(unittest.TestCase):
         self.assertRaises(ValueError, xtb_run.build_env,
                           {}, {'OMP_NUM_THREADS': ''})
 
-    def test_default_run_knobs_uncapped(self):
-        # EQ-omp-1 pin: the runner ships UNCAPPED until the calibration
-        # experiment (plan 06-07) measures; plan 06-11 owns the default
-        # edit and may change this ONE literal.
+    def test_default_run_knobs_no_env_overrides(self):
+        # EQ-omp-1 pin, FINALIZED by the 06-11 calibration decision
+        # (06-CALIBRATION.md; supersedes the 06-02 'uncapped until
+        # calibration' placeholder): NO default env knobs — the measured
+        # thread cap lives argv-side in DEFAULT_THREAD_ARG (a -P flag is
+        # not an OMP env knob), and OMP_STACKSIZE was dispositioned NOT
+        # NEEDED at the ~104-atom scale (no uncapped run crashed in the
+        # calibration sweep).
         self.assertEqual(xtb_run.DEFAULT_RUN_KNOBS, {})
+
+    def test_default_thread_arg_capped(self):
+        # SC5 outcome (06-CALIBRATION.md decision input (b); applied by
+        # plan 06-11): the runner ships a default argv-level '-P 4' cap.
+        # Measured 2026-09-26 (4 cores / 8 hardware threads): ~18%
+        # user-perceived wall penalty (107.6 s vs 91.4 s at 104 atoms)
+        # in exchange for leaving 4 hardware threads to PyMOL rendering
+        # (the uncapped-xtb UI-jank pitfall, PITFALLS.md:333,348). The
+        # controller (plan 06-05) consumes this when extra_args is None;
+        # an explicit caller extra_args still wins.
+        self.assertEqual(xtb_run.DEFAULT_THREAD_ARG, ('-P', '4'))
 
 
 class TestBuildRunInput(unittest.TestCase):
