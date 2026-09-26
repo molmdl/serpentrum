@@ -482,3 +482,70 @@ def chain_atom_counts(names):
             continue
         counts.append(len(model.atom))
     return counts
+
+
+# --- Phase 7: spectra mode vectors + optimized-frame overlay (SPECTRA-05) ----
+# The Spectra tab's row-click -> 3D vectors is a viewer operation, so every
+# cmd touch goes through HERE (GUI modules may not import pymol.cmd —
+# check_purity.py GUI purity). Object names are srp_-prefixed MANDATORY:
+# cleanup_srp / begin_game / Setup-Apply sweep them (wildcard srp_*), and a
+# .pse reload stays fresh-process-cleanable (INFRA-04 contract — a non-srp_
+# overlay object would survive Cleanup AND become an indistinguishable
+# orphan after reload; research Q4b). cgo_build.mode_arrows is the FROZEN
+# Phase-2 builder (unit-normalized directions, uniform length) — this
+# section only CONSUMES it.
+
+# Canonical srp_* object names for the spectra overlay.
+MODE_VEC_NAME = 'srp_mode_vec'  # CGO mode arrows (cgo_build.mode_arrows)
+XTBOPT_NAME = 'srp_xtbopt'      # optimized-run molecule (xtbopt.xyz, sticks)
+
+
+def load_mode_arrows(cgo, name=MODE_VEC_NAME, zoom=0):
+    """Load a cgo_build.mode_arrows stream as a named srp_ CGO object.
+
+    ``cmd.load_cgo(list(cgo), name, zoom=zoom)`` — mirrors load_box
+    (:91-109). ``zoom=0`` NEVER reframes the completion camera: the
+    one-shot framing of the overlay is zoom_mode_frame's job. Callers
+    MUST keep ``name`` srp_-prefixed (MODE_VEC_NAME default): a non-srp_
+    name escapes cleanup_srp and the .pse-reload contract (INFRA-04).
+    Replace semantics live in the caller: delete_object(name) first,
+    then load (07-09 wires this). Returns ``name``.
+    """
+    cmd.load_cgo(list(cgo), name, zoom=zoom)
+    return name
+
+
+def load_xtbopt(path, srp_name=XTBOPT_NAME, zoom=0):
+    """Load the run's xtbopt.xyz (the OPTIMIZED frame) as STICKS.
+
+    ``cmd.load(path, object=srp_name, zoom=zoom)`` +
+    ``cmd.show('sticks', srp_name)`` — mirrors materialize_pickup minus
+    the transform (:361-375); the probe-verified g98<->xtbopt identity
+    (07-RESEARCH-spectra-seam.md Q4b, max per-atom delta 0.0000 A on the
+    dimer fixture) means no transform is needed: the optimized frame IS
+    the frame the g98 vectors live in. STICKS for view parity with the
+    pickups/snake the player just watched (the head stays spheres; the
+    optimized snake reads as a molecule). ``srp_name`` MUST stay
+    srp_-prefixed (cleanup contract, load_mode_arrows docstring).
+    Returns ``srp_name``.
+    """
+    cmd.load(path, object=srp_name, zoom=zoom)
+    cmd.show('sticks', srp_name)
+    return srp_name
+
+
+def zoom_mode_frame():
+    """ONE-shot framing of the spectra overlay objects (pitfall 14).
+
+    Call ONCE per record (first vector draw), NEVER per table click —
+    per-click re-zoom yanks the camera out from under the user.
+    ``cmd.zoom('srp_xtbopt or srp_mode_vec')`` + ``cmd.refresh()``.
+    Returns True when a zoom was issued, False when NEITHER object
+    exists — cmd.zoom on a missing selection raises a Selector error,
+    so both names are guarded via object_exists first.
+    """
+    if not (object_exists(XTBOPT_NAME) or object_exists(MODE_VEC_NAME)):
+        return False
+    cmd.zoom('%s or %s' % (XTBOPT_NAME, MODE_VEC_NAME))
+    cmd.refresh()
+    return True

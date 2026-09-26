@@ -60,7 +60,11 @@ REQUIRED_SMOKES = ('smoke/01_skeleton_smoke.py',
                     'smoke/07_transform_sweep_smoke.py',
                     'smoke/08_stack_place_smoke.py',
                     # (Phase 6, plan 06-04 — bridge chain atom-count channel)
-                    'smoke/10_chain_count_smoke.py')
+                    'smoke/10_chain_count_smoke.py',
+                    # 13 = mode arrows + g98/xtbopt overlay identity (Phase 7,
+                    # plan 07-03) — re-asserts the OPTIMIZED-frame assumption
+                    # on every gate run
+                    'smoke/13_mode_arrows_smoke.py')
 
 SMOKE_BAT = 'C:\\src\\run-conda-pymol.bat'
 SMOKE_TIMEOUT = 90  # seconds, per research Q3
