@@ -452,3 +452,33 @@ def chain_object_names():
     names = cmd.get_names('public_objects')
     return sorted(n for n in names
                   if n.startswith('srp_head') or n.startswith('srp_seg'))
+
+
+def chain_atom_counts(names):
+    """Per-object atom counts for the named chain objects, input order.
+
+    For each ``name``: ``model = cmd.get_model(name)``; the count is
+    ``len(model.atom)`` when the model resolves. ``cmd.get_model`` is
+    the documented-safe reader (get_extent/get_model safe; NEVER
+    ``get_object_ttt`` — it segfaults, apply_matrix docstring above).
+    A name that no longer resolves to an object (KeyError from
+    get_model, or an empty-atom model) yields 0 — DOCUMENTED: a
+    vanished chain object is a DESYNC signal for the budget guard
+    (plan 06-09 launch cross-check), never a launch crash. Order
+    preserving: the returned list matches ``names`` positionally.
+
+    Consumer: SPECTRA-06 launch cross-check (plan 06-09) — the launch
+    API reads names from the FROZEN last_run record (reload-safe) and
+    compares this head-inclusive sum against the run-input count.
+    EQ-xyz-1: counts ONLY — run-input coordinates come from the engine
+    atoms (plans 06-02/06-06), never re-read from the viewer here.
+    """
+    counts = []
+    for name in names:
+        try:
+            model = cmd.get_model(name)
+        except Exception:
+            counts.append(0)
+            continue
+        counts.append(len(model.atom))
+    return counts

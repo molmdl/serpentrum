@@ -58,7 +58,9 @@ REQUIRED_SMOKES = ('smoke/01_skeleton_smoke.py',
                     'smoke/05_loop_camera_smoke.py',
                     'smoke/06_input_smoke.py',
                     'smoke/07_transform_sweep_smoke.py',
-                    'smoke/08_stack_place_smoke.py')
+                    'smoke/08_stack_place_smoke.py',
+                    # (Phase 6, plan 06-04 — bridge chain atom-count channel)
+                    'smoke/10_chain_count_smoke.py')
 
 SMOKE_BAT = 'C:\\src\\run-conda-pymol.bat'
 SMOKE_TIMEOUT = 90  # seconds, per research Q3
