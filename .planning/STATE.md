@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
-**Current focus:** Phase 6 xtb Pipeline COMPLETE + CHECKPOINT-APPROVED (2026-09-26, 06-12 live checkpoint 12/12 PASS with ONE owner amendment landed) — next: Phase 7 spectra UI (inherits the spectra_run contract + signal vocabulary + user-settable artifact dir)
+**Current focus:** Phase 7 spectra UI IN PROGRESS (wave 1 merged 07-01..07-04 at 77cafa5; 07-05 gui_plot landed 2026-09-26) — next: 07-06 plot human-verify harness (blocking checkpoint) / 07-07 SpectraTab shell
 
 ## Current Position
 
-Phase: 6 of 8 (xtb Pipeline) — COMPLETE + VERIFIED (06-VERIFICATION.md: passed 5/5; owner live checkpoint APPROVED 12/12)
-Plan: 12 of 12 complete (06-01..06-12); 06-12-SUMMARY.md: gates green (796 unittests, 8/8 required smokes, --xtb probe), owner live checkpoint APPROVED 12/12, EQ decisions recorded, Phase-7 handoff written
-Status: full launch pipeline live-proven in real Windows PyMOL — completion anchors snake_xyz; Get Spectra runs head-inclusive counts + budget_guard + binary resolution + async QProcess xtb (cancel/relaunch/double-run guard all PASS; cancel shows honest failure text, never fake success); artifacts copy out to a USER-SETTABLE stable dir (SRP_SPECTRA_DIR env, default <cwd>/srp_spectra — owner directive, was %TEMP%; spray scratch stays in %TEMP; srp_spectra/ gitignored); smoke 11 re-proves the contract under the env override; smokes 09/11 stay informational (no promotion instructed)
-Last activity: 2026-09-26 — 06-12 phase-close: Task 1 gates (a341119) -> owner checkpoint APPROVED 12/12 -> continuation agent applied the EQ-artifact-1 amendment (048d929), re-verified all legs, finalized SUMMARY
+Phase: 7 of 8 (Spectra UI) — IN PROGRESS
+Plan: 5 of 10 complete (07-01..07-05); 07-05-SUMMARY.md: gates green (829 unittests, 10/10 REQUIRED smokes incl. new smoke 12 PLOT-RENDER + 13 MODE-ARROWS), gui_plot.py paints via one paint_scene seam (screen == PNG), GUI_MODULES single-writer edit registered gui_spectra.py inert for 07-07
+Status: SPECTRA-03 structural half delivered data-in (07-08 embeds SpectraPlotPanel; run_finished->build_scene->set_scene pending); 07-06 real-GUI plot human-verify is the next BLOCKING checkpoint (fail-cheap, 04-07 precedent)
+Last activity: 2026-09-26 — 07-05 executed: GUI_MODULES single-writer registration (e1d7dae) -> gui_plot IrPlotWidget/seam/panel/render_image (f6ee16f) -> REQUIRED smoke 12 + tuple edit (52cd9ba); full --smoke leg 10/10 required PASS
 
-Progress: [█████████░] ~93% (85 plans executed — Phases 1-5 + 5.1 + 5.2 + 5.3 + 6 COMPLETE at 6+14+8+9+16+6+9+5+12; Phases 7-8 planned/TBD)
+Progress: [█████████░] ~95% (90 of 95 planned plans executed — Phases 1-5 + 5.1 + 5.2 + 5.3 + 6 COMPLETE; Phase 7: 5/10 done; Phase 8 unplanned)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 85
-- Total execution time: ~780 executor min (Phase 1: 104; Phase 2: ~330; Phase 3: ~165 incl. smoke-04/fix/measure follow-up agents + verifier; Phase 4: ~41 incl. waves 1-2 + 04-06..04-09; Phase 5.1: ~40 incl. 3 waves of executors + orchestrator-applied Task-3 retune + verifier; Phase 5.2: ~25 incl. 5 waves of executors + owner checkpoint rounds + verifier; Phase 5.3: ~55 incl. 3 waves (worktree protocol wave 2) + owner checkpoint + verifier)
+- Total plans completed: 90
+- Total execution time: ~790 executor min (Phase 1: 104; Phase 2: ~330; Phase 3: ~165 incl. smoke-04/fix/measure follow-up agents + verifier; Phase 4: ~41 incl. waves 1-2 + 04-06..04-09; Phase 5.1: ~40 incl. 3 waves of executors + orchestrator-applied Task-3 retune + verifier; Phase 5.2: ~25 incl. 5 waves of executors + owner checkpoint rounds + verifier; Phase 5.3: ~55 incl. 3 waves (worktree protocol wave 2) + owner checkpoint + verifier; Phase 7: 07-05 = 10 min direct on main)
 
 **By Phase:**
 
@@ -35,6 +35,7 @@ Progress: [█████████░] ~93% (85 plans executed — Phases 1-
 | 5.2. Generic Upload Stacking Consent | 9/9 | ~25 min — wave 1: 2 parallel TDD executors (~4 min each); waves 2-3: single TDD executors (3 + 5 min); wave 4: 4 parallel executors (5-8 min each); wave 5: gates task (~1 min) + owner feel-check (2 rounds) + continuation finalize | ~3 min |
 | 5.3. Randomized Pickup Spawning | 5/5 | ~55 min — wave 1: single TDD executor (18 min); wave 2: 3 parallel executors via worktree protocol (5.3-02 28 min incl. probe-justified seed swap, 5.3-03 5 min, 5.3-04 4 min; zero-conflict merges); wave 3: gates+smokes (~4 min) + BLOCKING owner feel-check (APPROVED round 1) + continuation finalize; verifier passed 5/5 | ~11 min |
 | 6. xtb Pipeline | 12/12 | waves 1-3 via exec branches (06-08/09/10/11 merged zero-conflict); wave 4 = 06-12 gates (~5 min) + BLOCKING owner live checkpoint (APPROVED 12/12, cap-3 win game; cancel/relaunch/double-run/head-inclusive counts all PASS) + continuation finalize with ONE owner amendment (EQ-artifact-1: artifacts dir user-settable, SRP_SPECTRA_DIR || <cwd>/srp_spectra, commit 048d929) + re-verified gates; test baseline 755 -> 796 across the phase (+41) | — not yet aggregated — |
+| 7. Spectra UI | 5/10 | wave 1 (07-01..07-04) merged via exec branches zero-conflict (HEAD 77cafa5); 07-05 single-plan direct on main: 10 min, gates 829 unittests + 10/10 required smokes (incl. new smoke 12) | — in progress — |
 
 **Recent Trend:**
 - Phase 3: 03-01 (7 min), 03-02 (22), 03-03 (~15 incl. respawn after /home-symlink permission rejection), 03-04 (10), 03-05 (~8, single-plan direct on main), 03-06 (~25, Windows smokes), 03-07 (20), 03-08 (35 + 3 follow-up agents ~25)
@@ -88,6 +89,8 @@ Recent decisions affecting current work:
 - **2026-09-26 (5.3-05 feel-check, owner verdicts — Phase 5.3 approved):** (a) Verdict verbatim "good, all pass" — randomized spawns APPROVED round 1 (first spawn across the box, visibly different spawn regions per capture, fair difficulty, refuse/cooldown intact, restart unchanged; live Windows PyMOL + SRP_DEBUG=1). (b) MIN_HEAD_DIST_FACTOR ships at 0.35 (no retune requested). (c) Edge-biased spawn distribution (increase chance of spawns near box edge) DEFERRED per owner instruction ("if this is quick add it, otherwise just mark it and move on") — not a single-knob retune (sampling-distribution change, new TDD cycle + spread-pin re-proof); sketch + GAME-07 seed-stream impact recorded in 5.3-05-SUMMARY.md.
 - **2026-09-26 (06-12 phase-close checkpoint, owner verdicts — Phase 6 approved):** (a) 12/12 steps PASS in real Windows PyMOL on a real cap-3 win game — refuse precondition, async launch, live-log responsiveness ("xtb real-time log responsive yes"), cancel shows the HONEST failure text (never fake success), relaunch to `xtb finished: ok`, double-run guard, head-inclusive counts proven by arithmetic (HUD 54 + benzene head 12 = counts line 66), over-budget warning correctly suppressed at 66<=100, placeholder-only Spectra tab accepted as Phase 6 scope. (b) **OWNER DIRECTIVE (EQ-artifact-1 amendment, applied 048d929):** the stable spectra artifacts dir is USER-SETTABLE — `SRP_SPECTRA_DIR` env override, DEFAULT `<cwd>/srp_spectra` (WAS `%TEMP%/srp_spectra`); spray scratch stays in %TEMP; keep-until-replaced + rmtree prefix guard unchanged (guard now pins the new base in both sites); `srp_spectra/` gitignored; smoke 11 pins the env override and re-proves the contract. (c) EQ-smoke-1 DISPOSITION RECORDED: smokes 09/11 stay INFORMATIONAL — owner instructed no promotion. (d) Phase-7 handoff written in 06-12-SUMMARY.md (frozen spectra_run keys; signal vocabulary started/log_line/run_finished; artifact dir contract; placeholder widgets temporary; Phase-7 plan files still cite the pre-amendment %TEMP% default — read via record paths).
 
+- **2026-09-26 (07-05 plot GUI):** Save route = route A only — ONE paint_scene seam serves paintEvent AND the 2x QImage PNG (identical look; QWidget.grab() demoted to a single non-shipped comment). v1 adjustment surface = size-preset combo + 'Show axis labels' toggle ONLY (no FWHM control, no zoom/pan). GUI_MODULES single-writer: gui_plot.py live + gui_spectra.py inert-first (07-07 creates the file against the entry). Renderer smoke rule now in AGENTS.md: QApplication.instance() or QApplication([]) before ANY font-touching paint (probe RUN A hard-kill). REQUIRED smoke 12 (PLOT-RENDER) pins it; margins widened from plan shorthand so axis titles never clip.
+
 ### Roadmap Evolution
 
 - 2026-09-20: **Phase 5.1 (Game Speed / Difficulty, GAME-11) inserted after Phase 5** (URGENT — owner playtesting feedback "current speed is easy, kinda slow even with small box"); directory .planning/phases/5.1-game-speed-difficulty/; coverage 44 -> 45; draft tiers relaxed ~2.0 / normal 3.0 (default) / fast ~4.5 / expert ~6.0 A/s — owner feel-check finalizes. Distinct from v2 GAME-10-v2 (speed-vs-length, still deferred).
@@ -117,8 +120,8 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-09-26 (execute-phase orchestrator — Phase 6 executed: waves 1-3 via exec branches (06-08/06-09/06-10/06-11 merged zero-conflict in dependency order); wave 4 = 06-12 Task-1 gates on main + BLOCKING owner live checkpoint -> APPROVED 12/12 -> continuation agent applied the ONE owner amendment (048d929) + finalized the phase SUMMARY; gates re-verified green post-amendment)
-Stopped at: Phase 6 COMPLETE + CHECKPOINT-APPROVED (pending any owner-run gsd-verifier); Phase 7 (spectra UI) is next — handoff recorded in 06-12-SUMMARY.md
+Last session: 2026-09-26 (gsd-executor — plan 07-05 executed on main: 3 atomic task commits e1d7dae/f6ee16f/52cd9ba + docs metadata; gates 829 unittests green; full --smoke leg 10/10 required PASS incl. new smoke 12)
+Stopped at: 07-05 COMPLETE (gui_plot + paint_scene seam + route-A render_image + REQUIRED smoke 12 + single-writer GUI_MODULES registration); 07-05-SUMMARY.md written
 Resume file: None needed
-Next action: Phase 7 spectra UI (plot/table/log-panel over the Phase-6 placeholder; honors the spectra_run record shape, runner signal vocabulary, and the user-settable artifacts dir contract; its live checkpoint owns the plot/table verdicts per EQ-checkpoint-1)
+Next action: Phase 7 wave 3 — 07-06 BLOCKING early plot human-verify (real-GUI harness, 04-07 precedent) + 07-07 SpectraTab shell (its gui_spectra.py allowlist entry is already inert-live)
 Date convention: planning-doc dates are UTC (git commit dates authoritative) — the dev shell is HKT (UTC+8); never stamp from the local date.
