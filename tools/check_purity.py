@@ -63,8 +63,15 @@ import sys
 # pymol.Qt only — 06-RESEARCH-runner.md Q2 (edit mirrors gui_game.py's
 # 04-05 entry). The runner NEVER imports pymol.cmd — the viewer is not
 # its concern.
+# gui_plot.py = broadened-IR plot widget + save-PNG (Phase 7, plan 07-05):
+# pymol.Qt only — 07-RESEARCH-qt-plot.md (edit mirrors gui_game.py's 04-05
+# entry). The plot NEVER imports pymol.cmd — it is data-in (Scenes from
+# plot_logic).
+# gui_spectra.py = SpectraTab (Phase 7, plan 07-07): pymol.Qt only. INERT
+# until the file lands (check_tree walks existing files only).
 GUI_MODULES = {'serpentrum/gui.py', 'serpentrum/gui_setup.py',
-               'serpentrum/gui_game.py', 'serpentrum/xtb_runner.py'}
+               'serpentrum/gui_game.py', 'serpentrum/xtb_runner.py',
+               'serpentrum/gui_plot.py', 'serpentrum/gui_spectra.py'}
 
 # Explicit cmd-bridge allowlist — the ONLY modules (besides ENTRY-lazy)
 # that may import pymol.cmd. Allows pymol/pmg_tk at module level AND in
