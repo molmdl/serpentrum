@@ -52,6 +52,14 @@ def _anchor():
                                  # 'xtbopt_path', 'log_path'); written ONLY by
                                  # the xtb runner's terminal branch; consumed by
                                  # the Spectra stage (Phase 7).
+            spectra_runner = None  # the live xtb run controller (Phase 6, plan 06-05;
+                                   # declared Phase 7, plan 07-04): an XtbRunController
+                                   # create-or-reused by the dialog at first launch
+                                   # (gui.py); Qt connections are DIALOG-scoped (they die
+                                   # with the dialog and are re-connected fresh), the
+                                   # controller object itself survives Plugin-Manager
+                                   # reload like dialog/controller. Consumed by the
+                                   # Spectra tab (Phase 7) via getattr guards.
         state = _SerpentrumState()
         from . import setup_logic  # lazy relative import (ENTRY-legal)
         state.setup = setup_logic.new_setup()
