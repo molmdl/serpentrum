@@ -115,6 +115,19 @@ class XtbRunController(QtCore.QObject):
         """Read-only accessor for the UI: current xtb_run state."""
         return self._status
 
+    def log_tail(self):
+        """Return a COPY of the bounded log tail (last 500 lines).
+
+        The public early-line recovery seam (Phase 7, plan 07-04; the gap
+        flagged in 07-RESEARCH-spectra-seam.md Q2 ambiguity 1): a UI that
+        connects AFTER a launch (dialog reopened; plugin reloaded onto a
+        live controller) replays this tail before connecting log_line, so
+        lines emitted before the connect are never lost. Copy semantics —
+        callers can never mutate controller state. Read-only like
+        status(); no locks needed (same-thread Qt signal delivery).
+        """
+        return list(self._log_lines)
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
