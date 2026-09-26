@@ -12,9 +12,17 @@ wired to the anchored XtbRunController's signals (plan 06-09) -- Phase
 7 replaces the page CONTENT, the launch + signal contracts survive.
 The real bottom button row lands in Phase 8 (SETUP-07).
 """
+import tempfile
+
 from pymol.Qt import QtCore
 from pymol.Qt import QtWidgets
 
+from . import budget_guard
+from . import pymol_bridge
+from . import setup_logic
+from . import xtb_runner
+from . import xtbenv
+from . import xyzio
 from .gui_setup import SetupTab
 from .gui_game import GameTab
 
@@ -124,15 +132,127 @@ class PluginDialog(QtWidgets.QDialog):
         self.game_tab.begin_game(setup)
 
     def _on_spectra_requested(self):
-        """GAME-09: switch to the Spectra tab (model-A handoff per 04-06).
+        """GAME-09: switch to the Spectra tab, then run the Phase-6
+        launch pipeline (plan 06-09, SPECTRA-02/06).
 
         The dialog owns the QTabWidget - GameTab never reaches its
-        parent (locked decision 9). Page 2 is the Phase-7 placeholder
-        (Phase 7 replaces its content); the last_run anchor record is
-        already on _serpentrum for Phases 6/7, so nothing is passed
-        through the signal itself.
+        parent (locked decision 9 / model-A). setCurrentIndex(2) stays
+        FIRST (the tab switch is GAME-09/Phase-7 UX) so the user
+        watches the status area as the pipeline speaks. The
+        spectra_requested signal contract is UNCHANGED - the extension
+        lives entirely in this SLOT, never in GameTab.
+
+        Pipeline legs (each precondition failure emits one CLEAR line
+        and NO launch - SC3, never a fake success):
+
+        1. Anchor guard: None means stripped-down state -> 'plugin
+           state unavailable - reopen the plugin'.
+        2. last_run guard: missing record or missing snake_xyz -> the
+           shared _NO_SNAKE_LINE (precondition failure per
+           EQ-desync-1, not a desync warning). Get Spectra stays as-is.
+        3. Head-inclusive counts (research guard Q1/pitfall 1):
+           atoms_engine = len(xyzio.read_xyz_text(snake_xyz)[1]) - the
+           TRUE xtb input size; NEVER last_run['atoms_total']
+           (head-EXCLUDED). xyzio.XyzError -> 'run input is corrupt:
+           <exc>' quoted verbatim, no launch (the engine-built input
+           should never be corrupt; this is the launch-boundary
+           contract). Viewer cross-check: pymol_bridge.chain_atom_counts
+           over the frozen last_run['chain_objects'] (sum = atoms incl.
+           head, len = molecules incl. head).
+        4. SPECTRA-06 re-check (warn-and-proceed, log-lines-only,
+           EQ-guard-2): budget_guard.launch_counts_line +
+           launch_budget_warnings, every line logged BEFORE any launch
+           (SC4) into the status area AND the game info box (EQ-ux-2).
+           atom_budget comes from the anchor's setup with the
+           setup_logic.DEFAULTS fallback when setup is None (reload
+           hole - NEVER crash).
+        5. Binary resolution: xtbenv.detect_binary with the
+           SETUP-05-configured path (the user seam; the runner adds no
+           fallback list). None -> 'xtb not found - set the xtb path on
+           the Setup tab (auto-detect found nothing)', no launch, Get
+           Spectra stays enabled (nothing started).
+        6. Disarm Get Spectra (the launch API owns the disarm - research
+           guard Q5 re-entrancy; re-enable happens on the terminal
+           run_finished branch or on a refused start) and launch via
+           _launch_spectra_run (async - the dialog never blocks).
         """
         self.tabs.setCurrentIndex(2)
+        anchor = getattr(self, '_anchor', None)
+        if anchor is None:
+            self._log_spectra_line(
+                'plugin state unavailable - reopen the plugin')
+            return
+        record = getattr(anchor, 'last_run', None)
+        if record is None or not record.get('snake_xyz'):
+            self._log_spectra_line(_NO_SNAKE_LINE)
+            return
+        try:
+            _comment, atoms = xyzio.read_xyz_text(record['snake_xyz'])
+        except xyzio.XyzError as exc:
+            self._log_spectra_line('run input is corrupt: %s' % (exc,))
+            return
+        atoms_engine = len(atoms)
+        molecules_stacked = record['molecules_stacked']
+        names = record['chain_objects'] or []
+        view_counts = pymol_bridge.chain_atom_counts(names)
+        atoms_view = sum(view_counts)
+        molecules_view = len(names)
+        setup = getattr(anchor, 'setup', None)
+        atom_budget = (setup.get('atom_budget') if setup
+                       else setup_logic.DEFAULTS['atom_budget'])
+        lines = [budget_guard.launch_counts_line(
+            molecules_stacked, atoms_engine, atom_budget)]
+        lines += budget_guard.launch_budget_warnings(
+            molecules_stacked, molecules_view, atoms_engine, atoms_view,
+            atom_budget)
+        for line in lines:
+            self._log_spectra_line(line)
+        exe = xtbenv.detect_binary(setup.get('xtb_path') if setup
+                                   else None)
+        if exe is None:
+            self._log_spectra_line(
+                'xtb not found - set the xtb path on the Setup tab '
+                '(auto-detect found nothing)')
+            return
+        game_tab = getattr(self, 'game_tab', None)
+        if game_tab is not None:
+            btn = getattr(game_tab, 'get_spectra_btn', None)
+            if btn is not None:
+                btn.setEnabled(False)
+        self._launch_spectra_run(record, exe)
+
+    def _launch_spectra_run(self, record, exe):
+        """Create-or-reuse the anchored controller and start the run.
+
+        Controller ownership (plan 06-09): the FIRST launch builds
+        xtb_runner.XtbRunController(anchor) and parks it on
+        anchor.spectra_runner (narrow ownership - no module-level
+        state, reload-single by construction), then wires its signals
+        via _connect_runner (dialog-scoped once, NOT anchor-scoped).
+        base_dir is tempfile.gettempdir() evaluated INSIDE Windows
+        PyMOL (never a /mnt/c path at runtime - STACK.md:168);
+        snake_id comes from the frozen last_run record.
+
+        A False return from start() (no-double-run guard or a preflight
+        failure - the controller already emitted its own log line)
+        re-enables Get Spectra and notes the no-start: the disarm from
+        step 6 is unwound and state never sticks at 'running'."""
+        anchor = self._anchor
+        controller = getattr(anchor, 'spectra_runner', None)
+        if controller is None:
+            controller = xtb_runner.XtbRunController(anchor)
+            anchor.spectra_runner = controller
+        self._connect_runner(controller)
+        started = controller.start(record['snake_xyz'], exe,
+                                   tempfile.gettempdir(),
+                                   record['snake_id'])
+        if not started:
+            game_tab = getattr(self, 'game_tab', None)
+            if game_tab is not None:
+                btn = getattr(game_tab, 'get_spectra_btn', None)
+                if btn is not None:
+                    btn.setEnabled(True)
+            self._log_spectra_line('xtb run did not start (see log)')
 
     def _build_spectra_placeholder(self, parent):
         """Phase-6 Spectra placeholder page (plan 06-09, EQ-ux-1).
