@@ -87,6 +87,13 @@ class SetupTab(QtWidgets.QWidget):
         self._build_layout()
         self._wire_signals()
         self.apply_state(self._setup)
+        # Owner directive (GATE D round 2, plan 08-08): head options
+        # appear WITHOUT Apply -- populate for the initial demo-set
+        # selection (the combo starts at index 0, so apply_state fires
+        # no currentIndexChanged on the default path).
+        source = self.demo_combo.currentData()
+        if source != _UPLOAD_SENTINEL:
+            self._eager_populate_demo(source)
 
     # --- widget construction ----------------------------------------------
 
@@ -368,9 +375,21 @@ class SetupTab(QtWidgets.QWidget):
     # --- signal handlers --------------------------------------------------
 
     def _on_source_changed(self):
-        """Reveal/hide the upload row per the demo combo selection."""
-        is_upload = self.demo_combo.currentData() == _UPLOAD_SENTINEL
+        """Reveal/hide the upload row per the demo combo selection.
+
+        Owner directive (GATE D round 2, plan 08-08): head options
+        appear at DEMO-SET-SELECTION time, not only post-Apply -- a
+        demo-set change eagerly repopulates the head combo (read-only
+        load, no materialize); switching to Upload resets to
+        Random-only until the browse load/split succeeds.
+        """
+        source = self.demo_combo.currentData()
+        is_upload = source == _UPLOAD_SENTINEL
         self._upload_container.setVisible(is_upload)
+        if is_upload:
+            self._populate_head_combo([])
+        else:
+            self._eager_populate_demo(source)
         self._refresh_status()
 
     def _on_cap_changed(self):
@@ -434,12 +453,51 @@ class SetupTab(QtWidgets.QWidget):
                 'xtb not found - set a manual path or add xtb to PATH')
 
     def _on_browse_upload(self):
-        """Open a file dialog to choose an upload molecule set file."""
+        """Open a file dialog to choose an upload molecule set file.
+
+        Owner directive (GATE D round 2, plan 08-08): after the upload
+        load/split succeeds, repopulate the head combo from the
+        uploaded records (same read-only setloader call as the Apply
+        path) so head options appear without Apply. On load error the
+        combo stays Random-only with a status note; the Apply path
+        still reports the full error list as its rejection modal.
+        """
         path, _filter = QtWidgets.QFileDialog.getOpenFileName(
             self, 'Choose molecule set', '',
             'Molecules (*.sdf *.mol2);;All Files (*)')
         if path:
             self.upload_path_field.setText(path)
+            records, errors = setloader.load_upload(
+                path, stacking_path=setloader.default_stacking_path())
+            if errors:
+                self._populate_head_combo([])
+                self.status_label.setText(
+                    'head options unavailable - upload errors: '
+                    + '; '.join(errors))
+            else:
+                self._populate_head_combo(records)
+
+    def _eager_populate_demo(self, set_id):
+        """Eagerly repopulate the head combo for a demo-set selection.
+
+        Owner directive (GATE D round 2, plan 08-08): the user chose
+        the demo set, so its head options must be visible immediately
+        -- READ-ONLY setloader.load_demo_set with the same arguments as
+        the Apply path (NO materialize, NO validation UI). On success
+        the existing _populate_head_combo populates Random + the set's
+        molecule names verbatim; on load error the combo is kept
+        Random-only and a status note explains why.
+        """
+        records, errors = setloader.load_demo_set(
+            set_id=set_id,
+            stacking_path=setloader.default_stacking_path())
+        if errors:
+            self._populate_head_combo([])
+            self.status_label.setText(
+                'head options unavailable - load errors: '
+                + '; '.join(errors))
+            return
+        self._populate_head_combo(records)
 
     def _on_browse_xtb(self):
         """Open a file dialog to choose the xtb executable."""
@@ -472,6 +530,191 @@ class SetupTab(QtWidgets.QWidget):
         if not restored:
             self.head_combo.setCurrentIndex(0)
         self.head_combo.blockSignals(False)
+
+    def _pause_gameplay(self):
+        """Pause live gameplay before a modal opens (plan 08-08).
+
+        The bottom action row is visible on the Game tab mid-run, so a
+        modal file dialog opened over a live 100 ms tick must pause the
+        game first (PITFALLS.md Pitfall 5). The dialog injects
+        game_pause_request = game_tab.request_auto_pause at
+        construction; getattr-guarded so stripped-down constructions
+        never raise, and the hook itself guards on
+        status == 'playing', so an unconditional call is safe.
+        """
+        pause = getattr(self, 'game_pause_request', None)
+        if pause is not None:
+            pause()
+
+    def _head_candidates(self):
+        """The molecule ids the head combo currently offers.
+
+        'random' excluded -- this is exactly the id list the combo was
+        populated from (the current demo set, or the uploaded records),
+        reused by the Randomize click so randomize_setup never sees a
+        second, invented candidate list.
+        """
+        candidates = []
+        for index in range(self.head_combo.count()):
+            data = self.head_combo.itemData(index)
+            if data is not None and data != 'random':
+                candidates.append(data)
+        return candidates
+
+    # --- Bottom action row handlers (plan 08-08, SETUP-07/08) ------------
+
+    def _on_reset(self):
+        """Reset (SETUP-07): restore the default settings.
+
+        Explicit self._setup = new_setup() assignment (Pitfall A):
+        collect_state shallow-copies self._setup and preserves
+        non-widget keys, so a bare apply_state(new_setup()) would leak
+        the OLD atom_budget/broadening_fwhm into the next collect. The
+        anchor is written the same way collect_state does; apply_state
+        then paints the defaults. The 3D scene stays unchanged until a
+        later Start (the row carries no materialize-without-starting
+        button -- spec.md has no Apply).
+        """
+        self._setup = setup_logic.new_setup()
+        if self._anchor is not None:
+            self._anchor.setup = self._setup
+        self.apply_state(self._setup)
+        self.status_label.setText('ready')
+
+    def _on_randomize(self):
+        """Randomize (SETUP-07, plan 08-08): redraw the full setup.
+
+        Pauses gameplay first, then delegates to the 08-05 pure helper
+        randomize_setup (GATE D d1-option-c-staleness: FULL-setup scope
+        -- head + box preset + win cap + speed + fwhm; consent and
+        environment keys never touched) with the candidate list the
+        head combo was built from. Concrete values only (Pitfall D), so
+        a load_state findData on the head combo succeeds -- the combo
+        is eagerly populated (owner directive), so the randomized head
+        id is always present and displays as itself, never snapped back
+        to Random by apply_state's findData fallback.
+
+        Note the anchor is written with the randomized dict so a later
+        reload / Game-tab Restart reproduces exactly this draw.
+        """
+        self._pause_gameplay()
+        candidates = self._head_candidates()
+        if not candidates:
+            self.status_label.setText(
+                'nothing to randomize - no molecule heads available')
+            return
+        setup = setup_logic.randomize_setup(self.collect_state(), candidates)
+        self._setup = setup
+        if self._anchor is not None:
+            self._anchor.setup = setup
+        self.apply_state(setup)
+        self.status_label.setText(
+            'randomized: head %s, box %s'
+            % (self.head_combo.currentText(), setup['box_preset']))
+
+    def _on_save_setup(self):
+        """Save Setup (SETUP-08, plan 08-08): write the setup to JSON.
+
+        Pauses gameplay first (modal coming). collect_state first so
+        the current widget state is saved; save_setup validates first
+        and raises SetupError on invalid state -> double-surface
+        (QMessageBox + status label, the _on_apply pattern). The save
+        dialog proposes serpentrum_setup.json (GATE D default); cancel
+        is an empty path -> silent return. '.json' is appended when
+        missing (the gui_plot.py extension pattern). Write errors
+        double-surface. Success reports the path on the status label.
+        """
+        self._pause_gameplay()
+        setup = self.collect_state()
+        try:
+            text = setup_logic.save_setup(setup)
+        except setup_logic.SetupError as exc:
+            QtWidgets.QMessageBox.warning(
+                self, 'Cannot save setup', str(exc))
+            self.status_label.setText('cannot save: %s' % (exc,))
+            return
+        path, _filter = QtWidgets.QFileDialog.getSaveFileName(
+            self, 'Save setup', 'serpentrum_setup.json',
+            'serpentrum setup (*.json)')
+        if not path:
+            return  # cancel guard
+        if not path.lower().endswith('.json'):
+            path += '.json'
+        try:
+            with open(path, 'w') as handle:
+                handle.write(text)
+        except (IOError, OSError) as exc:
+            QtWidgets.QMessageBox.warning(
+                self, 'Cannot save setup', 'cannot write: %s' % (exc,))
+            self.status_label.setText('cannot save: %s' % (exc,))
+            return
+        self.status_label.setText('setup saved: %s' % path)
+
+    def _on_load_setup(self):
+        """Load Setup (SETUP-08, plan 08-08): restore a setup from JSON.
+
+        Pauses gameplay first (modal coming). Cancel is a silent
+        return. Flow per 08-RESEARCH-persistence.md Q2: read file
+        (IOError/OSError -> friendly surfaces, no exception leaks) ->
+        load_setup (SetupError -> QMessageBox + status, the _on_apply
+        double-surface; setup_logic stays loud -- tests pin it) ->
+        merge_defaults (absent-key tolerance for backcompat files) ->
+        normalize_loaded (foreign xtb path rewrites to auto-detect with
+        the GATE D default-#1 note) -> validate (errors surface exactly
+        like _on_apply's validate branch) -> apply_state + anchor write
+        (Pitfall E: collect_state concludes so the Game tab's Restart
+        and a plugin reload read the loaded dict). An unknown head id
+        (e.g. upload-derived on a fresh machine) degrades via
+        apply_state's findData fallback with an advisory note.
+        """
+        self._pause_gameplay()
+        path, _filter = QtWidgets.QFileDialog.getOpenFileName(
+            self, 'Load setup', '',
+            'serpentrum setup (*.json);;All Files (*)')
+        if not path:
+            return  # cancel guard
+        try:
+            with open(path, 'r') as handle:
+                text = handle.read()
+        except (IOError, OSError) as exc:
+            QtWidgets.QMessageBox.warning(
+                self, 'Cannot load setup', 'cannot read: %s' % (exc,))
+            self.status_label.setText('cannot load: %s' % (exc,))
+            return
+        try:
+            loaded = setup_logic.load_setup(text)
+        except setup_logic.SetupError as exc:
+            QtWidgets.QMessageBox.warning(
+                self, 'Cannot load setup', str(exc))
+            self.status_label.setText('cannot load: %s' % (exc,))
+            return
+        merged = setup_logic.merge_defaults(loaded)
+        merged, xtb_note = setup_logic.normalize_loaded(
+            merged, xtbenv.validate_binary_path)
+        errors, warnings = setup_logic.validate(merged)
+        if errors:
+            QtWidgets.QMessageBox.warning(
+                self, 'Cannot load setup', '\n'.join(errors))
+            self.status_label.setText('errors: ' + '; '.join(errors))
+            return
+        self._setup = merged
+        self.apply_state(merged)
+        notes = []
+        if xtb_note is not None:
+            notes.append(xtb_note)
+        head = merged.get('head_molecule')
+        if (head and head != 'random'
+                and self.head_combo.findData(head) < 0):
+            notes.append('head molecule not in this set - Random used')
+        if warnings:
+            notes.append('warning: ' + '; '.join(warnings))
+        # Anchor write concludes the load (Pitfall E): collect_state
+        # re-reads the applied widgets and writes self._anchor.setup.
+        self.collect_state()
+        status = 'setup loaded: %s' % path
+        if notes:
+            status += ' (' + '; '.join(notes) + ')'
+        self.status_label.setText(status)
 
     # --- Apply / Cleanup handlers ----------------------------------------
 
