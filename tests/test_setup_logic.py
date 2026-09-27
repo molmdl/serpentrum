@@ -564,6 +564,105 @@ class TestRandomizeHead(unittest.TestCase):
         self.assertIn(pick, others)
 
 
+class TestRandomizeSetup(unittest.TestCase):
+    """randomize_setup (plan 08-05, SETUP-08 pure half of the Phase-8
+    Randomize button). Implements the GATE D verdict recorded in
+    08-01-SUMMARY.md: d1-option-c-staleness (owner, 2026-09-28) — scope =
+    FULL setup: randomize head_molecule (via the existing randomize_head
+    seam) + box_preset + win_cap_molecules + speed + broadening_fwhm,
+    writing CONCRETE reproducible values (never 'random' back into the
+    dict — a saved file must reproduce what the user saw, Pitfall D).
+
+    Contract: seed-deterministic via private random.Random (never the
+    global random module); NEVER touches generic_stack_consent (safety
+    opt-in); schema_version / demo_set / atom_budget / xtb_path carried
+    through UNCHANGED (randomize does not invent an xtb path or change
+    the set); unknown extra input keys preserved (module-wide
+    merge/overlay semantics); result always validate()-clean.
+    """
+
+    CANDIDATES = ['benzene', 'naphthalene', 'anthracene']
+
+    def test_same_seed_identical_full_dicts(self):
+        first = setup_logic.randomize_setup(new_setup(), self.CANDIDATES,
+                                            seed=42)
+        second = setup_logic.randomize_setup(new_setup(), self.CANDIDATES,
+                                             seed=42)
+        self.assertEqual(first, second)
+
+    def test_concrete_values_never_random(self):
+        result = setup_logic.randomize_setup(new_setup(), self.CANDIDATES,
+                                             seed=7)
+        # Pitfall D: the head is a CONCRETE candidate id, never 'random'.
+        self.assertIn(result['head_molecule'], self.CANDIDATES)
+        self.assertNotEqual(result['head_molecule'], 'random')
+        # box_preset is a known preset.
+        self.assertIn(result['box_preset'], BOX_PRESETS)
+        # win_cap_molecules is within validate's legal range (1..20).
+        cap = result['win_cap_molecules']
+        self.assertTrue(isinstance(cap, (int, float)))
+        self.assertTrue(1 <= cap <= 20)
+        # speed equals one of SPEED_TIERS' VALUES (a concrete tier value,
+        # not a synthesized number).
+        self.assertIn(result['speed'], [v for _n, v in SPEED_TIERS])
+        # broadening_fwhm is within validate's legal range (> 0).
+        fwhm = result['broadening_fwhm']
+        self.assertTrue(isinstance(fwhm, (int, float)))
+        self.assertTrue(fwhm > 0)
+
+    def test_consent_key_never_touched(self):
+        on = _mutated(generic_stack_consent=True)
+        off = _mutated(generic_stack_consent=False)
+        self.assertTrue(setup_logic.randomize_setup(on, self.CANDIDATES,
+                                                    seed=3)
+                        ['generic_stack_consent'])
+        self.assertFalse(setup_logic.randomize_setup(off, self.CANDIDATES,
+                                                     seed=3)
+                         ['generic_stack_consent'])
+
+    def test_result_validates_clean_for_a_spread_of_seeds(self):
+        for seed in range(10):
+            result = setup_logic.randomize_setup(new_setup(),
+                                                 self.CANDIDATES,
+                                                 seed=seed)
+            errors, _warnings = validate(result)
+            self.assertEqual(errors, [],
+                             'seed %d produced validate errors: %s'
+                             % (seed, errors))
+
+    def test_untouched_keys_carry_through_unchanged(self):
+        base = _mutated(schema_version=SCHEMA_VERSION,
+                        demo_set='set_a',
+                        atom_budget=250,
+                        xtb_path='/sentinel/xtb.exe')
+        result = setup_logic.randomize_setup(base, self.CANDIDATES, seed=5)
+        for key in ('schema_version', 'demo_set', 'atom_budget',
+                    'xtb_path'):
+            self.assertEqual(result[key], base[key],
+                             '%s must carry through unchanged' % (key,))
+
+    def test_unknown_extra_input_keys_preserved(self):
+        base = new_setup()
+        base['hand_edited_extra'] = 'survives'
+        result = setup_logic.randomize_setup(base, self.CANDIDATES, seed=9)
+        self.assertEqual(result['hand_edited_extra'], 'survives')
+
+    def test_seed_none_entropy_seeded_no_exception(self):
+        # seed=None draws on entropy: two calls MAY differ; over a few
+        # calls at least one key outcome should differ (loose statistical
+        # pin — keeps the entropy path exercised without flakiness).
+        seen = [setup_logic.randomize_setup(new_setup(), self.CANDIDATES,
+                                            seed=None)
+                for _i in range(5)]
+        self.assertTrue(any(r != seen[0] for r in seen[1:]))
+
+    def test_input_dict_not_mutated(self):
+        base = new_setup()
+        snapshot = dict(base)
+        setup_logic.randomize_setup(base, self.CANDIDATES, seed=1)
+        self.assertEqual(base, snapshot)
+
+
 class XtbPathUnificationTest(unittest.TestCase):
     """Pin the Phase-3 unification (03-03): setup_logic._xtb_path_problems
     delegates to xtbenv.validate_binary_path, so the two must agree on
