@@ -1,6 +1,6 @@
 """serpentrum.gui_spectra — the Spectra tab's live control surface (Phase 7,
-plans 07-07/07-08; SPECTRA-01 tab surface, SPECTRA-03 on-screen plot,
-SPECTRA-04 streaming log).
+plans 07-07..07-09; SPECTRA-01 tab surface, SPECTRA-03 on-screen plot,
+SPECTRA-04 streaming log, SPECTRA-05 frequency table + mode vectors).
 
 SpectraTab(anchor_state, parent) replaces the 06-09 placeholder page: a
 word-wrapped status label, a bounded streaming log panel, the embedded
@@ -40,13 +40,11 @@ late/reloading tab calls replay_log(controller.log_tail()) BEFORE the
 dialog connects log_line, so lines emitted before the connect are never
 lost (the reload early-line hole, closed by 07-04's accessor).
 
-Layout indices are PINNED for the later plans (07-RESEARCH Q5/Q6; the
-contract lives in the 07-07 plan): today (post-07-08)
+Layout indices are PINNED (07-RESEARCH Q5/Q6; the contract lives in
+the 07-07 plan). FINAL order (07-09 inserted the table at index 2):
     [0] = status label, [1] = log panel (stretch 2),
-    [2] = plot panel (stretch 3), [3] = button row.
-07-09 inserts the table at index 2 (stretch 2), yielding the final
-order status[0] / log[1] / table[2] / plot[3] / buttons[4]. Insert at
-the pinned index ONLY — never append.
+    [2] = frequency table (stretch 2, SPECTRA-05),
+    [3] = plot panel (stretch 3), [4] = button row.
 
 GUI purity class (tools/check_purity.py GUI_MODULES — the inert-first
 entry landed in plan 07-05): ``pymol.Qt`` ONLY (Qt reaches this code
@@ -63,9 +61,13 @@ from pymol.Qt import QtWidgets, QtCore
 
 # Pure siblings: the frozen verdict-line vocabulary (never re-grepped
 # from the log — the 'abnormal termination' substring trap stays dead),
-# the parse/Scene/live-fwhm seams (07-08), and the frozen status
-# constants (06-02 — imported, never re-pinned).
-from . import plot_logic, setup_logic, spectra, spectra_ui, xtb_run
+# the parse/Scene/live-fwhm seams (07-08), the frozen CGO arrow builder
+# (07-09 consumes at scale=1.0), and the frozen status constants
+# (06-02 — imported, never re-pinned). pymol_bridge is the BRIDGE seam
+# for the viewer overlay (GUI -> BRIDGE import is the 06-09 precedent,
+# check_purity.py:95-98).
+from . import (cgo_build, plot_logic, pymol_bridge, setup_logic, spectra,
+               spectra_ui, xtb_run)
 from .gui_plot import SpectraPlotPanel
 
 
@@ -74,19 +76,23 @@ class SpectraTab(QtWidgets.QWidget):
 
     Built by PluginDialog as page 2 (plan 07-07; the 06-09 placeholder
     page is gone). Owns: the status label, the bounded log panel, the
-    embedded SpectraPlotPanel and its record->Scene feed (07-08 —
-    SPECTRA-03 on-screen plot feed complete), the contextual run button
-    and its label logic, and the runner-slot display updates (started /
+    SPECTRA-05 frequency table (07-09 — every parsed mode via the
+    SHARED spectra_ui.table_rows/freq_label formatters; row-click
+    mode vectors land with this same plan's second task), the embedded
+    SpectraPlotPanel and its record->Scene feed (07-08 — SPECTRA-03
+    on-screen plot feed complete), the contextual run button and its
+    label logic, and the runner-slot display updates (started /
     log_line / run_finished). The dialog owns: the launch pipeline, the
     connect-once guard, the Get-Spectra re-enable and the game info-box
     feed (cross-tab orchestration the tab must not reach up for —
-    model-A). Next: 07-09's table + mode vectors, reusing the
-    ``self._spectrum`` single-source parse.
+    model-A). The table and the plot render the SAME
+    ``self._spectrum`` single-source parse (07-08) — index desync is
+    structurally impossible (07-RESEARCH-spectra-seam.md Q4d).
 
-    Layout (PINNED — see the module docstring's insert contract):
-    [0] status label, [1] log panel (stretch 2), [2] plot panel
-    (stretch 3), [3] button row (right-aligned). 07-09 inserts the
-    table at index 2.
+    Layout (PINNED — see the module docstring; FINAL order):
+    [0] status label, [1] log panel (stretch 2), [2] frequency table
+    (stretch 2), [3] plot panel (stretch 3), [4] button row
+    (right-aligned).
     """
 
     # Model-A return path (the gui_game.spectra_requested template):
@@ -102,6 +108,11 @@ class SpectraTab(QtWidgets.QWidget):
         # table/vectors consume it) plus the vibspectrum-fallback note.
         self._spectrum = None
         self._spectrum_note = None
+        # 07-09 once-per-record overlay guards (viewer side, Task 2):
+        # srp_xtbopt loads once per snake_id; the camera frames once
+        # per snake_id (pitfall 14 — never per table click).
+        self._xtbopt_snake_id = None
+        self._zoomed_snake_id = None
         self._build_widgets()
         self._build_layout()
 
@@ -117,6 +128,22 @@ class SpectraTab(QtWidgets.QWidget):
         self.log_panel = QtWidgets.QPlainTextEdit(self)
         self.log_panel.setReadOnly(True)
         self.log_panel.setMaximumBlockCount(500)
+        # SPECTRA-05 frequency table (07-09): one read-only row per
+        # parsed mode, SelectRows, click -> mode vectors (Task 2).
+        # Populated ONLY from self._spectrum via spectra_ui.table_rows
+        # (single-source parse — never re-derived here).
+        self.table = QtWidgets.QTableWidget(0, 3, self)
+        self.table.setHorizontalHeaderLabels(
+            ('mode', 'frequency (cm-1)', 'IR intensity (km/mol)'))
+        self.table.setEditTriggers(
+            QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.table.setSelectionBehavior(
+            QtWidgets.QAbstractItemView.SelectRows)
+        self.table.setSelectionMode(
+            QtWidgets.QAbstractItemView.SingleSelection)
+        self.table.verticalHeader().setVisible(False)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.cellClicked.connect(self._on_table_cell_clicked)
         # 07-05/07-06 human-approved panel, embedded AS-IS (approved
         # look = its defaults). Data-in only: the tab feeds Scenes via
         # set_scene; the panel's own adjustments (unit/color/direction/
@@ -130,19 +157,16 @@ class SpectraTab(QtWidgets.QWidget):
         self.run_btn.clicked.connect(self._on_run_button)
 
     def _build_layout(self):
-        """[0] status, [1] log (stretch 2), [2] plot panel (stretch 3),
-        [3] right-aligned button row.
-
-        INSERT CONTRACT: 07-09 inserts the table at index 2 (stretch 2)
-        -> plot shifts to 3, buttons to 4 -> final order status / log /
-        table / plot / buttons. Insert at the pinned index ONLY — never
-        append.
+        """FINAL pinned order: [0] status, [1] log (stretch 2),
+        [2] frequency table (stretch 2), [3] plot panel (stretch 3),
+        [4] right-aligned button row.
         """
         layout = QtWidgets.QVBoxLayout(self)
         layout.addWidget(self.status_label)          # [0]
         layout.addWidget(self.log_panel, 2)          # [1] stretch 2
-        layout.addWidget(self.plot_panel, 3)         # [2] stretch 3
-        btn_row = QtWidgets.QHBoxLayout()            # [3]
+        layout.addWidget(self.table, 2)              # [2] stretch 2
+        layout.addWidget(self.plot_panel, 3)         # [3] stretch 3
+        btn_row = QtWidgets.QHBoxLayout()            # [4]
         btn_row.addStretch(1)
         btn_row.addWidget(self.run_btn)
         layout.addLayout(btn_row)
@@ -247,6 +271,7 @@ class SpectraTab(QtWidgets.QWidget):
             self._spectrum = None
             self._spectrum_note = None
             self.plot_panel.set_scene(None)
+            self._populate_table()
 
     def _populate_spectrum(self, record):
         """Parse the record's spectrum artifact and put it on the plot.
@@ -282,10 +307,12 @@ class SpectraTab(QtWidgets.QWidget):
             else:
                 if not (vibs_path and os.path.isfile(vibs_path)):
                     # Degenerate/failed record: verdict + problems are
-                    # already in the status; the plot stays empty.
+                    # already in the status; the plot and table stay
+                    # empty.
                     self._spectrum = None
                     self._spectrum_note = None
                     self.plot_panel.set_scene(None)
+                    self._populate_table()
                     return
                 spectrum = spectra.parse(vibs_path)
                 spectrum = spectra.Spectrum(
@@ -297,6 +324,7 @@ class SpectraTab(QtWidgets.QWidget):
             self._spectrum = None
             self._spectrum_note = None
             self.plot_panel.set_scene(None)
+            self._populate_table()
             self.set_status_line('spectrum could not be read: %s' % exc)
             return
         setup = getattr(self._anchor, 'setup', None)
@@ -308,11 +336,49 @@ class SpectraTab(QtWidgets.QWidget):
         # Single-source parse: 07-09's table/vectors reuse THIS object.
         self._spectrum = spectrum
         self._spectrum_note = source_note
+        # The SAME parse drives the SPECTRA-05 table (07-09).
+        self._populate_table()
         if source_note:
             self.set_status_line(source_note)
         caption = plot_logic.mode_caption(scene)
         if caption:
             self.append_log_line(caption)
+
+    # --- SPECTRA-05 frequency table + mode vectors (07-09) -------------
+
+    def _populate_table(self):
+        """Rebuild the frequency table from the SINGLE parse.
+
+        Row r <=> self._spectrum.modes[r] — the table reads the one
+        Spectrum 07-08 stored on the tab (single-source parse from the
+        record; NEVER re-derived, re-parsed, or re-merged here, so an
+        index desync between table rows and mode vectors is
+        structurally impossible — 07-RESEARCH-spectra-seam.md Q4d).
+        All labels come from the SHARED spectra_ui.table_rows (the
+        single imaginary formatter freq_label: negatives as '-31.9i',
+        ASCII hyphen-minus; intensities '%.4g' so zero-intensity rows
+        stay visible AND distinct from tiny-but-nonzero — SPECTRA-05).
+        A None spectrum (failed/cancelled/idle/corrupt record) clears
+        the table — rows are never fabricated (Phase-6 SC3).
+        """
+        self.table.setRowCount(0)
+        if self._spectrum is None:
+            return
+        rows = spectra_ui.table_rows(self._spectrum)
+        self.table.setRowCount(len(rows))
+        flags = QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
+        for r, (idx, flabel, ilabel) in enumerate(rows):
+            for column, text in enumerate((str(idx), flabel, ilabel)):
+                item = QtWidgets.QTableWidgetItem(text)
+                item.setFlags(flags)  # read-only, never editable
+                self.table.setItem(r, column, item)
+        self.table.resizeColumnsToContents()
+
+    def _on_table_cell_clicked(self, row, column):
+        """Table-click stub — the mode-vector draw lands next (07-09
+        Task 2: mode_arrow_primitives -> cgo_build.mode_arrows ->
+        the pymol_bridge overlay on srp_xtbopt)."""
+        pass
 
     # --- the contextual button -----------------------------------------
 
