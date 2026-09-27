@@ -20,10 +20,13 @@ US government on NCBI sites is within the public domain; acknowledgment
 requested (https://www.ncbi.nlm.nih.gov/home/about/policies/, verified
 2026-09-07). PubChem-specific terms apply to PubChem-hosted content.
 
-NOTE: The PubChem 3D SDF files themselves are NOT part of this plan — they
-ship in a later phase (Phase 8, the molecule-geometry/data-prep track). The
-CIDs and their verification status are recorded here so the attribution is
-complete for the whole Demo Set A.
+NOTE: The five PubChem 3D SDF files (CIDs 241, 931, 8418, 995, 7095) shipped
+with the repo: human-placed and builder-verified in Phase 3 (plan 03-05,
+2026-09-11). serpentrum/data/manifest.json is generated from the parsed SDF
+reality by tools/build_demo_manifest.py, which aborts on any mismatch
+(atom_count / charge / ring_count / ring_atoms vs the manifest); the shipped
+manifest is byte-reproducible. The CIDs and their verification status are
+recorded here so the attribution is complete for the whole Demo Set A.
 
 ### Benzene — CID 241  [VERIFIED]
 - Formula: C6H6. 3D SDF: 12 atoms, V2000 3D record (OEChem).
@@ -41,7 +44,10 @@ complete for the whole Demo Set A.
 Public domain (US Government, NCBI policy; acknowledgment requested). Note:
 the PubChem-specific documentation page could not be fetched this session
 (404); the NCBI-wide policy page is the verified source for the license
-statement. Human approval covers this license note.
+statement. Human approval covers this license note. Re-verified live
+2026-09-27 (NCBI policies page reachable, public-domain statement verbatim;
+PubChem-specific docs pages still 404 — evidence in
+.planning/phases/08-demo-data-docs-release-audit/08-RESEARCH-data.md).
 
 ## 2. π-stack interaction rule + measured distances (literature + COD)
 
@@ -106,9 +112,10 @@ statement. Human approval covers this license note.
   domain by the contributors"). https://www.crystallography.net/cod/4003564.cif
 - Source paper: Liu, K.; Lei, Y.; Fu, H. "A General Synthetic Strategy to a
   Library of Luminescent All-Organic Core–Shell Microstructures."
-  Chemistry of Materials, 2020. DOI: 10.1021/acs.chemmater.0c01184
-  (DOI read from the CIF's _journal_paper_doi; vol/pages to be added at
-  data-prep from the DOI record.)
+  Chemistry of Materials 2020, 32 (12), 5162–5172.
+  DOI: 10.1021/acs.chemmater.0c01184
+  (DOI read from the CIF's _journal_paper_doi; vol/pages verified via
+  api.crossref.org/works/10.1021/acs.chemmater.0c01184, 2026-09-27.)
 - Measured (centroid–centroid, closest six-ring pair, phenanthrene···TCNB
   stack): 3.555 Å; interplanar 3.345 Å; lateral offset 1.204 Å; plane angle
   2.7°. Measurement script + commands recorded in the research document.
