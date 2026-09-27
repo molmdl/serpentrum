@@ -413,6 +413,50 @@ def randomize_setup(setup, candidates, seed=None):
     return result
 
 
+# Friendly note returned by normalize_loaded when a loaded xtb_path does
+# not exist on this machine (GATE D default #1 wording, owner-confirmed
+# 2026-09-28 in 08-01-SUMMARY.md; ASCII only). The GUI surfaces it in the
+# status line; pinned byte-exact by TestNormalizeLoaded.
+XTB_PATH_NORMALIZED_NOTE = ('xtb path not found on this machine - '
+                            'using auto-detect')
+
+
+def normalize_loaded(merged, path_problems_fn):
+    """Normalize a loaded+merged setup dict for machine-portable keys.
+
+    Plan 08-05 (Phase 8, SETUP-08): the xtb-path load policy (GATE D
+    default #1, CONFIRMED 08-01-SUMMARY.md — save as-is, normalize ON
+    LOAD). ``xtb_path`` is the one environment-specific setup key: a
+    path saved on the educator's machine may not exist on the student's.
+    Policy:
+
+      - ``xtb_path`` is None          -> untouched, note None (the DI fn
+                                         is NOT consulted)
+      - ``path_problems_fn`` returns  -> untouched, note None
+        an empty list (path valid here)
+      - ``path_problems_fn`` returns  -> ``xtb_path`` rewritten to None
+        problems (foreign path)         (auto-detect) + the exact
+                                          XTB_PATH_NORMALIZED_NOTE
+
+    Returns the tuple ``(merged, note)`` — a fresh dict (the input is
+    never mutated in place) and the note string (or None). PURE: the
+    filesystem judgment arrives ONLY via the injected
+    ``path_problems_fn`` (the GUI passes an
+    ``xtbenv.validate_binary_path``-backed callable at call time,
+    mirroring the ``_xtb_path_problems`` delegation above); it is called
+    exactly once, with the loaded path, and only when there is one.
+    """
+    result = dict(merged)
+    path = result.get('xtb_path')
+    if path is None:
+        return result, None
+    problems = path_problems_fn(path)
+    if not problems:
+        return result, None
+    result['xtb_path'] = None
+    return result, XTB_PATH_NORMALIZED_NOTE
+
+
 def randomize_head(candidates, seed):
     """Choose a head molecule id from candidates via a PRIVATE seeded RNG.
 
