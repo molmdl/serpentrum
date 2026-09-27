@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from serpentrum import molfile  # noqa: E402
 from serpentrum import molecule_data  # noqa: E402
+from serpentrum import setloader  # noqa: E402
 
 # serpentrum/data/ sits next to the serpentrum/ package directory.
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -34,6 +35,10 @@ _SDF_NAMES = ['benzene.sdf', 'naphthalene.sdf', 'anthracene.sdf',
 # Skip cleanly pre-checkpoint: all 5 SDFs + manifest.json must exist.
 HAS_DATA = all(os.path.isfile(os.path.join(_DATA_DIR, f))
                for f in _SDF_NAMES + ['manifest.json'])
+
+# The stacking dataset the production dialog passes to load_demo_set.
+_HAS_STACKING = HAS_DATA and os.path.isfile(
+    os.path.join(_DATA_DIR, 'stacking_pi_stack.json'))
 
 # Expected cyclomatic ring counts by molecule id (verified arithmetic,
 # 03-RESEARCH-upload-gate.md sec 2.2: mu = E - V + C).
@@ -155,6 +160,62 @@ class TestDemoSetA(unittest.TestCase):
         for mol_id, mol in self.molecules.items():
             self.assertEqual(mol['set'], 'set_a',
                              '%s: set != set_a' % mol_id)
+
+
+@unittest.skipUnless(_HAS_STACKING,
+                     'demo Set A SDFs + manifest + stacking dataset not '
+                     'yet provided (checkpoint 03-05)')
+class TestLoadDemoSetEndToEnd(unittest.TestCase):
+    """DATA-01 proof (08-02): the shipped demo pack loads end-to-end
+    through the REAL production entry point --
+    setloader.load_demo_set(data_dir, set_id='set_a', stacking_path=...)
+    -- exactly as the plugin dialog calls it.
+
+    Asserts zero load errors, exactly 5 records, every record carrying a
+    stacking entry (has_stack_entry), and every record carrying a
+    canonical 6-atom stack_ring (05-01 ring_cycle shim: biphenyl yields
+    ONE planar 6-ring in ring order).
+
+    Regression-proof over EXISTING, already-verified behavior (seam
+    green since 03-05, re-verified 2026-09-27 in 08-RESEARCH-data.md).
+    A failure here is a real regression finding, not a test bug.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        """One production load shared by every assertion."""
+        cls.records, cls.errors = setloader.load_demo_set(
+            data_dir=_DATA_DIR,
+            set_id='set_a',
+            stacking_path=os.path.join(_DATA_DIR,
+                                       'stacking_pi_stack.json'))
+
+    def test_load_has_zero_errors(self):
+        """load_demo_set produced no error strings."""
+        self.assertEqual(self.errors, [],
+                         'load_demo_set returned errors: %s' % self.errors)
+
+    def test_load_yields_all_five_molecules(self):
+        """Exactly the 5 Demo Set A molecules came back."""
+        self.assertEqual(len(self.records), 5,
+                         'expected 5 records, got %d' % len(self.records))
+
+    def test_every_record_has_stack_entry(self):
+        """Every molecule found its 'set_a' entry in the stacking
+        dataset the production call passes in."""
+        for record in self.records:
+            self.assertTrue(record['has_stack_entry'],
+                            '%s: has_stack_entry is False' % record['id'])
+
+    def test_every_record_stack_ring_has_six_atoms(self):
+        """Every molecule carries a canonical 6-atom stack_ring (the
+        single planar aromatic 6-ring in ring order)."""
+        for record in self.records:
+            self.assertIn('stack_ring', record,
+                          '%s: no stack_ring computed' % record['id'])
+            self.assertEqual(len(record['stack_ring']), 6,
+                             '%s: stack_ring has %d atoms, expected 6'
+                             % (record['id'], len(record['stack_ring'])))
 
 
 if __name__ == '__main__':
