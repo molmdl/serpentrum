@@ -47,6 +47,7 @@ python3.6 syntax (%-formatting).
 from pymol.Qt import QtWidgets, QtCore
 
 from . import generic_stack
+from . import help_text
 from . import hud_logic
 from . import molecule_data
 from . import molfile
@@ -104,6 +105,11 @@ class SetupTab(QtWidgets.QWidget):
         source = self.demo_combo.currentData()
         if source != _UPLOAD_SENTINEL:
             self._eager_populate_demo(source)
+        # DOCS-03 (plan 08-09): the initial status line is the
+        # before_apply hint - re-rendered HERE, after apply_state's
+        # _refresh_status cascade (which repaints 'ready'), so the
+        # user-visible first status IS the Start-only hint.
+        self.status_label.setText(help_text.SETUP_HINTS['before_apply'])
 
     # --- widget construction ----------------------------------------------
 
@@ -167,7 +173,10 @@ class SetupTab(QtWidgets.QWidget):
         self.generic_stack_note_label.setWordWrap(True)
 
         # --- Status label ---
-        self.status_label = QtWidgets.QLabel('ready', self)
+        # DOCS-03 (plan 08-09): the pre-apply status is the Start-only
+        # before_apply hint (help_text single source, 08-06).
+        self.status_label = QtWidgets.QLabel(
+            help_text.SETUP_HINTS['before_apply'], self)
         self.status_label.setWordWrap(True)
 
         # NO buttons here (plan 08-08): the Phase-3 temporary row is
@@ -577,12 +586,15 @@ class SetupTab(QtWidgets.QWidget):
         then paints the defaults. The 3D scene stays unchanged until a
         later Start (the row carries no materialize-without-starting
         button -- spec.md has no Apply).
+
+        DOCS-03 (plan 08-09): the post-Reset status is the Start-only
+        before_apply hint (the user is back at choose-settings state).
         """
         self._setup = setup_logic.new_setup()
         if self._anchor is not None:
             self._anchor.setup = self._setup
         self.apply_state(self._setup)
-        self.status_label.setText('ready')
+        self.status_label.setText(help_text.SETUP_HINTS['before_apply'])
 
     def _on_randomize(self):
         """Randomize (SETUP-07, plan 08-08): redraw the full setup.
@@ -870,8 +882,14 @@ class SetupTab(QtWidgets.QWidget):
         parts = ['Box + head materialized']
         if stacking_note is not None:
             parts.append(stacking_note)
-        if setup.get('head_molecule') == 'random':
-            parts.append('head will be randomized at game start')
+        if setup.get('head_molecule') == 'random' and records:
+            # GATE D d1-option-c-staleness (plan 08-09 honesty fix):
+            # 'random' resolves DETERMINISTICALLY to records[0] at Apply
+            # (pymol_bridge._select_head_record) - name the real head.
+            # The pre-08-09 clause claiming a game-start randomization
+            # was FALSE (no such randomization exists) and is removed;
+            # no new randomization claim is introduced here.
+            parts.append('head: %s' % records[0]['name'])
         # Absorbed C2 soft warning (debug session 05-upload-only,
         # resolved 2026-09-21; absorbed Phase 5.2, plan 5.2-05): SOFT
         # status clause (HARD block REJECTED -- demo mode is
@@ -892,6 +910,11 @@ class SetupTab(QtWidgets.QWidget):
                 'xtb not found - set a manual path or add xtb to PATH')
         if warnings:
             parts.append('warning: ' + '; '.join(warnings))
+        # DOCS-03 (plan 08-09): the success status ends with the
+        # Start-only next-action clause (help_text single source, 08-06)
+        # - appended LAST like the absorbed C2 clause above. Failure
+        # (modal) paths above show their error status instead - no hint.
+        parts.append(help_text.SETUP_HINTS['after_apply'])
         self.status_label.setText('; '.join(parts))
         # Write the dict back to the anchor (collect_state already did,
         # but be explicit after a successful apply).
