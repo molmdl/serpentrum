@@ -1,20 +1,20 @@
-"""serpentrum plugin dialog shell (3-tab dialog; Setup + Game live).
+"""serpentrum plugin dialog shell (3-tab dialog; all three pages live).
 
 Module level imports ONLY pymol.Qt -- the purity checker's GUI allowlist
-is exactly this module plus gui_setup and gui_game. Direct PyQt5
-imports are banned project-wide; Qt reaches this code exclusively through
-pymol.Qt.
+covers this module plus gui_setup, gui_game and gui_spectra (the last
+registered inert in 07-05, made live here in 07-07). Direct PyQt5
+imports are banned project-wide; Qt reaches this code exclusively
+through pymol.Qt.
 
 Pages 0-1 (Setup, Game) are live (SetupTab from 03-07; GameTab from
-Phase 4); page 2 (Spectra) is the Phase-6 placeholder: a status label,
-a bounded streaming log area and a contextual Cancel/Run-again button
-wired to the anchored XtbRunController's signals (plan 06-09) -- Phase
-7 replaces the page CONTENT, the launch + signal contracts survive.
-The real bottom button row lands in Phase 8 (SETUP-07).
+Phase 4); page 2 (Spectra) is the live SpectraTab from gui_spectra
+(plan 07-07 -- the 06-09 placeholder page is gone; the launch + runner
+signal contracts survive intact). Plans 07-08/07-09 add the plot panel
+and the frequency table at SpectraTab's PINNED layout indices. The
+real bottom button row lands in Phase 8 (SETUP-07).
 """
 import tempfile
 
-from pymol.Qt import QtCore
 from pymol.Qt import QtWidgets
 
 from . import budget_guard
@@ -25,19 +25,7 @@ from . import xtbenv
 from . import xyzio
 from .gui_setup import SetupTab
 from .gui_game import GameTab
-
-# Generic placeholder tabs (none today: the Spectra page moved into
-# _build_spectra_placeholder, plan 06-09). Future placeholder pages may
-# be added back to this loop.
-_TAB_DEFS = [
-]
-
-# ~200-line bound on the streaming log area (the document's block cap
-# trims the oldest blocks on append).
-_LOG_MAX_BLOCKS = 200
-# Soft bound on the small status label so repeated launches can never
-# grow it unboundedly (oldest lines dropped first).
-_STATUS_MAX_LINES = 12
+from .gui_spectra import SpectraTab
 
 # The one refuse line shared by the launch pipeline and the Run-again
 # button when no completed snake exists yet.
@@ -52,9 +40,21 @@ class PluginDialog(QtWidgets.QDialog):
 
     Registration contract: page 0 (Setup) is the live SetupTab from
     gui_setup; page 1 (Game) is the live GameTab from gui_game; page 2
-    (Spectra) is built by _build_spectra_placeholder (plan 06-09).
+    (Spectra) is the live SpectraTab from gui_spectra (plan 07-07).
     Each page is added with exactly one addTab(page, label) call inside
     __init__.
+
+    Spectra orchestration (plan 07-07, model-A / locked decision 9):
+    the dialog OWNS all cross-tab work -- the launch pipeline
+    (_on_spectra_requested), the dialog-scoped connect-once guard over
+    the anchored controller's signals, the Get-Spectra re-enable on the
+    terminal branch, and the game info-box feed (game_tab.log_external).
+    The tab OWNS its three surfaces (status label, streaming log panel,
+    contextual run button) and NEVER reaches up: its Run-again leg is
+    the emit-only run_again_requested signal, connected HERE to the
+    full launch pipeline (06-09's pinned Run-again semantics). Plans
+    07-08/07-09 add the plot panel and table at the tab's pinned layout
+    indices; the modeless + model-A contracts are unchanged.
 
     Switching contract: self.tabs (QTabWidget) is the documented
     handle -- setCurrentWidget(page) / setCurrentIndex(i); page order
@@ -93,26 +93,32 @@ class PluginDialog(QtWidgets.QDialog):
         # Page 1: Game (live GameTab from Phase 4, plan 04-05).
         self.game_tab = GameTab(anchor_state, self.tabs)
         self.tabs.addTab(self.game_tab, 'Game')
-        # Page 2: Spectra placeholder (Phase-6 control surface, plan
-        # 06-09; Phase 7 replaces the page CONTENT, not the contract).
-        self.tabs.addTab(self._build_spectra_placeholder(self.tabs),
-                         'Spectra')
-        # Any further generic placeholder pages (none today).
-        for _key, label, text in _TAB_DEFS:
-            page = QtWidgets.QWidget(self.tabs)
-            page_lay = QtWidgets.QVBoxLayout(page)
-            hint = QtWidgets.QLabel(text, page)
-            hint.setWordWrap(True)
-            page_lay.addStretch(1)
-            page_lay.addWidget(hint)
-            page_lay.addStretch(1)
-            self.tabs.addTab(page, label)
+        # Page 2: Spectra (live SpectraTab from gui_spectra, plan 07-07;
+        # the 06-09 placeholder page is gone - the launch + signal
+        # contracts survive). Table/plot surfaces arrive in 07-08/07-09
+        # at the tab's pinned layout indices.
+        self.spectra_tab = SpectraTab(anchor_state, self.tabs)
+        self.tabs.addTab(self.spectra_tab, 'Spectra')
         # Start flow (GAME-01, HUD research Q1 model A): SetupTab emits
         # start_requested(setup); this dialog owns the tab switch.
         setup_page.start_requested.connect(self._on_start_requested)
         # Get Spectra flow (GAME-09, plan 05-15): same model-A pattern -
         # GameTab emits spectra_requested; this dialog owns the switch.
         self.game_tab.spectra_requested.connect(self._on_spectra_requested)
+        # Run-again flow (plan 07-07): the tab's button emits only; the
+        # dialog re-enters the FULL launch pipeline (identical to a Get
+        # Spectra press - 06-09's pinned Run-again semantics).
+        self.spectra_tab.run_again_requested.connect(
+            self._on_spectra_requested)
+        # Reload recovery (plan 07-07): a live or terminal controller
+        # from before this dialog was built renders immediately - the
+        # connect-once path replays the controller's log tail BEFORE
+        # wiring log_line, then reflect_run_state draws the surface.
+        runner = (getattr(anchor_state, 'spectra_runner', None)
+                  if anchor_state is not None else None)
+        if runner is not None:
+            self._connect_runner(runner)
+            self.spectra_tab.reflect_run_state()
         buttons = QtWidgets.QHBoxLayout()   # Phase 8: 6 right-aligned buttons
         buttons.addStretch(1)               # reserved row - no buttons in Phase 1
         outer = QtWidgets.QVBoxLayout(self)
@@ -136,8 +142,8 @@ class PluginDialog(QtWidgets.QDialog):
         launch pipeline (plan 06-09, SPECTRA-02/06).
 
         The dialog owns the QTabWidget - GameTab never reaches its
-        parent (locked decision 9 / model-A). setCurrentIndex(2) stays
-        FIRST (the tab switch is GAME-09/Phase-7 UX) so the user
+        parent (locked decision 9 / model-A). The Spectra-tab switch
+        stays FIRST (the switch is GAME-09/Phase-7 UX) so the user
         watches the status area as the pipeline speaks. The
         spectra_requested signal contract is UNCHANGED - the extension
         lives entirely in this SLOT, never in GameTab.
@@ -254,63 +260,19 @@ class PluginDialog(QtWidgets.QDialog):
                     btn.setEnabled(True)
             self._log_spectra_line('xtb run did not start (see log)')
 
-    def _build_spectra_placeholder(self, parent):
-        """Phase-6 Spectra placeholder page (plan 06-09, EQ-ux-1).
-
-        Temporary control surface (Phase 7 replaces the page CONTENT;
-        the launch + runner-signal contracts survive):
-
-        - self.spectra_status: word-wrapped status label. Initial text
-          is the old placeholder hint plus the how-to line ('complete a
-          game, then press Get Spectra on the Game tab'); launch/
-          verdict one-liners append here via _log_spectra_line, capped
-          at _STATUS_MAX_LINES.
-        - self.spectra_log: read-only streaming area for the runner's
-          log_line events, bounded to _LOG_MAX_BLOCKS blocks (oldest
-          trimmed by the document cap).
-        - self.spectra_run_btn: contextual button -- 'Cancel xtb run'
-          while a run is in flight, 'Run again' after any terminal
-          branch; disabled until the first launch ('no xtb run yet').
-
-        Layout: status on top, log stretching, button right-aligned
-        under the log. NOTHING is added to the reserved bottom button
-        row (Phase 8, SETUP-07).
-        """
-        page = QtWidgets.QWidget(parent)
-        lay = QtWidgets.QVBoxLayout(page)
-        self.spectra_status = QtWidgets.QLabel(
-            'Spectra tab - xtb run, broadened IR spectrum and frequency '
-            'table arrive in Phases 6-7. Complete a game, then press '
-            'Get Spectra on the Game tab.', page)
-        self.spectra_status.setWordWrap(True)
-        self.spectra_log = QtWidgets.QTextBrowser(page)
-        self.spectra_log.setReadOnly(True)
-        self.spectra_log.document().setMaximumBlockCount(_LOG_MAX_BLOCKS)
-        self.spectra_run_btn = QtWidgets.QPushButton('Cancel xtb run',
-                                                     page)
-        self.spectra_run_btn.setEnabled(False)
-        self.spectra_run_btn.setToolTip('no xtb run yet')
-        self.spectra_run_btn.clicked.connect(self._on_spectra_run_button)
-        lay.addWidget(self.spectra_status)
-        lay.addWidget(self.spectra_log, 1)
-        lay.addWidget(self.spectra_run_btn, 0, QtCore.Qt.AlignRight)
-        return page
-
     def _log_spectra_line(self, line):
-        """Append one launch/verdict line to the Spectra status label.
+        """Route one launch/verdict line to the SpectraTab surfaces.
 
-        Also mirrors the line into the Game tab's info box via
-        game_tab.log_external (EQ-ux-2: the established one-line-log
-        channel stays fed); every reach is getattr-guarded -- a missing
-        game_tab or info box can never crash a launch path. The label
-        keeps at most _STATUS_MAX_LINES lines (oldest dropped first),
-        so repeated launches cannot grow it unboundedly.
+        Plan 07-07 destination rewire (06-09 decisions unchanged): the
+        line lands on the tab's status label AND its streaming log
+        panel (both stay readable), and keeps mirroring into the Game
+        tab's info box via game_tab.log_external (EQ-ux-2: the
+        established one-line-log channel stays fed); every reach is
+        getattr-guarded -- a missing game_tab or info box can never
+        crash a launch path.
         """
-        lines = self.spectra_status.text().split('\n')
-        lines.append(line)
-        if len(lines) > _STATUS_MAX_LINES:
-            lines = lines[-_STATUS_MAX_LINES:]
-        self.spectra_status.setText('\n'.join(lines))
+        self.spectra_tab.set_status_line(line)
+        self.spectra_tab.append_log_line(line)
         game_tab = getattr(self, 'game_tab', None)
         if game_tab is not None:
             log_external = getattr(game_tab, 'log_external', None)
@@ -318,82 +280,48 @@ class PluginDialog(QtWidgets.QDialog):
                 log_external(line)
 
     def _connect_runner(self, controller):
-        """Wire the anchored XtbRunController's signals to THIS dialog.
+        """Wire the anchored XtbRunController's signals (plan 07-07).
 
         Guard flag is dialog-scoped, NOT anchor-scoped (plan 06-09):
         the controller lives on the anchor and can outlive this dialog;
         a Plugin-Manager reload builds a NEW dialog whose slots then
         receive the connections (the old dialog's Qt connections die
         with it). Idempotent within one dialog lifetime.
+
+        The replay BEFORE the connect closes the reload early-line
+        hole: controller.log_tail() (07-04's accessor) streams the
+        bounded tail into the tab first, then plain same-thread
+        connects hand over the live stream. log_line/started land
+        STRAIGHT on the tab's methods; run_finished lands on the
+        dialog's cross-tab slot (Get-Spectra re-enable first, then the
+        tab's terminal display). Re-launches on a reused controller
+        are safe: start() resets the controller's tail (06-05
+        behavior) and this one-time path has already run.
         """
         if self._runner_connected:
             return
-        controller.started.connect(self._on_runner_started)
-        controller.log_line.connect(self._on_runner_log_line)
-        controller.run_finished.connect(self._on_run_finished)
+        self.spectra_tab.replay_log(controller.log_tail())
+        controller.log_line.connect(self.spectra_tab.append_log_line)
+        controller.started.connect(self.spectra_tab.on_runner_started)
+        controller.run_finished.connect(self._on_spectra_run_finished)
         self._runner_connected = True
 
-    def _on_runner_started(self):
-        """Runner launch acknowledged: status line + arm the cancel leg."""
-        self._log_spectra_line(
-            'xtb running... (async - the dialog stays responsive)')
-        self.spectra_run_btn.setText('Cancel xtb run')
-        self.spectra_run_btn.setToolTip('cancel the running xtb job')
-        self.spectra_run_btn.setEnabled(True)
+    def _on_spectra_run_finished(self, status, problems):
+        """Terminal branch (ok/failed/cancelled): dialog-owned leg.
 
-    def _on_runner_log_line(self, line):
-        """Stream one decoded xtb output line into the log area."""
-        self.spectra_log.append(line)
-
-    def _on_run_finished(self, status, problems):
-        """Terminal branch (ok/failed/cancelled): verdict line + re-arm.
-
-        Re-enables Get Spectra (the launch API owns its disarm; Q5
-        re-entrancy) and flips the placeholder button to 'Run again' so
-        SC2's relaunch-after-cancel/completion is one click away.
+        The dialog owns the cross-tab orchestration (model-A): FIRST
+        re-enable Get Spectra (getattr-guarded -- 06-09's pinned
+        terminal re-enable; the launch API owns the disarm, Q5
+        re-entrancy), THEN hand the verdict to the tab's terminal
+        display (run_status_lines vocabulary + 'Run again' button
+        flip). The tab never reaches up.
         """
-        line = 'xtb finished: %s' % (status,)
-        if problems:
-            line += ' - ' + '; '.join(str(p) for p in problems)
-        self._log_spectra_line(line)
         game_tab = getattr(self, 'game_tab', None)
         if game_tab is not None:
             btn = getattr(game_tab, 'get_spectra_btn', None)
             if btn is not None:
                 btn.setEnabled(True)
-        self.spectra_run_btn.setText('Run again')
-        self.spectra_run_btn.setToolTip(
-            'launch another xtb run on the completed snake')
-        self.spectra_run_btn.setEnabled(True)
-
-    def _on_spectra_run_button(self):
-        """Contextual placeholder button (plan 06-09, EQ-ux-1).
-
-        Cancel leg: the anchored controller reports a live run
-        (status() 'running' mirrors xtb_run.RUNNING) -> cancel()
-        (proc.kill() only -- the runner's terminal branch owns the
-        verdict). Run-again leg (any terminal state): re-enter the FULL
-        launch pipeline via _on_spectra_requested so every re-check
-        (counts line, budget warnings, binary resolution, Get-Spectra
-        disarm) holds on EVERY relaunch (SC4) -- NEVER
-        _launch_spectra_run with stale values. No completed snake: the
-        shared refuse line in the status area.
-        """
-        anchor = getattr(self, '_anchor', None)
-        controller = (getattr(anchor, 'spectra_runner', None)
-                      if anchor is not None else None)
-        if (controller is not None
-                and controller.status() == 'running'):
-            controller.cancel()
-            return
-        record = (getattr(anchor, 'last_run', None)
-                  if anchor is not None else None)
-        if record is not None and record.get('snake_xyz'):
-            # Re-enter the full pipeline; setCurrentIndex(2) is a no-op
-            # on this page, so the visit is idempotent.
-            self._on_spectra_requested()
-            return
-        self._log_spectra_line(_NO_SNAKE_LINE)
+        self.spectra_tab.on_run_finished(status, problems)
 
     def focusInEvent(self, event):
         """Q3 focus-stealing safety net (04-RESEARCH-input.md Q3 (b)).
