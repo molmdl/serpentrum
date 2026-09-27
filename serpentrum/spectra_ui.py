@@ -97,6 +97,38 @@ def table_rows(spectrum):
             for m in modes]
 
 
+def imaginary_note(freqs):
+    """One ASCII guidance line when any freq < 0, else None; wording and
+    cutoffs owner-approved at GATE D (08-01) as d2-option-b-two-tier:
+
+    - No imaginary modes -> None (the caller appends nothing).
+    - Every imaginary mode strictly below 20i (|freq| < 20.0) -> the
+      benign tier, counting ALL imaginary modes:
+      '%d small imaginary mode(s) (<20i cm-1): soft inter-stack modes,
+      physical for molecular stacks'
+    - Any imaginary mode at or above 20i -> the saddle tier WINS,
+      counting ONLY the large imaginary modes:
+      '%d large imaginary mode(s) (>=20i cm-1): possible saddle point -
+      check the structure'
+
+    Boundary: exactly -20.0 lands on the saddle line (the benign cutoff
+    is strict <). House style keeps '(s)' even for a singular count —
+    no plural special-casing. 'cm-1' and the ASCII hyphen match the
+    table header and freq_label conventions. The >=20i tier has never
+    been observed in repo runs; its wording is owner-approved, not
+    observed-derived.
+    """
+    imaginary = [f for f in freqs if f < 0.0]
+    if not imaginary:
+        return None
+    large = [f for f in imaginary if abs(f) >= 20.0]
+    if large:
+        return ('%d large imaginary mode(s) (>=20i cm-1): possible saddle '
+                'point - check the structure' % len(large))
+    return ('%d small imaginary mode(s) (<20i cm-1): soft inter-stack '
+            'modes, physical for molecular stacks' % len(imaginary))
+
+
 def mode_arrow_primitives(spectrum, mode_index):
     """(atoms_xyz, vectors) for the 1-based ``mode_index`` — raw material
     for the GUI's FROZEN cgo_build.mode_arrows call (cgo_build.py:134-208:
