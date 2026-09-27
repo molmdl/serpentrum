@@ -12,10 +12,12 @@ What it stages (07-RESEARCH-qt-plot.md [TRAIN] items 2-5):
     (tests/fixtures/xtb/g98.out) via spectra.parse_g98 and builds the
     paint-ready Scene via plot_logic.build_scene - the SAME scene the
     headless smoke 12 proves
-  - hosts ONE gui_plot.SpectraPlotPanel (size-preset combo +
-    'Show axis labels' toggle + 'Save Plot (PNG)') in a modeless
-    top-level QWidget window so the human can verify the on-screen
-    look, the combo reflow, the label toggle, and the save-PNG route
+  - hosts ONE gui_plot.SpectraPlotPanel (y-unit / curve-color /
+    x-direction combos + 'Invert y axis' + 'Show axis labels' toggles
+    [owner amendment 2026-09-26] + size-preset combo + 'Save Plot
+    (PNG)') in a modeless top-level QWidget window so the human can
+    verify the on-screen look, the combo reflow, the toggles, and the
+    save-PNG route
   - routes the panel's save reports (status_cb=print) to the PyMOL
     console so 'plot saved: <path>' is visible inline
 
@@ -109,6 +111,24 @@ print('        (labels, curve, white background) and is a real PNG',
       flush=True)
 print('     g. resize the PyMOL window/panel - no crashes, no label '
       'garbage at small sizes', flush=True)
+print('     h. y-unit combo (round-2 amendments): absorbance - the '
+      'curve normalizes (peak touches the top of', flush=True)
+print("        the axis), y label becomes 'absorbance (arb.)'; "
+      "transmittance - the curve flips (peaks point", flush=True)
+print("        DOWN), y label 'transmittance (arb.)', T <= 1 on the "
+      'scale', flush=True)
+print('     i. color combo blue/red/black - the curve color switches '
+      'on screen', flush=True)
+print("     j. x-direction combo 'descending' - the axis reads "
+      '3600 -> 0 left-to-right;', flush=True)
+print("        'Invert y axis' checkbox flips the curve vertically",
+      flush=True)
+print('     k. ROUND-1 DEFECT FIX: switch size to large, then back '
+      'to medium - the plot now', flush=True)
+print('        AUTO-SHRINKS to exactly 640x400 (no manual resize); '
+      'save a PNG of a', flush=True)
+print('        transmittance/red/inverted view - it matches the '
+      'screen', flush=True)
 print('  4. report any visual defect precisely (which step, what looks '
       'wrong)', flush=True)
 

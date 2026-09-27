@@ -11,6 +11,8 @@ verdicts are flushed sentinels grepped by tests/run_gates.py --smoke:
                                   reload 1600x1000 (800x500 @ scale 2)
     STAGE3 PNG-NOLABELS           show_labels=False leg writes a valid PNG
     STAGE4 PNG-EMPTY              None scene paints the hint, never crashes
+    STAGE5 OPTIONS <bytes>        unit/color/invert render parity leg
+                                  (owner amendment 2026-09-26)
     SMOKE-OK PLOT-RENDER          all stages passed
     SMOKE-FAIL <stage>: ...       a stage failed (one line per failure)
 
@@ -170,6 +172,23 @@ def s_stage4_render_empty():
     print('STAGE4 PNG-EMPTY %d bytes' % size, flush=True)
 
 
+def s_stage5_render_options(scene):
+    # Stage 5 (owner-amendment options leg, 2026-09-26): the FULL
+    # non-default option combination — transmittance unit (pure derive)
+    # + invert_x + invert_y + red line color — renders through the
+    # SAME paint_scene seam to a valid PNG (route-A parity regression:
+    # the PNG save path must accept every on-screen option state).
+    from serpentrum import gui_plot, plot_logic
+    t_scene = plot_logic.scene_with_unit(scene, 'transmittance')
+    assert abs(min(t_scene.ys) - 0.1) < 1e-6, \
+        'transmittance peak %r != 0.1' % (min(t_scene.ys),)
+    img = gui_plot.render_image(t_scene, (640, 400), scale=2,
+                                show_labels=True, invert_x=True,
+                                invert_y=True, line_color=(1.0, 0.0, 0.0))
+    size, _tmp = _save_and_assert_png(img, 'options')
+    print('STAGE5 OPTIONS %d bytes' % size, flush=True)
+
+
 def s_cleanup():
     for path in TMP_PNGS:
         try:
@@ -188,6 +207,7 @@ if _APP is not None:
         check('stage3_render_nolabels',
               lambda: s_stage3_render_nolabels(_scene[0]))
         check('stage4_render_empty', s_stage4_render_empty)
+        check('stage5_render_options', lambda: s_stage5_render_options(_scene[0]))
         check('cleanup', s_cleanup)
 
 if FAILURES:
