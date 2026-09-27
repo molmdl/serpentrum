@@ -25,7 +25,7 @@ A PyMOL plugin game: steer a molecular head around a bounded box, stack real sma
 - [x] **Phase 5.2: Generic Upload Stacking Consent (INSERTED 2026-09-20)** - Opt-in generic π-stack geometry for ring-bearing uploads (illustrative, labeled); upload-only games become winnable *(owner insertion — promotes v2 STACK-06)* *(STACK-03 integrity guards: non-silent, labeled, human-approved geometry)*
 - [x] **Phase 5.3: Randomized Pickup Spawning (INSERTED 2026-09-26)** - Pickup spawn positions randomized across the box (owner: new molecules spawn too close to the snake = too simple) *(owner insertion — playtesting feedback; owner feel-check APPROVED 2026-09-26, MIN_HEAD_DIST_FACTOR 0.35 ships, edge-bias idea deferred)*
 - [x] **Phase 6: xtb Pipeline** - Async cancellable `xtb --ohess` with verified success contract and calibrated atom-budget guard *(research F — parallel track)*
-- [ ] **Phase 7: Spectra UI** - Broadened IR plot, clickable frequency table → static mode vectors, streaming log, saveable plot *(research G)*
+- [x] **Phase 7: Spectra UI** - Broadened IR plot, clickable frequency table → static mode vectors, streaming log, saveable plot *(research G)* — COMPLETE 2026-09-26 (verified 38/38 must-haves, 3/3 SCs; owner checkpoints: 07-06 plot APPROVED round 2 with amendments, 07-10 live flow APPROVED round 2 with optimized-frame + [TRAIN] sign-offs)
 - [ ] **Phase 8: Demo Data, Docs & Release Audit** - Human-approved Set A + attribution, 6-button setup persistence, help/docs, end-to-end audit *(research H)*
 
 ## Phase Details
@@ -285,7 +285,7 @@ Plans:
 - [x] 07-07-PLAN.md — SpectraTab shell + gui.py placeholder replacement: streaming log, status, Cancel/Run-again delegation; all 06-09 behaviors preserved (SPECTRA-01/04) (Wave 3, parallel)
 - [x] 07-08-PLAN.md — plot panel embed + run_finished → parse → build_scene → set_scene (SPECTRA-03 on-screen) (Wave 4)
 - [x] 07-09-PLAN.md — frequency table + row-click mode vectors on srp_xtbopt (OPTIMIZED frame — owner sign-off at 07-10) (SPECTRA-05) (Wave 5)
-- [ ] 07-10-PLAN.md — phase-closing gates + consolidated human-verify checkpoint (live flow + optimized-frame sign-off + [TRAIN] discharges) (Wave 6, blocking)
+- [x] 07-10-PLAN.md — phase-closing gates + consolidated human-verify checkpoint (live flow + optimized-frame sign-off + [TRAIN] discharges) (Wave 6, blocking)
 
 Notes: Pure parser already tested in Phase 2; UI is wiring plus the two verified QPainter precedents (`dynoplot.py`, `pmg_qt/volume.py`) and the probe-verified QImage save route (route A; `QWidget.grab()` demoted to documented fallback). Mode vectors draw on the OPTIMIZED frame (`srp_xtbopt` from record['xtbopt_path']; g98 ≡ xtbopt within 1e-6 Å probed; game frame wrong by up to 0.14 Å) — owner sign-off at the 07-10 checkpoint. Shared imaginary formatter lives in `spectra_ui.freq_label` (single convention; plot shows no raw frequency labels in v1). Avoids Pitfalls 12 (table↔vector index match), 2 (streaming + cancel UX), 5.
 
@@ -355,5 +355,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5.2. Generic Upload Stacking Consent (INSERTED 2026-09-20) | 9/9 | Complete (verified 5/5 SCs; owner feel-check APPROVED 11/11, literals as drafted; DBG d=3.6000 live) | 2026-09-26 |
 | 5.3. Randomized Pickup Spawning (INSERTED 2026-09-26) | 5/5 | Complete (verified 5/5 must-haves; owner feel-check APPROVED "good, all pass", factor 0.35 ships; edge-bias idea DEFERRED with sketch in 5.3-05-SUMMARY) | 2026-09-26 |
 | 6. xtb Pipeline | 12/12 | Complete (verified 5/5 SCs; owner live checkpoint APPROVED 12/12 with SRP_SPECTRA_DIR amendment; 796 unittests, 8/8 required smokes; DEFAULT_THREAD_ARG ('-P','4') ships; HESSIAN_WARNING measurement-derived) | 2026-09-26 |
-| 7. Spectra UI | 0/10 | Planned (2026-09-25; 10 plans in 6 waves) | - |
+| 7. Spectra UI | 10/10 | Complete (verified 38/38 must-haves, 3/3 SCs; owner-approved plot options expanded at 07-06; 07-10 live checkpoint APPROVED round 2 — optimized frame signed off; 840 unittests, 10/10 required smokes, --xtb green) | 2026-09-26 |
 | 8. Demo Data, Docs & Release Audit | 0/TBD | Not started | - |
