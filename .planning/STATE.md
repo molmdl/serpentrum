@@ -14,7 +14,7 @@ Plan: 6 of 10 COMPLETE (07-06 checkpoint round 2 APPROVED 2026-09-26 — owner r
 Status: SPECTRA-03 v1 surface APPROVED expanded (unit modes / colors / x-direction / y-invert / exact-preset sizing — defaults = approved look: intensity / ascending / no y-invert / blue); blocking gate CLEARED; next 07-08 SpectraTab embed
 Last activity: 2026-09-26 — 07-06 checkpoint APPROVED round 2 (owner: 'approved'); plan closed — docs-only finalization on main
 
-Progress: [█████████░] ~96% (91 of 95 planned plans fully closed — Phases 1-5 + 5.1 + 5.2 + 5.3 + 6 COMPLETE; Phase 7: 6/10 closed; Phase 8 unplanned)
+Progress: [█████████░] ~97% (92 of 95 planned plans fully closed — Phases 1-5 + 5.1 + 5.2 + 5.3 + 6 COMPLETE; Phase 7: 7/10 closed; Phase 8 unplanned)
 
 ## Performance Metrics
 
