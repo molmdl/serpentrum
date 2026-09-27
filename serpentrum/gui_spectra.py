@@ -270,14 +270,16 @@ class SpectraTab(QtWidgets.QWidget):
         absent/invalid — never re-pinned, never a crash on a stripped
         anchor.
         """
-        paths = record or {}
-        g98_path = paths.get('g98_path')
+        # Pure path precedence (g98 first, vibspectrum fallback, 'none'
+        # when degenerate) — tested in tests/test_spectra_ui.py; the
+        # os.path.isfile existence checks stay here in the tab.
+        g98_path, vibs_path, source = spectra_ui.record_spectrum_paths(
+            record or {})
         source_note = None
         try:
-            if g98_path and os.path.isfile(g98_path):
+            if source == 'g98' and os.path.isfile(g98_path):
                 spectrum = spectra.parse(g98_path)
             else:
-                vibs_path = paths.get('vibspectrum_path')
                 if not (vibs_path and os.path.isfile(vibs_path)):
                     # Degenerate/failed record: verdict + problems are
                     # already in the status; the plot stays empty.

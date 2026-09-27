@@ -183,5 +183,35 @@ class TestRunStatusLines(unittest.TestCase):
                          ['xtb finished: failed', 'problems: p1'])
 
 
+class TestRecordSpectrumPaths(unittest.TestCase):
+
+    def test_ok_record_prefers_g98(self):
+        # Both paths present -> g98 wins (vectors + atom block live there).
+        record = {'g98_path': '/x/srp_spectra/s1/g98.out',
+                  'vibspectrum_path': '/x/srp_spectra/s1/vibspectrum'}
+        self.assertEqual(
+            spectra_ui.record_spectrum_paths(record),
+            ('/x/srp_spectra/s1/g98.out', '/x/srp_spectra/s1/vibspectrum',
+             'g98'))
+
+    def test_vibspectrum_fallback(self):
+        # g98 missing -> vibspectrum fallback, source named for the note.
+        record = {'g98_path': None,
+                  'vibspectrum_path': '/x/srp_spectra/s1/vibspectrum'}
+        self.assertEqual(
+            spectra_ui.record_spectrum_paths(record),
+            (None, '/x/srp_spectra/s1/vibspectrum', 'vibspectrum'))
+
+    def test_degenerate_record_both_none(self):
+        # failed/cancelled runs may carry None paths -> never fabricate.
+        record = {'g98_path': None, 'vibspectrum_path': None}
+        self.assertEqual(spectra_ui.record_spectrum_paths(record),
+                         (None, None, 'none'))
+
+    def test_empty_dict(self):
+        self.assertEqual(spectra_ui.record_spectrum_paths({}),
+                         (None, None, 'none'))
+
+
 if __name__ == '__main__':
     unittest.main()

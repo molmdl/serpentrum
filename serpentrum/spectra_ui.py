@@ -41,6 +41,12 @@ row. Four builders:
   re-scans the log text — the 'abnormal termination' substring trap
   stays dead (06-RESEARCH-guard pitfall 8; xtbenv.evaluate_run owns
   verdicts).
+- ``record_spectrum_paths`` (plan 07-08) — the display-path precedence
+  over the frozen record: g98 first (the displacement vectors + atom
+  block live there), vibspectrum fallback, ``(None, None, 'none')``
+  when the record is degenerate or the keys are missing. Pure
+  selection ONLY — filesystem existence checks stay in the GUI caller
+  (gui_spectra.SpectraTab._populate_spectrum).
 
 Purity: stdlib + ``from . import xtb_run`` (intra-package relative import,
 exempt — tools/check_purity.py:95-98); new pure modules auto-classify PURE
@@ -138,3 +144,30 @@ def run_status_lines(record):
     if problems:
         lines.append('problems: %s' % '; '.join(str(p) for p in problems))
     return lines
+
+
+def record_spectrum_paths(record):
+    """Display-path precedence over the frozen spectra_run record ->
+    ``(g98_path, vibspectrum_path, source)``.
+
+    Precedence (07-RESEARCH-spectra-seam.md Q4d): g98 first — it alone
+    carries the displacement vectors + the atom block — so a record
+    with g98_path set yields ``(g98, vibs, 'g98')`` even when the
+    vibspectrum path is also present. A record with only
+    vibspectrum_path yields ``(None, vibs, 'vibspectrum')`` (the caller
+    appends the vectors-unavailable note). A degenerate record (both
+    paths None/falsey — failed/cancelled runs may carry None paths) or
+    missing keys yields ``(None, None, 'none')``.
+
+    Pure selection ONLY: this NEVER touches the filesystem — existence
+    checks (os.path.isfile) stay in the GUI caller
+    (gui_spectra.SpectraTab._populate_spectrum), keeping the whole
+    degenerate matrix unit-testable.
+    """
+    g98 = record.get('g98_path')
+    vibs = record.get('vibspectrum_path')
+    if g98:
+        return (g98, vibs, 'g98')
+    if vibs:
+        return (None, vibs, 'vibspectrum')
+    return (None, None, 'none')
