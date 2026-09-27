@@ -214,6 +214,110 @@ class TestSizePresets(unittest.TestCase):
                             'non-ASCII preset label %r' % label)
 
 
+class TestUnitModes(unittest.TestCase):
+    """Owner amendment (07-06 checkpoint round 1, 2026-09-26): y-axis
+    DISPLAY unit selectable in the panel - intensity (default,
+    unchanged) / absorbance (arb.) / transmittance (arb.). The
+    transforms live PURE here: absorbance = intensity normalized to
+    peak = 1 (xtb IR intensities are proportional to absorbance via
+    Beer-Lambert linearity - arbitrary units, honestly labeled
+    '(arb.)'); transmittance = 10**(-A) of that normalized absorbance
+    (peaks point down, T in (0, 1]). Unknown modes raise ValueError
+    (loud, never a silent passthrough). All non-y Scene fields pass
+    through UNCHANGED in every derived scene.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.spectrum = spectra.parse_g98(G98_PATH)
+        cls.scene = plot_logic.build_scene(cls.spectrum.modes)
+
+    def test_unit_modes_table(self):
+        self.assertTrue(hasattr(plot_logic, 'UNIT_MODES'))
+        table = plot_logic.UNIT_MODES
+        self.assertIsInstance(table, tuple)
+        for label, mode in table:
+            self.assertTrue(_is_ascii(label),
+                            'non-ASCII unit label %r' % label)
+            self.assertTrue(_is_ascii(mode))
+        self.assertEqual([label for label, _mode in table],
+                         ['IR intensity (km/mol)',
+                          'absorbance (arb.)',
+                          'transmittance (arb.)'])
+        self.assertEqual([mode for _label, mode in table],
+                         ['intensity', 'absorbance', 'transmittance'])
+        # The intensity entry is the pinned v1 default (first).
+        self.assertEqual(table[0],
+                         ('IR intensity (km/mol)', 'intensity'))
+
+    def test_intensity_passthrough(self):
+        derived = plot_logic.scene_with_unit(self.scene, 'intensity')
+        self.assertEqual(list(derived.ys), list(self.scene.ys))
+        self.assertEqual(derived.y_label, self.scene.y_label)
+
+    def test_absorbance_peak_one(self):
+        derived = plot_logic.scene_with_unit(self.scene, 'absorbance')
+        self.assertAlmostEqual(max(derived.ys), 1.0, delta=1e-9)
+        # The normalization is a monotone scale - argmax is the same
+        # grid point as in the intensity scene (shape preserved).
+        argmax_base = max(range(len(self.scene.ys)),
+                          key=lambda i: self.scene.ys[i])
+        argmax_abs = max(range(len(derived.ys)),
+                         key=lambda i: derived.ys[i])
+        self.assertEqual(argmax_base, argmax_abs)
+        self.assertEqual(derived.y_label, 'absorbance (arb.)')
+        self.assertAlmostEqual(
+            derived.y_max, max(1.0 * 1.1, plot_logic.Y_MAX_FLOOR),
+            delta=1e-9)
+        y_values = [value for value, _label in derived.y_ticks]
+        self.assertTrue(y_values, 'y_ticks must be non-empty')
+        for value in y_values:
+            self.assertGreaterEqual(value, 0.0)
+            self.assertLessEqual(value, derived.y_max)
+        for prev, cur in zip(y_values, y_values[1:]):
+            self.assertLess(prev, cur, 'y_ticks not strictly ascending')
+
+    def test_transmittance_bounds_and_peak(self):
+        derived = plot_logic.scene_with_unit(self.scene, 'transmittance')
+        for y in derived.ys:
+            self.assertGreater(y, 0.0)
+            self.assertLessEqual(y, 1.0)
+        # At the absorbance peak (A = 1) T = 10**(-1) = 0.1.
+        self.assertAlmostEqual(min(derived.ys), 0.1, delta=1e-9)
+        # Far from any peak (intensity ~ 0 -> A_rel ~ 0) T ~ 1.
+        argmin_base = min(range(len(self.scene.ys)),
+                          key=lambda i: self.scene.ys[i])
+        self.assertGreater(derived.ys[argmin_base], 0.999)
+        self.assertEqual(derived.y_label, 'transmittance (arb.)')
+
+    def test_empty_scene_safe(self):
+        # The pinned zero curve (empty modes): no division-by-zero;
+        # a zero curve stays zeros in every unit (an empty spectrum
+        # shows the hint path in the GUI anyway).
+        empty = plot_logic.build_scene([])
+        for mode in ('absorbance', 'transmittance'):
+            derived = plot_logic.scene_with_unit(empty, mode)
+            self.assertTrue(all(y == 0.0 for y in derived.ys),
+                            'mode %r must zero-passthrough' % mode)
+
+    def test_unknown_mode_raises(self):
+        with self.assertRaises(ValueError):
+            plot_logic.scene_with_unit(self.scene, 'wavenumber')
+
+    def test_non_y_fields_unchanged(self):
+        for mode in ('absorbance', 'transmittance'):
+            derived = plot_logic.scene_with_unit(self.scene, mode)
+            self.assertEqual(derived.xs, self.scene.xs)
+            self.assertEqual(derived.x_min, self.scene.x_min)
+            self.assertEqual(derived.x_max, self.scene.x_max)
+            self.assertEqual(derived.x_ticks, self.scene.x_ticks)
+            self.assertEqual(derived.x_label, self.scene.x_label)
+            self.assertEqual(derived.n_modes, self.scene.n_modes)
+            self.assertEqual(derived.n_imaginary,
+                             self.scene.n_imaginary)
+            self.assertEqual(derived.fwhm, self.scene.fwhm)
+
+
 class TestModeCaption(unittest.TestCase):
     """The imaginary-mode caption: counts only, no raw frequencies (the
     single shared frequency formatter lives in spectra_ui.freq_label)."""
