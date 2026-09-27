@@ -354,6 +354,65 @@ def load_setup(text):
     return data
 
 
+# Legal selection ranges for randomize_setup (plan 08-05), DERIVED from
+# validate()'s own rules above — declared once here so randomize
+# references the rule instead of restating a magic literal. These are
+# NOT a second validation authority; validate() stays the single source
+# (any bound drift shows up as a validate-pass test failure).
+#
+#   win_cap_molecules : validate pins 1 <= cap <= 20 (see validate)
+RANDOMIZE_WIN_CAP_MIN = 1
+RANDOMIZE_WIN_CAP_MAX = 20
+#   broadening_fwhm   : validate pins > 0 only; typical linewidths are
+#                       ~10-20 cm^-1 (DEFAULTS 16.0, STACK.md section 6),
+#                       so concrete choices are DEFAULTS's value scaled.
+RANDOMIZE_FWHM_FACTORS = (0.5, 0.75, 1.0, 1.25, 1.5)
+
+
+def randomize_setup(setup, candidates, seed=None):
+    """Randomize a full setup dict with CONCRETE reproducible values.
+
+    Plan 08-05 (Phase 8, SETUP-08 pure half of the Randomize button).
+    Implements the GATE D verdict (08-01-SUMMARY.md
+    ``d1-option-c-staleness``, owner 2026-09-28): scope = the FULL
+    setup — ``head_molecule`` + ``box_preset`` + ``win_cap_molecules`` +
+    ``speed`` + ``broadening_fwhm`` are redrawn; every other key
+    (``schema_version``, ``demo_set``, ``atom_budget``, ``xtb_path``,
+    and crucially ``generic_stack_consent``) is carried through
+    UNCHANGED. Consent is a safety-relevant opt-in (STACK-06) and a
+    Randomize click must never grant or revoke it.
+
+    Concreteness (Pitfall D): the result writes only CONCRETE values so
+    a Save->Load round-trip reproduces exactly what the user saw —
+    ``head_molecule`` is one of ``candidates`` (never the sentinel
+    ``'random'``, via the existing ``randomize_head`` seam), ``speed``
+    is one of the ``SPEED_TIERS`` values (not a synthesized number),
+    ``box_preset`` is a ``BOX_PRESETS`` key, and the scalars stay within
+    validate()'s legal ranges (see RANDOMIZE_WIN_CAP_* /
+    RANDOMIZE_FWHM_FACTORS above). A result therefore validates clean
+    for any validate-clean input.
+
+    Determinism: every draw goes through ONE private
+    ``random.Random(seed)`` instance (created here, never the global
+    random module — the house seed-isolation rule; ``randomize_head``
+    additionally re-seeds its own instance from the same seed, which is
+    seed-deterministic by its own contract). ``seed=None`` is
+    entropy-seeded (two calls may differ). Unknown extra keys in
+    ``setup`` pass through untouched (module merge/overlay semantics);
+    the input dict is never mutated.
+    """
+    rng = random.Random(seed)
+    result = dict(setup)
+    result['head_molecule'] = randomize_head(candidates, seed)
+    result['box_preset'] = rng.choice(sorted(BOX_PRESETS))
+    result['win_cap_molecules'] = rng.randint(RANDOMIZE_WIN_CAP_MIN,
+                                              RANDOMIZE_WIN_CAP_MAX)
+    result['speed'] = rng.choice([value for _name, value in SPEED_TIERS])
+    result['broadening_fwhm'] = (DEFAULTS['broadening_fwhm']
+                                 * rng.choice(RANDOMIZE_FWHM_FACTORS))
+    return result
+
+
 def randomize_head(candidates, seed):
     """Choose a head molecule id from candidates via a PRIVATE seeded RNG.
 
