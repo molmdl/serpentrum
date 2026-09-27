@@ -10,10 +10,13 @@ and ``render_image`` uses it into a 2x QImage for the save route
 (route A — the SAME scene and the SAME look on screen and on disk;
 probe stage2/stage4 SMOKE-OK in 07-RESEARCH-qt-plot.md).
 
-The Spectra tab (plan 07-08) embeds ``SpectraPlotPanel``: a control
-row (size-preset combo + 'Show axis labels' toggle + Save button) over
-the plot. v1 adjustment surface ends there — NO FWHM control, NO
-zoom/pan (v2 bait). Save reporting goes through an optional status_cb
+The Spectra tab (plan 07-08) embeds ``SpectraPlotPanel``: an
+appearance row (y-unit / curve-color / x-direction combos + 'Invert y
+axis' + 'Show axis labels' toggles — owner amendment 2026-09-26,
+defaults preserving the approved look) and a size/save row
+(size-preset combo + Save button) over the plot. The adjustment
+surface ends there — NO FWHM control, NO zoom/pan (v2 bait). Save
+reporting goes through an optional status_cb
 callable(str) the TAB owns: this module NEVER imports pymol.cmd and
 spawns no dialogs of its own (the save picker is the static
 QFileDialog.getSaveFileName convenience — no .exec_ token, same class
@@ -46,23 +49,41 @@ EMPTY_HINT = 'run a calculation to plot a spectrum'
 _TICK_GAP_CHARS = 2
 
 
-def _map_x(value, scene, plot_left, plot_w):
-    """Wavenumber value -> plot-local x pixel (reads the scene ONLY)."""
+def _map_x(value, scene, plot_left, plot_w, invert_x=False):
+    """Wavenumber value -> plot-local x pixel (reads the scene ONLY).
+
+    invert_x (owner amendment 2026-09-26): descending wavenumber —
+    x_max maps to the LEFT edge and x_min to the right (the
+    chemistry-conventional 4000 -> 400 journal look).
+    """
     span_x = scene.x_max - scene.x_min
     if span_x <= 0.0:  # guard: plot_logic always spans > 0; never divide
         span_x = 1.0
+    if invert_x:
+        return plot_left + (scene.x_max - float(value)) / span_x * plot_w
     return plot_left + (float(value) - scene.x_min) / span_x * plot_w
 
 
-def _map_y(value, scene, plot_bottom, plot_h):
-    """Intensity value -> plot-local y pixel (reads the scene ONLY)."""
+def _map_y(value, scene, plot_top, plot_h, invert_y=False):
+    """Y value -> plot-local y pixel (reads the scene ONLY).
+
+    PLOT_TOP is the plot rect's top edge (y grows DOWNWARD in device
+    coordinates, so a mapped pixel is plot_top + fraction * plot_h).
+    Default (invert_y False, the approved look): y = y_max sits at the
+    top edge. invert_y True (owner amendment 2026-09-26): the curve
+    flips vertically — y = 0 sits at the top edge.
+    """
     span_y = scene.y_max
     if span_y <= 0.0:  # guard: plot_logic floors y_max at Y_MAX_FLOOR
         span_y = 1.0
-    return plot_bottom - float(value) / span_y * plot_h
+    fraction = float(value) / span_y
+    if invert_y:
+        return plot_top + fraction * plot_h
+    return plot_top + (1.0 - fraction) * plot_h
 
 
-def paint_scene(painter, rect, scene, show_labels=True):
+def paint_scene(painter, rect, scene, show_labels=True,
+                invert_x=False, invert_y=False, line_color=None):
     """THE one painter seam: draw the Scene into RECT on any device.
 
     Used identically by IrPlotWidget.paintEvent and render_image so the
@@ -75,6 +96,15 @@ def paint_scene(painter, rect, scene, show_labels=True):
     returns — never a crash. A real zero-curve scene (the pinned
     empty-modes case, spectra.py:465-466) paints as a flat baseline on
     a normal axis, NOT the hint.
+
+    Owner amendments (2026-09-26, checkpoint round 1): invert_x draws
+    the wavenumber axis descending (chemistry-conventional 4000 -> 400;
+    the tick ITERATION reverses too so drawn pixel positions still
+    ascend and the last-pixel label dodge works unchanged); invert_y
+    flips the curve vertically (transmittance's journal look);
+    line_color, an (r, g, b) float tuple in [0, 1], re-colors the curve
+    — None keeps the pinned default blue (#1f4fff) so the approved
+    look is exactly preserved.
     """
     painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
     dark = QtGui.QColor('#444444')
@@ -112,7 +142,7 @@ def paint_scene(painter, rect, scene, show_labels=True):
         return  # too small to draw sanely — never crash on a tiny rect
 
     plot_left = float(plot.left())
-    plot_bottom = float(plot.bottom())
+    plot_top = float(plot.top())
     plot_w = float(plot.width())
     plot_h = float(plot.height())
 
@@ -126,8 +156,17 @@ def paint_scene(painter, rect, scene, show_labels=True):
     if show_labels:
         label_h = fm.height()
         last_label_x = None
-        for value, label in scene.x_ticks:
-            px = _map_x(value, scene, plot_left, plot_w)
+        # Inverted axes flip the value->pixel direction; iterating the
+        # tick list REVERSED restores ascending pixel positions so the
+        # last-pixel label dodge below works unchanged (amendment).
+        x_ticks = list(scene.x_ticks)
+        if invert_x:
+            x_ticks.reverse()
+        y_ticks = list(scene.y_ticks)
+        if invert_y:
+            y_ticks.reverse()
+        for value, label in x_ticks:
+            px = _map_x(value, scene, plot_left, plot_w, invert_x)
             painter.drawLine(int(px), plot.bottom() - 4,
                              int(px), plot.bottom())
             if (last_label_x is not None
@@ -140,8 +179,8 @@ def paint_scene(painter, rect, scene, show_labels=True):
                 int(QtCore.Qt.AlignHCenter | QtCore.Qt.AlignTop),
                 label)
             last_label_x = px
-        for value, label in scene.y_ticks:
-            py = _map_y(value, scene, plot_bottom, plot_h)
+        for value, label in y_ticks:
+            py = _map_y(value, scene, plot_top, plot_h, invert_y)
             painter.drawLine(plot.left(), int(py),
                              plot.left() + 4, int(py))
             painter.drawText(
@@ -176,16 +215,26 @@ def paint_scene(painter, rect, scene, show_labels=True):
     polygon = QtGui.QPolygonF()
     for i in range(len(scene.xs)):
         polygon.append(QtCore.QPointF(
-            _map_x(scene.xs[i], scene, plot_left, plot_w),
-            _map_y(scene.ys[i], scene, plot_bottom, plot_h)))
+            _map_x(scene.xs[i], scene, plot_left, plot_w, invert_x),
+            _map_y(scene.ys[i], scene, plot_top, plot_h, invert_y)))
+    # Curve pen: the pinned default blue stays EXACTLY #1f4fff when
+    # line_color is None (the approved look); an (r, g, b) tuple re-
+    # colors via fromRgbF (owner amendment: blue / red / black).
+    if line_color is not None:
+        curve_color = QtGui.QColor.fromRgbF(
+            float(line_color[0]), float(line_color[1]),
+            float(line_color[2]))
+    else:
+        curve_color = QtGui.QColor('#1f4fff')
     painter.save()
     painter.setClipRect(plot)
-    painter.setPen(QtGui.QPen(QtGui.QColor('#1f4fff'), 2))
+    painter.setPen(QtGui.QPen(curve_color, 2))
     painter.drawPolyline(polygon)
     painter.restore()
 
 
-def render_image(scene, logical_size, scale=2, show_labels=True):
+def render_image(scene, logical_size, scale=2, show_labels=True,
+                 invert_x=False, invert_y=False, line_color=None):
     """Route-A save: re-render the Scene into a 2x QImage -> QImage.
 
     The probe-verified shape (07-RESEARCH-qt-plot.md, stage2/stage4
@@ -195,13 +244,19 @@ def render_image(scene, logical_size, scale=2, show_labels=True):
     always has one; headless callers MUST do the guarded
     QApplication.instance() or QApplication([]) construct first (probe
     RUN A: font access with no app silently hard-kills the process).
+
+    invert_x / invert_y / line_color forward verbatim to paint_scene
+    (the route-A invariant: PNG parity with ANY on-screen option state
+    — unit, direction, invert, color).
     """
     w, h = logical_size
     img = QtGui.QImage(w * scale, h * scale, QtGui.QImage.Format_RGB32)
     img.fill(QtGui.QColor('white'))
     img.setDevicePixelRatio(float(scale))
     painter = QtGui.QPainter(img)
-    paint_scene(painter, QtCore.QRect(0, 0, w, h), scene, show_labels)
+    paint_scene(painter, QtCore.QRect(0, 0, w, h), scene, show_labels,
+                invert_x=invert_x, invert_y=invert_y,
+                line_color=line_color)
     painter.end()
     return img
 
@@ -218,6 +273,9 @@ class IrPlotWidget(QtWidgets.QWidget):
         super(IrPlotWidget, self).__init__(parent)
         self._scene = None
         self._show_labels = True
+        self._invert_x = False
+        self._invert_y = False
+        self._line_color = None  # None = the pinned default #1f4fff
         self.setMinimumSize(320, 260)
 
     def sizeHint(self):
@@ -238,72 +296,173 @@ class IrPlotWidget(QtWidgets.QWidget):
         self._show_labels = bool(flag)
         self.update()
 
+    def set_invert_x(self, flag):
+        """Descending wavenumber axis (chemistry-conventional 4000 ->
+        400) when True; ascending (the approved look) when False."""
+        self._invert_x = bool(flag)
+        self.update()
+
+    def set_invert_y(self, flag):
+        """Flip the curve vertically when True (e.g. transmittance's
+        journal look); the approved look when False."""
+        self._invert_y = bool(flag)
+        self.update()
+
+    def set_line_color(self, color_or_None):
+        """Re-color the curve: an (r, g, b) float tuple in [0, 1], or
+        None to restore the pinned default blue (#1f4fff)."""
+        self._line_color = color_or_None
+        self.update()
+
     def paintEvent(self, event):
         """volume.py:252-274 shape: direct paint over the seam, no
         pixmap double-buffer (both precedents skip it)."""
         painter = QtGui.QPainter()
         painter.begin(self)
-        paint_scene(painter, self.rect(), self._scene, self._show_labels)
+        paint_scene(painter, self.rect(), self._scene, self._show_labels,
+                    invert_x=self._invert_x, invert_y=self._invert_y,
+                    line_color=self._line_color)
         painter.end()
 
 
 class SpectraPlotPanel(QtWidgets.QWidget):
     """The piece the Spectra tab (07-08) embeds.
 
-    Control row: size-preset combo (house addItem(label, data) pattern
-    over plot_logic.size_presets()) + 'Show axis labels' toggle
-    (default ON) + 'Save Plot (PNG)' button. The panel carries NO
-    status label of its own — save reporting goes to the optional
-    status_cb callable(str) the TAB sets.
+    TWO control rows over the plot (owner amendment 2026-09-26,
+    checkpoint round 1): row A (appearance) holds the y-unit combo
+    (plot_logic.UNIT_MODES — intensity default), the curve-color combo
+    (blue / red / black), the x-direction combo (ascending / descending
+    wavenumber), an 'Invert y axis' checkbox, and the 'Show axis
+    labels' toggle; row B holds the size-preset combo
+    (plot_logic.size_presets()) and 'Save Plot (PNG)'. The panel keeps
+    the BASE intensity Scene and derives the displayed Scene through
+    pure plot_logic.scene_with_unit — recompute lives ONLY in the PURE
+    half. The panel carries NO status label of its own — save
+    reporting goes to the optional status_cb callable(str) the TAB
+    sets.
     """
 
     def __init__(self, parent=None, status_cb=None):
         super(SpectraPlotPanel, self).__init__(parent)
         self._status_cb = status_cb
+        self._base_scene = None
+        self._unit_mode = plot_logic.UNIT_MODES[0][1]  # 'intensity'
         self.plot = IrPlotWidget(self)
 
+        # --- Row A: appearance (unit / color / direction / toggles).
+        self.unit_combo = QtWidgets.QComboBox(self)
+        for label, mode in plot_logic.UNIT_MODES:
+            self.unit_combo.addItem(label, mode)
+        self.color_combo = QtWidgets.QComboBox(self)
+        self.color_combo.addItem('blue', None)       # pinned default
+        self.color_combo.addItem('red', (1.0, 0.0, 0.0))
+        self.color_combo.addItem('black', (0.0, 0.0, 0.0))
+        self.xdir_combo = QtWidgets.QComboBox(self)
+        self.xdir_combo.addItem('x: ascending', False)
+        self.xdir_combo.addItem('x: descending', True)
+        self.invert_y_check = QtWidgets.QCheckBox('Invert y axis', self)
+        self.invert_y_check.setChecked(False)
+        self.labels_check = QtWidgets.QCheckBox('Show axis labels', self)
+        self.labels_check.setChecked(True)
+
+        # --- Row B: size preset + save.
         self.size_combo = QtWidgets.QComboBox(self)
         for label, preset in plot_logic.size_presets():
             self.size_combo.addItem(label, preset)
-        self.labels_check = QtWidgets.QCheckBox('Show axis labels', self)
-        self.labels_check.setChecked(True)
         self.save_btn = QtWidgets.QPushButton('Save Plot (PNG)', self)
 
-        row = QtWidgets.QHBoxLayout()
-        row.addWidget(QtWidgets.QLabel('Plot size:', self))
-        row.addWidget(self.size_combo)
-        row.addWidget(self.labels_check)
-        row.addWidget(self.save_btn)
-        row.addStretch(1)
+        row_appearance = QtWidgets.QHBoxLayout()
+        row_appearance.addWidget(QtWidgets.QLabel('y unit:', self))
+        row_appearance.addWidget(self.unit_combo)
+        row_appearance.addWidget(QtWidgets.QLabel('color:', self))
+        row_appearance.addWidget(self.color_combo)
+        row_appearance.addWidget(self.xdir_combo)
+        row_appearance.addWidget(self.invert_y_check)
+        row_appearance.addWidget(self.labels_check)
+        row_appearance.addStretch(1)
+        row_size = QtWidgets.QHBoxLayout()
+        row_size.addWidget(QtWidgets.QLabel('Plot size:', self))
+        row_size.addWidget(self.size_combo)
+        row_size.addWidget(self.save_btn)
+        row_size.addStretch(1)
         layout = QtWidgets.QVBoxLayout(self)
-        layout.addLayout(row)
+        layout.addLayout(row_appearance)
+        layout.addLayout(row_size)
         layout.addWidget(self.plot, 1)
 
-        self.size_combo.currentIndexChanged.connect(self._on_size_changed)
+        self.unit_combo.currentIndexChanged.connect(self._on_unit_changed)
+        self.color_combo.currentIndexChanged.connect(self._on_color_changed)
+        self.xdir_combo.currentIndexChanged.connect(self._on_xdir_changed)
+        self.invert_y_check.stateChanged.connect(self._on_invert_y)
         self.labels_check.stateChanged.connect(self._on_toggle)
+        self.size_combo.currentIndexChanged.connect(self._on_size_changed)
         self.save_btn.clicked.connect(self._on_save)
+
+        # Pin the plot to the DEFAULT preset at construction (same
+        # exact-size pin as _on_size_changed) so the first show is
+        # already exactly 'medium (640x400)'.
+        self._on_size_changed(self.size_combo.currentIndex())
 
     # --- public seam for the tab -----------------------------------
 
     def set_scene(self, scene):
-        """Forward the new Scene to the plot (data-in; no recompute)."""
-        self.plot.set_scene(scene)
+        """Store the BASE intensity Scene and forward the unit-derived
+        Scene to the plot (data-in; display transforms live purely in
+        plot_logic.scene_with_unit)."""
+        self._base_scene = scene
+        self.plot.set_scene(self._derive_scene())
 
     # --- internal handlers -----------------------------------------
+
+    def _derive_scene(self):
+        """The displayed Scene: the base Scene in the current unit
+        mode, or None when no base scene exists yet (the plot then
+        shows the empty hint)."""
+        if self._base_scene is None:
+            return None
+        return plot_logic.scene_with_unit(self._base_scene,
+                                          self._unit_mode)
 
     def _report(self, message):
         if self._status_cb is not None:
             self._status_cb(message)
 
+    def _on_unit_changed(self, index):
+        mode = self.unit_combo.currentData()
+        if mode is None:
+            return
+        self._unit_mode = mode
+        self.plot.set_scene(self._derive_scene())
+
+    def _on_color_changed(self, index):
+        self.plot.set_line_color(self.color_combo.currentData())
+
+    def _on_xdir_changed(self, index):
+        self.plot.set_invert_x(bool(self.xdir_combo.currentData()))
+
+    def _on_invert_y(self, state):
+        self.plot.set_invert_y(self.invert_y_check.isChecked())
+
     def _on_size_changed(self, index):
-        # currentData() gives the (w, h) preset tuple directly; the
-        # scene is x-range data — resize-responsive by construction,
-        # NO recompute.
+        """Pin the plot EXACTLY to the selected (w, h) preset.
+
+        Both minimum AND maximum size are pinned (owner amendment
+        2026-09-26, checkpoint round-1 defect c fix): a preset change
+        grows AND shrinks the plot deterministically in the layout —
+        the plot always matches the chosen preset exactly, and any
+        extra window space becomes margin. The window itself stays
+        resizable; the plot simply stays preset-sized.
+
+        currentData() gives the (w, h) preset tuple directly; the
+        scene is x-range data — resize-responsive by construction,
+        NO recompute.
+        """
         preset = self.size_combo.currentData()
         if preset is None:
             return
         w, h = preset
-        self.plot.setMinimumSize(max(w, 320), max(h, 260))
+        self.plot.setMinimumSize(w, h)
+        self.plot.setMaximumSize(w, h)
         self.plot.updateGeometry()
         self.plot.update()
 
@@ -313,7 +472,13 @@ class SpectraPlotPanel(QtWidgets.QWidget):
     def _on_save(self):
         """Static getSaveFileName convenience (gui_setup.py:403 cancel
         guard) -> render_image at 2x -> PNG. Errors report via
-        status_cb; this module never imports pymol.cmd for prints."""
+        status_cb; this module never imports pymol.cmd for prints.
+
+        Route-A parity (amendment): the CURRENT unit-derived scene and
+        the FULL on-screen option state (labels / x-invert / y-invert /
+        line color) all forward to render_image, so the PNG matches the
+        screen exactly for any option combination.
+        """
         scene = self.plot._scene
         if scene is None:
             self._report('nothing to save - run a calculation first')
@@ -327,7 +492,10 @@ class SpectraPlotPanel(QtWidgets.QWidget):
         try:
             img = render_image(
                 scene, (self.plot.width(), self.plot.height()), scale=2,
-                show_labels=self.plot._show_labels)
+                show_labels=self.plot._show_labels,
+                invert_x=self.plot._invert_x,
+                invert_y=self.plot._invert_y,
+                line_color=self.plot._line_color)
             ok = img.save(path, 'PNG')
         except Exception as exc:
             self._report('plot save failed: %s' % exc)
