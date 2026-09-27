@@ -284,7 +284,7 @@ Plans:
 - [x] 07-06-PLAN.md — CHECKPOINT: early plot human-verify via real-GUI harness (fail cheap, 04-07 precedent) (Wave 3, blocking)
 - [x] 07-07-PLAN.md — SpectraTab shell + gui.py placeholder replacement: streaming log, status, Cancel/Run-again delegation; all 06-09 behaviors preserved (SPECTRA-01/04) (Wave 3, parallel)
 - [x] 07-08-PLAN.md — plot panel embed + run_finished → parse → build_scene → set_scene (SPECTRA-03 on-screen) (Wave 4)
-- [ ] 07-09-PLAN.md — frequency table + row-click mode vectors on srp_xtbopt (OPTIMIZED frame — owner sign-off at 07-10) (SPECTRA-05) (Wave 5)
+- [x] 07-09-PLAN.md — frequency table + row-click mode vectors on srp_xtbopt (OPTIMIZED frame — owner sign-off at 07-10) (SPECTRA-05) (Wave 5)
 - [ ] 07-10-PLAN.md — phase-closing gates + consolidated human-verify checkpoint (live flow + optimized-frame sign-off + [TRAIN] discharges) (Wave 6, blocking)
 
 Notes: Pure parser already tested in Phase 2; UI is wiring plus the two verified QPainter precedents (`dynoplot.py`, `pmg_qt/volume.py`) and the probe-verified QImage save route (route A; `QWidget.grab()` demoted to documented fallback). Mode vectors draw on the OPTIMIZED frame (`srp_xtbopt` from record['xtbopt_path']; g98 ≡ xtbopt within 1e-6 Å probed; game frame wrong by up to 0.14 Å) — owner sign-off at the 07-10 checkpoint. Shared imaginary formatter lives in `spectra_ui.freq_label` (single convention; plot shows no raw frequency labels in v1). Avoids Pitfalls 12 (table↔vector index match), 2 (streaming + cancel UX), 5.
