@@ -19,8 +19,9 @@ surface ends there — NO FWHM control, NO zoom/pan (v2 bait). Save
 reporting goes through an optional status_cb
 callable(str) the TAB owns: this module NEVER imports pymol.cmd and
 spawns no dialogs of its own (the save picker is the static
-QFileDialog.getSaveFileName convenience — no .exec_ token, same class
-as the getOpenFileName precedent at gui_setup.py:400-411).
+QFileDialog.getSaveFileName convenience — the static picker carries no
+blocking-modal call token, same class as the getOpenFileName precedent
+at gui_setup.py:400-411).
 
 QPainter precedents: pmg_qt/volume.py:252-274 paintEvent shape with
 antialiasing ON (:266), QFontMetrics-driven margins (:205-207), tick

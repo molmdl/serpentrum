@@ -3,8 +3,8 @@
 
 BRIDGE purity class (03-01): ``from pymol import cmd`` at module level is
 allowed here and ONLY here. PyQt5/numpy are banned anywhere (Qt stays in
-GUI modules; pure modules do the math). ``.exec_()`` is banned (the bridge
-builds no dialogs). Relative imports of pure modules (cgo_build,
+GUI modules; pure modules do the math). Blocking modal dialog calls are
+banned (the bridge builds no dialogs). Relative imports of pure modules (cgo_build,
 setup_logic) are purity-exempt. setloader is NOT imported here — molecule
 records arrive as arguments to ``materialize`` (the bridge never parses
 SDFs itself; that is molfile/setloader's PURE job from 03-02/03-04).

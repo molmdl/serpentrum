@@ -53,8 +53,8 @@ BRIDGE purity statement: this module imports pymol.wizard + pymol.cmd at
 module level — legal ONLY because tools/check_purity.py lists
 serpentrum/input.py in BRIDGE_MODULES (pre-registered by plan 04-01).
 PyQt5 / numpy are NEVER imported here (Qt stays in GUI modules);
-.exec_() is never called (the bridge builds no dialogs). python3.6
-syntax only (%-formatting).
+the modeless gate's blocking-call ban never fires here (the bridge
+builds no dialogs). python3.6 syntax only (%-formatting).
 """
 
 from pymol import cmd

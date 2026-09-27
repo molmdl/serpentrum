@@ -1,13 +1,22 @@
 """serpentrum.gui_setup - the Setup tab configuration form (GUI class).
 
-Phase 3 plan 03-07. SetupTab(QWidget) is the live configuration form that
-makes SETUP-02..06 user-visible: demo-set dropdown + upload picker, box
-preset, head molecule, xtb auto-detect + manual path, win cap with the
-inline hessian warning, and a persistent validate() status label. Three
-TEMPORARY buttons (Apply / Show in Viewer, Cleanup, Start) live INSIDE
-this page -- the canonical 6-button bottom row (SETUP-07) and save/load
-(SETUP-08) stay in Phase 8; the reserved bottom QHBoxLayout in gui.py is
-untouched.
+Phase 3 plan 03-07; Phase 8 plan 08-08 removed the Phase-3 temporary
+button row from this page. SetupTab(QWidget) is the live configuration
+form that makes SETUP-02..06 user-visible: demo-set dropdown + upload
+picker, box preset, head molecule, xtb auto-detect + manual path, win
+cap with the inline hessian warning, and a persistent validate()
+status label. Buttons NO LONGER live inside this page -- the canonical
+6-button bottom action row (SETUP-07: Reset/Randomize/Save Setup/Load
+Setup/Cleanup model/Start) is dialog-owned in gui.py and calls this
+page's handlers: _on_reset, _on_randomize, _on_save_setup,
+_on_load_setup (SETUP-08 save/load flows through the pure
+setup_logic persistence helpers), _on_cleanup and _on_start (the
+04-06 byte-identical Start route -- _on_apply first, then
+start_requested.emit). _on_apply survives only as that internal
+apply+validate-first path. Per the GATE D round-2 owner directive the
+head combo populates at demo-set SELECTION time (read-only setloader
+load, no materialize) and after a successful upload browse-load --
+head options never require the old Apply click.
 
 Purity class: GUI (pymol.Qt only at module level; bare pymol/pmg_tk
 banned at any level; PyQt5/numpy banned). All PyMOL cmd access goes
@@ -60,17 +69,18 @@ class SetupTab(QtWidgets.QWidget):
     """The Setup configuration form.
 
     Seven QGroupBox sections (Molecule set, Box, Head molecule, xtb,
-    Win cap, Speed, Generic stacking) + a persistent status QLabel +
-    three temporary buttons
-    (Apply / Show in Viewer, Cleanup, Start). collect_state()/apply_state()
+    Win cap, Speed, Generic stacking) + a persistent status QLabel.
+    collect_state()/apply_state()
     round-trip is the established pattern: collect_state reads widgets
     into the setup dict; apply_state populates widgets from the dict. A
     _loading flag guards apply_state against cascading signal recompute.
+    The action buttons are NOT widgets of this page (plan 08-08): the
+    dialog-owned bottom row (SETUP-07/08) drives this page's handlers.
     """
 
     # Emitted with the collected setup dict when Start succeeds (apply
-    # first). Temp Phase-4 signal; the canonical Start button lives in
-    # the Phase-8 bottom row (SETUP-07).
+    # first). Canonical signal (04-06 contract): the dialog's bottom-row
+    # Start button connects to _on_start, which emits this.
     start_requested = QtCore.Signal(object)
 
     def __init__(self, anchor_state=None, parent=None):
@@ -160,15 +170,15 @@ class SetupTab(QtWidgets.QWidget):
         self.status_label = QtWidgets.QLabel('ready', self)
         self.status_label.setWordWrap(True)
 
-        # --- Temporary buttons (Phase 3; Phase 8 replaces with the
-        #     canonical 6-button bottom row) ---
-        self.apply_btn = QtWidgets.QPushButton(
-            'Apply / Show in Viewer', self)
-        self.cleanup_btn = QtWidgets.QPushButton('Cleanup', self)
-        self.start_btn = QtWidgets.QPushButton('Start', self)
+        # NO buttons here (plan 08-08): the Phase-3 temporary row is
+        # REMOVED -- the canonical 6-button bottom action row
+        # (SETUP-07) lives in PluginDialog (gui.py) and calls this
+        # page's handlers (_on_reset/_on_randomize/_on_save_setup/
+        # _on_load_setup/_on_cleanup/_on_start).
 
     def _build_layout(self):
-        """Arrange widgets into 7 QGroupBox sections + status + buttons."""
+        """Arrange widgets into 7 QGroupBox sections + status (no buttons
+        since plan 08-08 -- the action row is dialog-owned)."""
         layout = QtWidgets.QVBoxLayout(self)
 
         # --- Molecule set group (QVBoxLayout: upload row needs
@@ -242,13 +252,9 @@ class SetupTab(QtWidgets.QWidget):
         # --- Stretch ---
         layout.addStretch(1)
 
-        # --- Temporary buttons row ---
-        btn_row = QtWidgets.QHBoxLayout()
-        btn_row.addWidget(self.apply_btn)
-        btn_row.addWidget(self.cleanup_btn)
-        btn_row.addWidget(self.start_btn)
-        btn_row.addStretch(1)
-        layout.addLayout(btn_row)
+        # NO trailing button row (plan 08-08): the Phase-3 temporary
+        # row was here and is REMOVED; the dialog-owned bottom action
+        # row (gui.py) supersedes it.
 
     def _wire_signals(self):
         """Connect widget signals to handlers."""
@@ -264,9 +270,6 @@ class SetupTab(QtWidgets.QWidget):
         # House-minimum wire: _refresh_status's own _loading guard
         # covers apply_state restores, so no dedicated handler.
         self.generic_stack_check.stateChanged.connect(self._refresh_status)
-        self.apply_btn.clicked.connect(self._on_apply)
-        self.cleanup_btn.clicked.connect(self._on_cleanup)
-        self.start_btn.clicked.connect(self._on_start)
         self.browse_upload_btn.clicked.connect(self._on_browse_upload)
         self.browse_xtb_btn.clicked.connect(self._on_browse_xtb)
 
@@ -897,7 +900,8 @@ class SetupTab(QtWidgets.QWidget):
         return True
 
     def _on_start(self):
-        """Start (temp, Phase 4): apply the current config, then emit.
+        """Start (canonical, driven by the dialog's bottom row since
+        Plan 08-08): apply the current config, then emit.
 
         Applies FIRST so the game always plays on a materialized scene
         (box + head exist for visible movement -- GAME-01); a failed
