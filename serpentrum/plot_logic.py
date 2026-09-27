@@ -133,6 +133,77 @@ def build_scene(modes, fwhm=16.0, x_min=0.0, x_max=None, n_points=800):
         fwhm=fwhm)
 
 
+# Owner amendment (07-06 checkpoint round 1, 2026-09-26): the y-axis
+# DISPLAY unit is selectable in the panel. (label, mode) combo data for
+# the house addItem(label, data) pattern; the FIRST entry is the
+# default (the approved look, unchanged from v1).
+UNIT_MODES = (('IR intensity (km/mol)', 'intensity'),
+              ('absorbance (arb.)', 'absorbance'),
+              ('transmittance (arb.)', 'transmittance'))
+
+_UNIT_MODE_KEYS = tuple(mode for _label, mode in UNIT_MODES)
+
+
+def scene_with_unit(scene, mode):
+    """Re-express a Scene's y-axis in another DISPLAY unit -> Scene.
+
+    Modes (UNIT_MODES):
+      - 'intensity': passthrough — the Scene is returned unchanged
+        (km/mol, the v1 approved look and the pinned default).
+      - 'absorbance': intensity normalized to peak = 1. Rationale:
+        xtb IR intensities (km/mol) are proportional to absorbance via
+        Beer-Lambert linearity, so the relative absorbance curve is
+        the intensity curve up to an unknown constant; normalizing the
+        peak to 1 keeps it honest — arbitrary units, labeled '(arb.)'.
+      - 'transmittance': T = 10**(-A) of the NORMALIZED absorbance
+        (T in (0, 1]; peaks point DOWN at T = 0.1; far from peaks
+        T ~ 1). Also '(arb.)' — this recomputes nothing physical, it
+        re-expresses the normalized curve in the transmittance
+        convention. The GUI's y-invert option restores the journal
+        look if wanted.
+
+    Unknown modes raise ValueError — loud, never a silent passthrough.
+    A zero curve (the pinned empty-modes scene) stays zeros in every
+    unit (no division-by-zero; the GUI shows the hint path for an
+    empty spectrum anyway). Everything except ys/y_max/y_ticks/y_label
+    passes through UNCHANGED. y_max/y_ticks recompute under the
+    build_scene policy (10% headroom over the new peak, floored at
+    Y_MAX_FLOOR; nice_ticks(0, y_max, 5)).
+    """
+    if mode not in _UNIT_MODE_KEYS:
+        raise ValueError(
+            'unknown plot unit mode %r (expected one of %s)'
+            % (mode, ', '.join(_UNIT_MODE_KEYS)))
+    if mode == 'intensity':
+        return scene
+    y_label = dict((m, label) for label, m in UNIT_MODES)[mode]
+    peak = max(scene.ys) if scene.ys else 0.0
+    if peak <= 0.0:
+        a_rel = list(scene.ys)  # zero curve: stays zeros in any unit
+    else:
+        a_rel = [y / peak for y in scene.ys]
+    if mode == 'absorbance':
+        new_ys = a_rel
+    else:  # 'transmittance'
+        new_ys = [10.0 ** (-a) for a in a_rel] if peak > 0.0 else a_rel
+    peak_new = max(new_ys) if new_ys else 0.0
+    y_max = max(peak_new * 1.1, Y_MAX_FLOOR)
+    y_ticks = nice_ticks(0.0, y_max, 5)
+    return Scene(
+        xs=scene.xs,
+        ys=new_ys,
+        x_min=scene.x_min,
+        x_max=scene.x_max,
+        y_max=y_max,
+        x_ticks=scene.x_ticks,
+        y_ticks=y_ticks,
+        x_label=scene.x_label,
+        y_label=y_label,
+        n_modes=scene.n_modes,
+        n_imaginary=scene.n_imaginary,
+        fwhm=scene.fwhm)
+
+
 def size_presets():
     """The v1 plot-size adjustment data -> [(label, (w, h))].
 
