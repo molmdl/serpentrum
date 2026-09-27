@@ -10,8 +10,9 @@ Pages 0-1 (Setup, Game) are live (SetupTab from 03-07; GameTab from
 Phase 4); page 2 (Spectra) is the live SpectraTab from gui_spectra
 (plan 07-07 -- the 06-09 placeholder page is gone; the launch + runner
 signal contracts survive intact). Plans 07-08/07-09 add the plot panel
-and the frequency table at SpectraTab's PINNED layout indices. The
-real bottom button row lands in Phase 8 (SETUP-07).
+and the frequency table at SpectraTab's PINNED layout indices. Plan
+08-08 landed the canonical 6-button bottom action row (SETUP-07) in
+the QHBoxLayout reserved here since Phase 1.
 """
 import tempfile
 
@@ -60,8 +61,10 @@ class PluginDialog(QtWidgets.QDialog):
     handle -- setCurrentWidget(page) / setCurrentIndex(i); page order
     stays fixed Setup -> Game -> Spectra. The Start transition
     (GAME-01) is owned HERE: SetupTab.start_requested connects to
-    _on_start_requested, which setCurrentIndex(1) + begin_game(setup);
-    the Game tab never reaches up to its parent QTabWidget.
+    _on_start_requested, which switches to the Game page (exactly ONE
+    Start switch, the 04-06 byte-identical route) and calls
+    begin_game(setup); the Game tab never reaches up to its parent
+    QTabWidget.
 
     Lifecycle hooks (plan 04-08): focusInEvent delegates to
     game_tab.request_auto_pause() (the Q3 focus-stealing safety net --
@@ -94,9 +97,11 @@ class PluginDialog(QtWidgets.QDialog):
         # twice on one dialog would duplicate slot calls).
         self._runner_connected = False
         self.tabs = QtWidgets.QTabWidget(self)
-        # Page 0: Setup (live SetupTab from gui_setup).
-        setup_page = SetupTab(anchor_state, self.tabs)
-        self.tabs.addTab(setup_page, 'Setup')
+        # Page 0: Setup (live SetupTab from gui_setup). Retained as
+        # self.setup_page (plan 08-08): the bottom action row wires to
+        # the page's handlers, so the dialog must keep the reference.
+        self.setup_page = SetupTab(anchor_state, self.tabs)
+        self.tabs.addTab(self.setup_page, 'Setup')
         # Page 1: Game (live GameTab from Phase 4, plan 04-05).
         self.game_tab = GameTab(anchor_state, self.tabs)
         self.tabs.addTab(self.game_tab, 'Game')
@@ -108,7 +113,13 @@ class PluginDialog(QtWidgets.QDialog):
         self.tabs.addTab(self.spectra_tab, 'Spectra')
         # Start flow (GAME-01, HUD research Q1 model A): SetupTab emits
         # start_requested(setup); this dialog owns the tab switch.
-        setup_page.start_requested.connect(self._on_start_requested)
+        self.setup_page.start_requested.connect(self._on_start_requested)
+        # Gameplay pause hook (plan 08-08): bottom-row handlers call
+        # this BEFORE opening any modal (PITFALLS.md Pitfall 5 -- the
+        # row is visible on the Game tab mid-run). request_auto_pause
+        # already guards on status == 'playing', so unconditional calls
+        # are safe; attribute assignment, never a signal.
+        self.setup_page.game_pause_request = self.game_tab.request_auto_pause
         # Get Spectra flow (GAME-09, plan 05-15): same model-A pattern -
         # GameTab emits spectra_requested; this dialog owns the switch.
         self.game_tab.spectra_requested.connect(self._on_spectra_requested)
@@ -126,8 +137,35 @@ class PluginDialog(QtWidgets.QDialog):
         if runner is not None:
             self._connect_runner(runner)
             self.spectra_tab.reflect_run_state()
-        buttons = QtWidgets.QHBoxLayout()   # Phase 8: 6 right-aligned buttons
-        buttons.addStretch(1)               # reserved row - no buttons in Phase 1
+        # Canonical bottom action row (plan 08-08, SETUP-07; button
+        # order + labels verbatim from spec.md:21-26: Reset, Randomize,
+        # Save Setup, Load Setup, Cleanup model, Start). addStretch(1)
+        # FIRST keeps the six buttons right-aligned. All six wire to
+        # SetupTab handlers; Start reuses the UNCHANGED _on_start (the
+        # 04-06 byte-identical route: apply-first bool contract ->
+        # start_requested.emit -> _on_start_requested owns the tab
+        # switch + begin_game). Static QPushButton + .clicked.connect
+        # only -- no dialogs, no blocking-call tokens.
+        buttons = QtWidgets.QHBoxLayout()
+        buttons.addStretch(1)
+        reset_btn = QtWidgets.QPushButton('Reset', self)
+        reset_btn.clicked.connect(self.setup_page._on_reset)
+        buttons.addWidget(reset_btn)
+        randomize_btn = QtWidgets.QPushButton('Randomize', self)
+        randomize_btn.clicked.connect(self.setup_page._on_randomize)
+        buttons.addWidget(randomize_btn)
+        save_btn = QtWidgets.QPushButton('Save Setup', self)
+        save_btn.clicked.connect(self.setup_page._on_save_setup)
+        buttons.addWidget(save_btn)
+        load_btn = QtWidgets.QPushButton('Load Setup', self)
+        load_btn.clicked.connect(self.setup_page._on_load_setup)
+        buttons.addWidget(load_btn)
+        cleanup_btn = QtWidgets.QPushButton('Cleanup model', self)
+        cleanup_btn.clicked.connect(self.setup_page._on_cleanup)
+        buttons.addWidget(cleanup_btn)
+        start_btn = QtWidgets.QPushButton('Start', self)
+        start_btn.clicked.connect(self.setup_page._on_start)
+        buttons.addWidget(start_btn)
         outer = QtWidgets.QVBoxLayout(self)
         outer.addWidget(self.tabs)
         outer.addLayout(buttons)
