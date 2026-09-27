@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
-**Current focus:** Phase 7 spectra UI IN PROGRESS at 6/10 (07-06 checkpoint round 2 APPROVED 2026-09-26 — plan CLOSED) — next: 07-08 SpectraTab embed (embed SpectraPlotPanel AS-IS: approved look = its defaults; amendment surface must survive the embed)
+**Current focus:** Phase 7 spectra UI IN PROGRESS at 8/10 (07-08 plot embed COMPLETE 2026-09-27 — panel embedded AS-IS, record→Scene feed guarded, live fwhm, degenerate states degrade to clear lines; gates 840 green) — next: 07-09 frequency table + mode vectors (consumes self._spectrum + insert-at-index-2)
 
 ## Current Position
 
 Phase: 7 of 8 (Spectra UI) — IN PROGRESS
-Plan: 6 of 10 COMPLETE (07-06 checkpoint round 2 APPROVED 2026-09-26 — owner ran smoke\manual_plot_check.py in real Windows PyMOL and typed 'approved'; steps h-k PASS; round-1 defect c fixed and re-verified)
-Status: SPECTRA-03 v1 surface APPROVED expanded (unit modes / colors / x-direction / y-invert / exact-preset sizing — defaults = approved look: intensity / ascending / no y-invert / blue); blocking gate CLEARED; next 07-08 SpectraTab embed
-Last activity: 2026-09-26 — 07-06 checkpoint APPROVED round 2 (owner: 'approved'); plan closed — docs-only finalization on main
+Plan: 8 of 10 COMPLETE (07-08 — SpectraPlotPanel embedded at pinned index 2 AS-IS; run_finished/reload → record_spectrum_paths → parse → build_scene(live fwhm) → set_scene; vibspectrum fallback noted; failed/cancelled/corrupt → empty plot + clear lines, nothing fabricated; self._spectrum retained for 07-09)
+Status: SPECTRA-03 on-screen half WIRED (plot feed complete; live-run leg = 07-10 consolidated human-verify); next 07-09 frequency table + row-click vectors on srp_xtbopt
+Last activity: 2026-09-27 — Completed 07-08-PLAN.md (2 tasks, a87873f + 3d784a7; 840 unittests + required smokes SMOKE-OK)
 
-Progress: [█████████░] ~97% (92 of 95 planned plans fully closed — Phases 1-5 + 5.1 + 5.2 + 5.3 + 6 COMPLETE; Phase 7: 7/10 closed; Phase 8 unplanned)
+Progress: [█████████░] ~98% (93 of 95 planned plans fully closed — Phases 1-5 + 5.1 + 5.2 + 5.3 + 6 COMPLETE; Phase 7: 8/10 closed; Phase 8 unplanned)
 
 ## Performance Metrics
 
@@ -35,7 +35,7 @@ Progress: [█████████░] ~97% (92 of 95 planned plans fully cl
 | 5.2. Generic Upload Stacking Consent | 9/9 | ~25 min — wave 1: 2 parallel TDD executors (~4 min each); waves 2-3: single TDD executors (3 + 5 min); wave 4: 4 parallel executors (5-8 min each); wave 5: gates task (~1 min) + owner feel-check (2 rounds) + continuation finalize | ~3 min |
 | 5.3. Randomized Pickup Spawning | 5/5 | ~55 min — wave 1: single TDD executor (18 min); wave 2: 3 parallel executors via worktree protocol (5.3-02 28 min incl. probe-justified seed swap, 5.3-03 5 min, 5.3-04 4 min; zero-conflict merges); wave 3: gates+smokes (~4 min) + BLOCKING owner feel-check (APPROVED round 1) + continuation finalize; verifier passed 5/5 | ~11 min |
 | 6. xtb Pipeline | 12/12 | waves 1-3 via exec branches (06-08/09/10/11 merged zero-conflict); wave 4 = 06-12 gates (~5 min) + BLOCKING owner live checkpoint (APPROVED 12/12, cap-3 win game; cancel/relaunch/double-run/head-inclusive counts all PASS) + continuation finalize with ONE owner amendment (EQ-artifact-1: artifacts dir user-settable, SRP_SPECTRA_DIR || <cwd>/srp_spectra, commit 048d929) + re-verified gates; test baseline 755 -> 796 across the phase (+41) | — not yet aggregated — |
-| 7. Spectra UI | 6/10 closed | wave 1 (07-01..07-04) merged via exec branches zero-conflict (HEAD 77cafa5); 07-05 single-plan direct on main: 10 min; 07-06 harness merge + round-1 verdict (a/b/d/e/f PASS, c defect) + owner amendments applied in a single direct-on-main continuation (11 min; gates 836 unittests + smoke 12 STAGE0..STAGE5) + round-2 checkpoint APPROVED (owner 'approved' 2026-09-26) + docs-only finalization | — in progress — |
+| 7. Spectra UI | 8/10 closed | wave 1 (07-01..07-04) merged via exec branches zero-conflict (HEAD 77cafa5); 07-05 single-plan direct on main: 10 min; 07-06 harness merge + round-1 verdict (a/b/d/e/f PASS, c defect) + owner amendments applied in a single direct-on-main continuation (11 min; gates 836 unittests + smoke 12 STAGE0..STAGE5) + round-2 checkpoint APPROVED (owner 'approved' 2026-09-26) + docs-only finalization; 07-07 single-plan direct on main; 07-08 single-plan direct on main: 9 min (840 unittests + smokes green, 2 commits) | — in progress — |
 
 **Recent Trend:**
 - Phase 3: 03-01 (7 min), 03-02 (22), 03-03 (~15 incl. respawn after /home-symlink permission rejection), 03-04 (10), 03-05 (~8, single-plan direct on main), 03-06 (~25, Windows smokes), 03-07 (20), 03-08 (35 + 3 follow-up agents ~25)
@@ -91,6 +91,7 @@ Recent decisions affecting current work:
 
 - **2026-09-26 (07-05 plot GUI):** Save route = route A only — ONE paint_scene seam serves paintEvent AND the 2x QImage PNG (identical look; QWidget.grab() demoted to a single non-shipped comment). v1 adjustment surface = size-preset combo + 'Show axis labels' toggle ONLY (no FWHM control, no zoom/pan). GUI_MODULES single-writer: gui_plot.py live + gui_spectra.py inert-first (07-07 creates the file against the entry). Renderer smoke rule now in AGENTS.md: QApplication.instance() or QApplication([]) before ANY font-touching paint (probe RUN A hard-kill). REQUIRED smoke 12 (PLOT-RENDER) pins it; margins widened from plan shorthand so axis titles never clip.
 
+- **2026-09-27 (07-08 plot embed):** (a) record_spectrum_paths is PURE selection ONLY (no os.path.isfile) — g98-first / vibspectrum-fallback / 'none'; existence checks stay in the tab so the degenerate matrix is unit-testable. (b) Plot refresh hangs off the single on_run_finished slot (_refresh_from_record) — reflect_run_state inherits it (no double-parse on plugin reload / dialog reopen). (c) self._spectrum + self._spectrum_note retained as 07-09's single-source parse (index desync impossible, research Q4d). (d) fwhm = LIVE anchor.setup['broadening_fwhm'] w/ setup_logic.DEFAULTS fallback at populate time (never re-pinned). (e) Panel embedded AS-IS (07-06 approved look = its defaults); gui_plot.py + gui.py untouched. Gates: 840 unittests + all required smokes SMOKE-OK (HEAD 3d784a7).
 - **2026-09-26 (07-06 checkpoint round 1, owner verdicts + directives — SUPERSEDES the 07-05 'v1 surface' line above):** (a) Round-1 verdict: steps a/b/d/e/f PASS (curve/labels legible; ascending x axis accepted as-is; toggle, save, PNG-opens-outside-PyMOL all PASS). (b) Defect c = preset SHRINK sticky (larger -> smaller needed manual resize) — FIXED by the exact min/max pin: the plot is EXACTLY the chosen preset (grow AND shrink automatic; window stays resizable, extra space = margin; pin applied at construction for the default preset too). (c) **OWNER DIRECTIVES — plot v1 surface EXPANDED:** y-unit modes intensity (default, km/mol) / absorbance (arb.) / transmittance (arb.); x-direction ascending (default) / descending (chemistry-conventional 4000->400); y-invert toggle (off default); curve colors blue (default, pinned #1f4fff exactly) / red / black. ALL defaults preserve the approved round-1 look; NO new REQ ID (SPECTRA-03 surface expansion, 5.3/06-12 amendment precedent). **ROUND 2 (2026-09-26): CHECKPOINT APPROVED** — owner ran smoke\manual_plot_check.py in real Windows PyMOL and typed 'approved' (steps h unit modes / i colors / j x-direction+y-invert / k shrink-fix + option-state PNG parity all PASS); defaults = the approved look (intensity / ascending / no y-invert / blue / exact preset size); option surface shipped: unit modes, colors, x-direction, y-invert, exact-preset sizing. (d) Implementation contracts: transforms PURE in plot_logic.scene_with_unit + UNIT_MODES (absorbance = intensity normalized to peak=1 — Beer-Lambert proportionality, arbitrary units honestly '(arb.)'; transmittance = 10^(-A) of the normalized absorbance, peaks down, T in (0,1]; unknown mode = ValueError); panels keep the BASE intensity scene and derive per-change; render_image/paint_scene signatures carry invert_x/invert_y/line_color so PNG == screen for ANY option state (route-A parity); smoke 12 STAGE5 OPTIONS pins the regression.
 
 ### Roadmap Evolution
@@ -122,8 +123,8 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-09-26 (gsd-executor — 07-06 finalization on main: documentation-only; owner checkpoint round 2 APPROVED ('approved'); 07-06-SUMMARY + STATE flipped to closed)
-Stopped at: 07-06 CLOSED (blocking human-verify checkpoint APPROVED round 2, 2026-09-26) — Phase 7 at 6/10
+Last session: 2026-09-27 (gsd-executor — 07-08 executed on main: panel embed + record→Scene feed + record_spectrum_paths pure seam; 2 commits; gates 840 green)
+Stopped at: 07-08 CLOSED (SUMMARY written) — Phase 7 at 8/10
 Resume file: None needed
-Next action: 07-08 SpectraTab embed (do NOT start plan work outside its own plan) — embed SpectraPlotPanel AS-IS; approved look = the panel defaults (intensity unit / ascending x / no y-invert / blue / exact preset size); the amendment surface (unit/color/direction/invert combos) must survive the embed; [TRAIN] axis-convention item carries the owner's 'b pass' + shipped direction option
+Next action: 07-09 frequency table + row-click mode vectors (do NOT start plan work outside its own plan) — consumes self._spectrum / self._spectrum_note; table inserts at layout index 2 (stretch 2) shifting plot→3, buttons→4; vectors draw on srp_xtbopt (OPTIMIZED frame — owner sign-off at 07-10)
 Date convention: planning-doc dates are UTC (git commit dates authoritative) — the dev shell is HKT (UTC+8); never stamp from the local date.

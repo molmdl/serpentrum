@@ -276,14 +276,14 @@ Notes: PyMOL-free; the only gameplay touchpoint is the final-snake xyz handoff �
 **Plans**: 10 plans in 6 waves (planned 2026-09-25 from 07-RESEARCH-qt-plot/-spectra-seam; owner directive: fine-grained focused plans)
 
 Plans:
-- [ ] 07-01-PLAN.md — TDD spectra_ui pure half: shared freq_label (-31.9i convention), table_rows (every mode, zero-intensity included), mode_arrow_primitives, run_status_lines (Wave 1, parallel)
-- [ ] 07-02-PLAN.md — TDD plot_logic pure half: Scene builder over broaden + nice_ticks + size presets + caption; ascending axis pinned (Wave 1, parallel)
-- [ ] 07-03-PLAN.md — bridge mode-vector seams (load_mode_arrows/load_xtbopt/zoom_mode_frame) + REQUIRED smoke 13 with always-on g98≡xtbopt overlay assertion (Wave 1, parallel)
-- [ ] 07-04-PLAN.md — research-flagged seam gaps: XtbRunController.log_tail() public accessor + spectra_runner anchor field declaration (Wave 1, parallel)
-- [ ] 07-05-PLAN.md — gui_plot.py: IrPlotWidget + paint_scene seam + SpectraPlotPanel + render_image save route + REQUIRED smoke 12 + single-writer GUI_MODULES registration (Wave 2)
-- [ ] 07-06-PLAN.md — CHECKPOINT: early plot human-verify via real-GUI harness (fail cheap, 04-07 precedent) (Wave 3, blocking)
-- [ ] 07-07-PLAN.md — SpectraTab shell + gui.py placeholder replacement: streaming log, status, Cancel/Run-again delegation; all 06-09 behaviors preserved (SPECTRA-01/04) (Wave 3, parallel)
-- [ ] 07-08-PLAN.md — plot panel embed + run_finished → parse → build_scene → set_scene (SPECTRA-03 on-screen) (Wave 4)
+- [x] 07-01-PLAN.md — TDD spectra_ui pure half: shared freq_label (-31.9i convention), table_rows (every mode, zero-intensity included), mode_arrow_primitives, run_status_lines (Wave 1, parallel)
+- [x] 07-02-PLAN.md — TDD plot_logic pure half: Scene builder over broaden + nice_ticks + size presets + caption; ascending axis pinned (Wave 1, parallel)
+- [x] 07-03-PLAN.md — bridge mode-vector seams (load_mode_arrows/load_xtbopt/zoom_mode_frame) + REQUIRED smoke 13 with always-on g98≡xtbopt overlay assertion (Wave 1, parallel)
+- [x] 07-04-PLAN.md — research-flagged seam gaps: XtbRunController.log_tail() public accessor + spectra_runner anchor field declaration (Wave 1, parallel)
+- [x] 07-05-PLAN.md — gui_plot.py: IrPlotWidget + paint_scene seam + SpectraPlotPanel + render_image save route + REQUIRED smoke 12 + single-writer GUI_MODULES registration (Wave 2)
+- [x] 07-06-PLAN.md — CHECKPOINT: early plot human-verify via real-GUI harness (fail cheap, 04-07 precedent) (Wave 3, blocking)
+- [x] 07-07-PLAN.md — SpectraTab shell + gui.py placeholder replacement: streaming log, status, Cancel/Run-again delegation; all 06-09 behaviors preserved (SPECTRA-01/04) (Wave 3, parallel)
+- [x] 07-08-PLAN.md — plot panel embed + run_finished → parse → build_scene → set_scene (SPECTRA-03 on-screen) (Wave 4)
 - [ ] 07-09-PLAN.md — frequency table + row-click mode vectors on srp_xtbopt (OPTIMIZED frame — owner sign-off at 07-10) (SPECTRA-05) (Wave 5)
 - [ ] 07-10-PLAN.md — phase-closing gates + consolidated human-verify checkpoint (live flow + optimized-frame sign-off + [TRAIN] discharges) (Wave 6, blocking)
 
