@@ -423,7 +423,9 @@ class SpectraTab(QtWidgets.QWidget):
         a vanished overlay object mid-life is tolerated (every delete
         and zoom is guarded — pymol_bridge.object_exists / the 07-03
         guarded zoom). Static vectors only — per-tick animation is v2
-        (GAME-09-v2).
+        (GAME-09-v2). Every draw first sweeps srp_* to sticks
+        (pymol_bridge.show_srp_sticks) — owner post-approval follow-up
+        (07-10): the sphere head occluded the head-position vectors.
         """
         if self._spectrum is None:
             return
@@ -453,6 +455,12 @@ class SpectraTab(QtWidgets.QWidget):
                     'the optimized structure could not be loaded: %s'
                     % exc)
                 return
+        # Sticks sweep: the game snake's sphere head occludes the
+        # head-position vectors (owner 07-10 post-approval follow-up);
+        # hide/show are cheap no-ops when already sticks, so this runs
+        # idempotently on every click. CGO/objects like srp_mode_vec
+        # are unaffected; the game rebuild restores its own reps.
+        pymol_bridge.show_srp_sticks()
         # Arrows: replace-per-click (delete-then-load; never
         # accumulate). Frozen builder; v1 pins scale=1.0.
         pymol_bridge.delete_object('srp_mode_vec')

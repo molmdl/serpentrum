@@ -534,6 +534,21 @@ def load_xtbopt(path, srp_name=XTBOPT_NAME, zoom=0):
     return srp_name
 
 
+def show_srp_sticks():
+    """Convert ALL srp_ molecular objects to stick representation.
+
+    Owner directive (07-10 post-approval follow-up): the game snake's
+    sphere head occluded the mode vectors drawn at the head position;
+    a sticks sweep makes every overlay layer readable. CGO objects
+    (srp_mode_vec, srp_box) are unaffected by rep commands; the game
+    rebuild (cleanup_srp + materialize) restores its own presentation,
+    so this is a display-only, self-healing state change. User
+    molecules are never touched (srp_ prefix contract, INFRA-04).
+    """
+    cmd.hide('spheres', 'srp_*')
+    cmd.show('sticks', 'srp_*')
+
+
 def zoom_mode_frame():
     """ONE-shot framing of the spectra overlay objects (pitfall 14).
 
