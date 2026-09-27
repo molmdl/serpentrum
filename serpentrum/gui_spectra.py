@@ -77,8 +77,10 @@ class SpectraTab(QtWidgets.QWidget):
     Built by PluginDialog as page 2 (plan 07-07; the 06-09 placeholder
     page is gone). Owns: the status label, the bounded log panel, the
     SPECTRA-05 frequency table (07-09 — every parsed mode via the
-    SHARED spectra_ui.table_rows/freq_label formatters; row-click
-    mode vectors land with this same plan's second task), the embedded
+    SHARED spectra_ui.table_rows/freq_label formatters; a row click
+    draws that mode's static displacement vectors on the OPTIMIZED
+    frame srp_xtbopt via the BRIDGE overlay, replace-per-click with
+    once-per-record load/zoom), the embedded
     SpectraPlotPanel and its record->Scene feed (07-08 — SPECTRA-03
     on-screen plot feed complete), the contextual run button and its
     label logic, and the runner-slot display updates (started /
@@ -375,10 +377,82 @@ class SpectraTab(QtWidgets.QWidget):
         self.table.resizeColumnsToContents()
 
     def _on_table_cell_clicked(self, row, column):
-        """Table-click stub — the mode-vector draw lands next (07-09
-        Task 2: mode_arrow_primitives -> cgo_build.mode_arrows ->
-        the pymol_bridge overlay on srp_xtbopt)."""
-        pass
+        """Row click -> the clicked mode's static displacement vectors
+        drawn on the OPTIMIZED frame (SPECTRA-05; the cellClicked
+        column is ignored — the ROW selects the mode).
+
+        Flow: row r <=> self._spectrum.modes[r] (the single-source
+        parse; 1-based selector input is r + 1) ->
+        spectra_ui.mode_arrow_primitives -> the FROZEN
+        cgo_build.mode_arrows at the v1-pinned scale=1.0
+        (unit-normalized, uniform-length) -> pymol_bridge
+        load_mode_arrows as srp_mode_vec. Every cmd touch goes through
+        the BRIDGE seams (07-03) — the tab never imports pymol.cmd.
+
+        Frame decision (07-RESEARCH-spectra-seam.md Q4b probe): the g98
+        Standard-orientation atom block the arrows are built from is
+        coordinate-identical to xtbopt.xyz (max pairwise-diff 1e-6 A),
+        so the vectors are drawn over srp_xtbopt loaded from
+        record['xtbopt_path'] — the game frame (srp_head/srp_seg_*)
+        would be wrong by up to 0.14 A AND can have been cleaned.
+        srp_xtbopt loads ONCE per record (snake_id-guarded,
+        delete-then-reload on change); the camera zoom
+        (zoom_mode_frame) fires ONCE per record (pitfall 14 — never
+        per click). Repeated clicks REPLACE srp_mode_vec
+        (delete-then-load; arrows never accumulate).
+
+        Refusals are clear status lines, never crashes: no spectrum /
+        missing xtbopt / vibspectrum-only parse (mode_arrow_primitives
+        returns None). srp_ objects die at cleanup_srp / begin_game;
+        a vanished overlay object mid-life is tolerated (every delete
+        and zoom is guarded — pymol_bridge.object_exists / the 07-03
+        guarded zoom). Static vectors only — per-tick animation is v2
+        (GAME-09-v2).
+        """
+        if self._spectrum is None:
+            return
+        record = getattr(self._anchor, 'spectra_run', None) or {}
+        prims = spectra_ui.mode_arrow_primitives(self._spectrum, row + 1)
+        if prims is None:
+            self.set_status_line(
+                'this spectrum has no displacement vectors '
+                '(vibspectrum fallback) - vectors need the g98 output')
+            return
+        xtbopt_path = record.get('xtbopt_path')
+        if not xtbopt_path:
+            self.set_status_line(
+                'the optimized structure file is unavailable - cannot '
+                'draw mode vectors')
+            return
+        # Load the optimized frame ONCE per record (replace on
+        # snake_id change or a vanished srp_xtbopt).
+        if (not pymol_bridge.object_exists('srp_xtbopt')
+                or self._xtbopt_snake_id != record.get('snake_id')):
+            try:
+                pymol_bridge.delete_object('srp_xtbopt')
+                pymol_bridge.load_xtbopt(xtbopt_path)
+                self._xtbopt_snake_id = record.get('snake_id')
+            except OSError as exc:
+                self.set_status_line(
+                    'the optimized structure could not be loaded: %s'
+                    % exc)
+                return
+        # Arrows: replace-per-click (delete-then-load; never
+        # accumulate). Frozen builder; v1 pins scale=1.0.
+        pymol_bridge.delete_object('srp_mode_vec')
+        cgo = cgo_build.mode_arrows(prims[0], prims[1], scale=1.0)
+        pymol_bridge.load_mode_arrows(cgo)
+        # Camera: frame the overlay ONCE per record (pitfall 14); the
+        # bridge zoom is a guarded no-op when neither object exists.
+        if self._zoomed_snake_id != record.get('snake_id'):
+            pymol_bridge.zoom_mode_frame()
+            self._zoomed_snake_id = record.get('snake_id')
+        # The educational framing states the frame EXPLICITLY (owner
+        # sign-off at 07-10; an amended interpretation edits this line
+        # + the load target only).
+        self.set_status_line(
+            'mode %d: vectors drawn on the optimized structure '
+            '(srp_xtbopt)' % (row + 1))
 
     # --- the contextual button -----------------------------------------
 
