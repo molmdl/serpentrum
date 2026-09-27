@@ -213,5 +213,58 @@ class TestRecordSpectrumPaths(unittest.TestCase):
                          (None, None, 'none'))
 
 
+class TestImaginaryNote(unittest.TestCase):
+    """DOCS-03 negative-frequency guidance line (plan 08-06). Wording and
+    cutoffs are the GATE D d2-option-b-two-tier verdict (owner,
+    2026-09-28; .planning/phases/08-demo-data-docs-release-audit/
+    08-01-SUMMARY.md) — EXACT literals, strict < threshold at 20i."""
+
+    SMALL = ('2 small imaginary mode(s) (<20i cm-1): soft inter-stack '
+             'modes, physical for molecular stacks')
+
+    def test_empty_none(self):
+        self.assertIsNone(spectra_ui.imaginary_note([]))
+
+    def test_no_negatives_none(self):
+        self.assertIsNone(spectra_ui.imaginary_note([100.0, 5.0]))
+
+    def test_two_small_imaginary(self):
+        # Count = number of imaginary modes; 'cm-1' matches the table
+        # header convention (gui_spectra.py:151); ASCII hyphen.
+        self.assertEqual(
+            spectra_ui.imaginary_note([-6.65, 100.0, -5.05]),
+            self.SMALL)
+
+    def test_singular_keeps_house_plural_style(self):
+        # House style keeps '(s)' — matches existing count-line
+        # patterns; no plural special-casing.
+        self.assertEqual(
+            spectra_ui.imaginary_note([-6.65]),
+            '%d small imaginary mode(s) (<20i cm-1): soft inter-stack '
+            'modes, physical for molecular stacks' % 1)
+
+    def test_boundary_minus_20_is_saddle(self):
+        # Strict < threshold: exactly -20.0 is NOT benign -> saddle line.
+        self.assertEqual(
+            spectra_ui.imaginary_note([-20.0]),
+            '%d large imaginary mode(s) (>=20i cm-1): possible saddle '
+            'point - check the structure' % 1)
+
+    def test_mixed_counts_large_tier_only(self):
+        # -60.0 is large (>=20i), -3.0 is small: the large tier wins and
+        # counts only the large imaginary modes.
+        self.assertEqual(
+            spectra_ui.imaginary_note([-60.0, -3.0]),
+            '%d large imaginary mode(s) (>=20i cm-1): possible saddle '
+            'point - check the structure' % 1)
+
+    def test_ascii_only(self):
+        for freqs in ([-6.65, 100.0, -5.05], [-20.0], [-60.0, -3.0]):
+            note = spectra_ui.imaginary_note(freqs)
+            self.assertIsNotNone(note)
+            self.assertTrue(_is_ascii(note),
+                            'non-ASCII note for %r: %r' % (freqs, note))
+
+
 if __name__ == '__main__':
     unittest.main()
