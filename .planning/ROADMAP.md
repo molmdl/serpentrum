@@ -300,9 +300,23 @@ Notes: Pure parser already tested in Phase 2; UI is wiring plus the two verified
   3. README documents install, usage and the demo set with the vibe-coding warning block intact (and the leftover "sECDpent" name fixed), and the doc-vs-code audit passes — README steps reproduce; help text matches real controls and dataset values. [DOCS-01, DOCS-04]
   4. In-game help covers controls, the "click the 3D viewer" focus hint, what negative frequencies mean, and a next-action hint on every screen. [DOCS-03]
   5. End-to-end release audit: the full flow (setup → play → complete → xtb → IR plot → save) passes headless with human checkpoints, and all v1 requirements are checked off with complete traceability. [DOCS-05]
-**Plans**: TBD (expected 3–5; data pack (gated on approvals) ∥ persistence+buttons ∥ help text ∥ docs/audits — parallelizable once their inputs exist)
+**Plans**: 12 plans (6 waves; planned 2026-09-28 from the four 08-RESEARCH-* files; owner directive: many small focused plans, consolidated checkpoints)
 
-Notes: Data ships only after citation pinning + human approval (repo hard rule — no fabrication). Avoids Pitfalls 8 (.pse desync), 4 (leak check), UX table.
+Plans:
+- [ ] 08-01-PLAN.md — Demo-pack completion: setloader end-to-end load proof test + DATA_SOURCES.md 3 content edits + audit chain (DRAFT-headed) (Wave 1)
+- [ ] 08-02-PLAN.md — CHECKPOINT: consolidated DATA-02/04/DOCS-02 human-approval sign-off + conditional approval-literal flip with coupled test-pin edit (Wave 2, blocking)
+- [ ] 08-03-PLAN.md — TDD pure persistence helpers (randomize_setup + normalize_loaded) + Randomize-scope owner decision (Wave 1, parallel; decision-gated)
+- [ ] 08-04-PLAN.md — 6-button bottom row GUI wiring (gui.py + gui_setup.py handlers) + temp-row removal + source-pin test (Wave 2, parallel)
+- [ ] 08-05-PLAN.md — CHECKPOINT: 6-button live pass + educator Save→fresh-install→Load→Start reproduction round-trip (+ conditional width fix) (Wave 3, blocking)
+- [ ] 08-06-PLAN.md — Negative-freq wording decision + TDD imaginary_note (spectra_ui) + TDD help_text.py PURE module (Wave 1, parallel; decision-gated)
+- [ ] 08-07-PLAN.md — Help wiring: state-driven next-action hints (Game/Setup/Spectra) + negative-freq log line + stale-clause honesty fix (Wave 4)
+- [ ] 08-08-PLAN.md — README rewrite (DOCS-01) + 'Under Development' sub-line owner decision (Wave 3, parallel; decision-gated)
+- [ ] 08-09-PLAN.md — TDD doc-vs-code audit: tools/check_docs.py + tests/test_docs_audit.py in the gate suite (DOCS-04 leg A) (Wave 4, parallel)
+- [ ] 08-10-PLAN.md — REQUIRED smoke/14 release e2e chain (scripted win → xyz → fixture spectra → PNG → setup round-trip) + REQUIRED_SMOKES registration (Wave 1, parallel)
+- [ ] 08-11-PLAN.md — TDD tools/audit_requirements.py + Evidence column over all 46 IDs + 36-row checkbox reconciliation (DOCS-05 traceability) (Wave 5)
+- [ ] 08-12-PLAN.md — CHECKPOINT: phase-closing release audit (live full flow incl. real xtb + SIGN-OFFs A/B) + conditional 10-row ledger flip + final battery (Wave 6, blocking)
+
+Notes: Data ships only after citation pinning + human approval (repo hard rule — no fabrication; 08-02 is THE data gate). Three consolidated human checkpoints (08-02 data, 08-05 persistence, 08-12 release) per owner directive. Real xtb stays OUT of required smokes (06-12 EQ-smoke-1 disposition; smoke 14 is fixture-tailed). Waves 1/2/4 run parallel plans under the worktree protocol (disjoint files_modified). Avoids Pitfalls 8 (.pse desync), 4 (leak check), UX table; honors the test_stacking_dataset.py 'DRAFT' marker-pin trap (same-commit coupling in 08-02).
 
 ## Execution Waves (parallelization: true)
 
@@ -356,4 +370,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5.3. Randomized Pickup Spawning (INSERTED 2026-09-26) | 5/5 | Complete (verified 5/5 must-haves; owner feel-check APPROVED "good, all pass", factor 0.35 ships; edge-bias idea DEFERRED with sketch in 5.3-05-SUMMARY) | 2026-09-26 |
 | 6. xtb Pipeline | 12/12 | Complete (verified 5/5 SCs; owner live checkpoint APPROVED 12/12 with SRP_SPECTRA_DIR amendment; 796 unittests, 8/8 required smokes; DEFAULT_THREAD_ARG ('-P','4') ships; HESSIAN_WARNING measurement-derived) | 2026-09-26 |
 | 7. Spectra UI | 10/10 | Complete (verified 38/38 must-haves, 3/3 SCs; owner-approved plot options expanded at 07-06; 07-10 live checkpoint APPROVED round 2 — optimized frame signed off; 840 unittests, 10/10 required smokes, --xtb green) | 2026-09-26 |
-| 8. Demo Data, Docs & Release Audit | 0/TBD | Not started | - |
+| 8. Demo Data, Docs & Release Audit | 0/12 | Planned 2026-09-28 (12 plans, 6 waves; 3 consolidated checkpoints) | - |
