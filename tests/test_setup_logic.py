@@ -662,6 +662,86 @@ class TestRandomizeSetup(unittest.TestCase):
         setup_logic.randomize_setup(base, self.CANDIDATES, seed=1)
         self.assertEqual(base, snapshot)
 
+class TestNormalizeLoaded(unittest.TestCase):
+    """normalize_loaded (plan 08-05) — the Load Setup xtb-path
+    portability policy (GATE D default #1, CONFIRMED in 08-01-SUMMARY.md):
+    save as-is, normalize ON LOAD. A loaded xtb_path that has problems on
+    THIS machine is rewritten to None (auto-detect) and the caller gets
+    the exact house-note 'xtb path not found on this machine - using
+    auto-detect' (ASCII) to surface in the friendly status line.
+
+    setup_logic stays PURE: the filesystem judgment arrives via the
+    INJECTED path_problems_fn (dependency-injection seams; the GUI passes
+    xtbenv.validate_binary_path-backed problems at call time, mirroring
+    the _xtb_path_problems delegation). Contract pins: DI fn called
+    exactly once with the loaded path when there IS a path; None path =
+    no call at all; input dict never mutated.
+    """
+
+    FOREIGN = '/other/machine/xtb.exe'
+
+    def _problems_fn(self, problems_by_call):
+        """Return a recording fn that serves `problems` from a list —
+        one entry per call; records every argument it receives."""
+        calls = []
+
+        def fn(path):
+            calls.append(path)
+            return problems_by_call[len(calls) - 1]
+        return fn, calls
+
+    def test_none_path_untouched_note_none_no_call(self):
+        merged = _mutated(xtb_path=None)
+        fn, calls = self._problems_fn([[]])
+        result, note = setup_logic.normalize_loaded(merged, fn)
+        self.assertEqual(result, merged)
+        self.assertIsNone(note)
+        self.assertEqual(calls, [], 'None path must not consult the DI fn')
+
+    def test_valid_path_untouched_note_none(self):
+        merged = _mutated(xtb_path='/this/machine/xtb.exe')
+        fn, calls = self._problems_fn([[]])  # empty problems = valid
+        result, note = setup_logic.normalize_loaded(merged, fn)
+        self.assertEqual(result, merged)
+        self.assertEqual(result['xtb_path'], '/this/machine/xtb.exe')
+        self.assertIsNone(note)
+        self.assertEqual(calls, ['/this/machine/xtb.exe'])
+
+    def test_foreign_path_rewritten_to_none_with_exact_note(self):
+        merged = _mutated(xtb_path=self.FOREIGN)
+        fn, calls = self._problems_fn(
+            [["'%s' does not exist" % (self.FOREIGN,)]])
+        result, note = setup_logic.normalize_loaded(merged, fn)
+        self.assertIsNone(result['xtb_path'])
+        self.assertEqual(note,
+                         'xtb path not found on this machine - '
+                         'using auto-detect')
+        self.assertEqual(calls, [self.FOREIGN])
+        # Every other key is carried through.
+        rest = dict(result)
+        rest.pop('xtb_path')
+        expected = dict(merged)
+        expected.pop('xtb_path')
+        self.assertEqual(rest, expected)
+
+    def test_returns_tuple_and_does_not_mutate_input(self):
+        merged = _mutated(xtb_path=self.FOREIGN)
+        snapshot = dict(merged)
+        fn, _calls = self._problems_fn([['not found']])
+        outcome = setup_logic.normalize_loaded(merged, fn)
+        self.assertTrue(isinstance(outcome, tuple))
+        self.assertEqual(len(outcome), 2)
+        self.assertEqual(merged, snapshot,
+                         'input dict must not be mutated in place')
+
+    def test_problems_fn_called_exactly_once_with_loaded_path(self):
+        # Dependency-injection contract: exactly one call, with the
+        # loaded path as the sole argument value.
+        merged = _mutated(xtb_path=self.FOREIGN)
+        fn, calls = self._problems_fn([['not found'], ['extra unused']])
+        setup_logic.normalize_loaded(merged, fn)
+        self.assertEqual(calls, [self.FOREIGN])
+
 
 class XtbPathUnificationTest(unittest.TestCase):
     """Pin the Phase-3 unification (03-03): setup_logic._xtb_path_problems
