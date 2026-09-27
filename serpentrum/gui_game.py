@@ -60,6 +60,7 @@ from pymol.Qt import QtWidgets, QtCore, QtGui
 
 from . import game_engine
 from . import generic_stack
+from . import help_text
 from . import hud_logic
 from . import pymol_bridge
 from . import setup_logic
@@ -317,9 +318,12 @@ class GameTab(QtWidgets.QWidget):
         self.get_spectra_btn = QtWidgets.QPushButton('Get Spectra', self)
         self.get_spectra_btn.setEnabled(False)
 
-        self.hint_label = QtWidgets.QLabel(
-            'Click Start on the Setup tab. Steer with arrow keys; '
-            'click the 3D viewer first if keys seem dead.', self)
+        # DOCS-03 (plan 08-09): the focus hint is single-sourced from
+        # help_text (08-06); construction renders the constant and every
+        # state flip below setTexts its game_hint(state) variant. NEVER
+        # re-inline the literal (the test_help_text drift alarm pins the
+        # reference AND the literal's absence here).
+        self.hint_label = QtWidgets.QLabel(help_text.GAME_FOCUS_HINT, self)
         self.hint_label.setWordWrap(True)
 
     def _build_layout(self):
@@ -464,6 +468,9 @@ class GameTab(QtWidgets.QWidget):
                                        speed_val))
         self._log('Get ready...')
         self.restart_btn.setEnabled(True)
+        # DOCS-03 (plan 08-09): the hint follows the 'countdown' state
+        # (session['status'] is set to 'countdown' at session build).
+        self.hint_label.setText(help_text.game_hint('countdown'))
         self._run_countdown(3)
 
     def _build_engine(self, setup):
@@ -656,6 +663,9 @@ class GameTab(QtWidgets.QWidget):
         self._update_remaining()
         self.pause_btn.setEnabled(True)
         self._log('Move with the arrow keys.')
+        # DOCS-03 (plan 08-09): GO! flipped the status to 'playing' -
+        # the hint follows.
+        self.hint_label.setText(help_text.game_hint('playing'))
 
     # --- tick + elapsed ----------------------------------------------------
 
@@ -1281,6 +1291,8 @@ class GameTab(QtWidgets.QWidget):
             game_input.set_active(False)  # grab-and-no-op, wizard stays
             self.pause_btn.setText('Resume')
             self._log('paused')
+            # DOCS-03 (plan 08-09): the hint follows the 'paused' state.
+            self.hint_label.setText(help_text.game_hint('paused'))
         else:
             pause_time = session.pop('_pause_time', None)
             if pause_time is not None:
@@ -1292,6 +1304,9 @@ class GameTab(QtWidgets.QWidget):
             session['status'] = 'playing'
             self.pause_btn.setText('Pause')
             self._log('resumed')
+            # DOCS-03 (plan 08-09): resume flips the status back to
+            # 'playing' - the hint follows.
+            self.hint_label.setText(help_text.game_hint('playing'))
 
     def request_auto_pause(self):
         """Q3 focus-stealing mitigation (input research Q3 (b)).
@@ -1428,6 +1443,8 @@ class GameTab(QtWidgets.QWidget):
                 'snake_xyz': snake_xyz,
             }
         self.get_spectra_btn.setEnabled(True)  # (e) presenter-only enable
+        # DOCS-03 (plan 08-09): the run is over - point at Get Spectra.
+        self.hint_label.setText(help_text.game_hint('over'))
 
     def shutdown(self):
         """dialog-close hook (PluginDialog.closeEvent) - every end path
@@ -1533,6 +1550,11 @@ class GameTab(QtWidgets.QWidget):
         self._log(msg)
 
     def _set_idle_state(self):
-        """Idle HUD: nothing to pause or restart until a game begins."""
+        """Idle HUD: nothing to pause or restart until a game begins.
+
+        DOCS-03 (plan 08-09): the idle hint renders game_hint('idle') -
+        the canonical focus hint plus the controls recap.
+        """
         self.pause_btn.setEnabled(False)
         self.restart_btn.setEnabled(False)
+        self.hint_label.setText(help_text.game_hint('idle'))

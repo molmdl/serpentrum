@@ -192,18 +192,25 @@ class TestAsciiSweep(unittest.TestCase):
 
 class TestDriftAlarms(unittest.TestCase):
 
-    def test_focus_hint_matches_gui_game_literal(self):
-        # Drift alarm for 08-09's rewiring: gui_game.py:320-323 still
-        # owns the joined focus-hint literal today. NOTE ON THE MOVE:
-        # plan 08-09 Task 1 replaces the gui_game.py literal with a
-        # help_text.GAME_FOCUS_HINT reference and, IN THE SAME COMMIT,
-        # updates this assertion to accept (and pin) the constant
-        # reference there instead.
+    def test_focus_hint_reference_in_gui_game(self):
+        # Drift alarm POST-08-09 Task 1 (this assertion was updated in
+        # the SAME commit as the rewiring): gui_game.py no longer owns
+        # the focus-hint literal - it imports the help_text constant.
+        # Pin BOTH directions: the constant reference must be present
+        # in source, and the raw literal must NOT re-materialize as an
+        # inline duplication (single-source contract).
         gui_game_literals = _adjacent_literals(
             os.path.join(ROOT, 'serpentrum', 'gui_game.py'))
-        self.assertIn(help_text.GAME_FOCUS_HINT, gui_game_literals,
-                      'gui_game.py no longer contains the GAME_FOCUS_'
-                      'HINT literal - single-source drift')
+        with open(os.path.join(ROOT, 'serpentrum', 'gui_game.py'),
+                  'r') as fh:
+            source = fh.read()
+        self.assertIn('help_text.GAME_FOCUS_HINT', source,
+                      'gui_game.py lost the help_text.GAME_FOCUS_HINT '
+                      'reference - single-source drift')
+        self.assertNotIn(help_text.GAME_FOCUS_HINT, gui_game_literals,
+                         'gui_game.py re-inlined the GAME_FOCUS_HINT '
+                         'literal beside the constant reference - '
+                         'single-source drift')
 
     def test_no_removed_control_reference(self):
         # 08-08 removes the temp Apply / Show in Viewer control; none of
