@@ -8,7 +8,7 @@
     "gsd-roadmapper": { "model": "synthetic/hf:zai-org/GLM-5.3-Flash" },
     "gsd-project-researcher": { "model": "synthetic/hf:zai-org/GLM-5.3-Flash" },
     "gsd-research-synthesizer": { "model": "synthetic/hf:zai-org/GLM-5.3-Flash" },
-    "gsd-codebase-mapper": { "model": "synthetic/hf:zai-org/GLM-5.3-Flash" },
+    "gsd-codebase-mapper": { "model": "synthetic/hf:deepseek-ai/DeepSeek-V4.1-Flash" },
     "gsd-executor": { "model": "synthetic/hf:moonshotai/Kimi-K3" },
     "gsd-debugger": { "model": "synthetic/hf:moonshotai/Kimi-K3" },
     "gsd-verifier": { "model": "synthetic/hf:zai-org/GLM-5.3-Flash" },
