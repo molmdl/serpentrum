@@ -45,6 +45,11 @@ the 07-07 plan). FINAL order (07-09 inserted the table at index 2):
     [0] = status label, [1] = log panel (stretch 2),
     [2] = frequency table (stretch 2, SPECTRA-05),
     [3] = plot panel (stretch 3), [4] = button row.
+07-10 checkpoint round 1 (owner directive — the dialog must fit the
+screen): the log and the table carry FIXED maximum heights (scrolling)
+so the page stays compact; the plot panel keeps its approved
+exact-preset sizing (stretch still hands the panel the leftover space).
+The dialog itself is also screen-capped in gui.py.
 
 GUI purity class (tools/check_purity.py GUI_MODULES — the inert-first
 entry landed in plan 07-05): ``pymol.Qt`` ONLY (Qt reaches this code
@@ -92,9 +97,11 @@ class SpectraTab(QtWidgets.QWidget):
     structurally impossible (07-RESEARCH-spectra-seam.md Q4d).
 
     Layout (PINNED — see the module docstring; FINAL order):
-    [0] status label, [1] log panel (stretch 2), [2] frequency table
-    (stretch 2), [3] plot panel (stretch 3), [4] button row
-    (right-aligned).
+    [0] status label, [1] log panel (stretch 2; fixed max height,
+    scrolling — 07-10 owner directive), [2] frequency table
+    (stretch 2; fixed max height, scrolling — same directive),
+    [3] plot panel (stretch 3; approved exact-preset sizing kept),
+    [4] button row (right-aligned).
     """
 
     # Model-A return path (the gui_game.spectra_requested template):
@@ -130,6 +137,11 @@ class SpectraTab(QtWidgets.QWidget):
         self.log_panel = QtWidgets.QPlainTextEdit(self)
         self.log_panel.setReadOnly(True)
         self.log_panel.setMaximumBlockCount(500)
+        # 07-10 checkpoint round 1 (owner directive: the dialog too tall —
+        # it must fit the screen): cap the log so it scrolls (~7 lines
+        # visible) instead of inflating the page; the 500-block tail is
+        # unchanged.
+        self.log_panel.setMaximumHeight(110)
         # SPECTRA-05 frequency table (07-09): one read-only row per
         # parsed mode, SelectRows, click -> mode vectors (Task 2).
         # Populated ONLY from self._spectrum via spectra_ui.table_rows
@@ -146,6 +158,10 @@ class SpectraTab(QtWidgets.QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.cellClicked.connect(self._on_table_cell_clicked)
+        # 07-10 checkpoint round 1 (owner directive: the dialog too tall —
+        # it must fit the screen): cap the table so it scrolls (~6-7 rows
+        # visible via the scrollbar); row clicks are unaffected.
+        self.table.setMaximumHeight(150)
         # 07-05/07-06 human-approved panel, embedded AS-IS (approved
         # look = its defaults). Data-in only: the tab feeds Scenes via
         # set_scene; the panel's own adjustments (unit/color/direction/

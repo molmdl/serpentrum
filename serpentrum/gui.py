@@ -75,6 +75,13 @@ class PluginDialog(QtWidgets.QDialog):
         super(PluginDialog, self).__init__(parent)
         self.setWindowTitle('serpentrum')
         self.setMinimumWidth(450)
+        # 07-10 checkpoint round 1 (owner directive: the plugin window
+        # must never exceed the screen): cap the dialog to the available
+        # screen height — content scrolls within tabs; the plot keeps
+        # its approved preset size. The QApplication always exists in
+        # the PyMOL GUI.
+        avail = QtWidgets.QApplication.desktop().availableGeometry(self)
+        self.setMaximumHeight(max(560, int(avail.height() * 0.92)))
         # Live-state anchor (pmg_tk.startup._serpentrum): carries setup,
         # last_run and the Phase-6 spectra_runner; survives Plugin-
         # Manager reload; stripped-down constructions may pass None --
