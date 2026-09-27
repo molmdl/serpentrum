@@ -69,7 +69,11 @@ REQUIRED_SMOKES = ('smoke/01_skeleton_smoke.py',
                     # 13 = mode arrows + g98/xtbopt overlay identity (Phase 7,
                     # plan 07-03) — re-asserts the OPTIMIZED-frame assumption
                     # on every gate run
-                    'smoke/13_mode_arrows_smoke.py')
+                    'smoke/13_mode_arrows_smoke.py',
+                    # 14 = release e2e chain (Phase 8, plan 08-04) — scripted
+                    # engine win -> xyz handoff -> fixture spectra -> PNG save
+                    # -> setup round-trip, one headless run
+                    'smoke/14_release_e2e_smoke.py')
 
 SMOKE_BAT = 'C:\\src\\run-conda-pymol.bat'
 SMOKE_TIMEOUT = 90  # seconds, per research Q3
