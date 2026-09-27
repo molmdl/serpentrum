@@ -38,20 +38,20 @@ key-decisions:
   - "Unknown unit modes raise ValueError — loud, never a silent passthrough of the wrong unit"
 
 # Metrics
-duration: 11 min (round-2 continuation)
+duration: 11 min (round-2 continuation) + docs-only finalization
 completed: 2026-09-26
 ---
 
 # Phase 7 Plan 06: Plot Human-Verify Harness Summary
 
-**Real-GUI plot check harness staged (201fd8d), checkpoint round 1 partial-PASS with one defect; owner amendments applied — pure unit-mode transforms (absorbance/transmittance), x-direction/y-invert/line-color options with full PNG parity, and the exact-preset pin that fixes the sticky-size defect; harness re-staged for round 2.**
+**Real-GUI plot check harness staged (201fd8d) and the amended panel APPROVED by the owner across TWO checkpoint rounds — round 1 (a/b/d/e/f PASS, defect c) drove four owner amendments (unit modes, line colors, x-direction + y-invert, exact-preset shrink fix) implemented in 1c811d1/d4d5e3b/8768577/d29c9a3; round 2 (2026-09-26) the owner typed "approved" in real Windows PyMOL and the BLOCKING checkpoint RESOLVED. Pure unit-mode transforms (absorbance/transmittance), full PNG option parity, and the exact-preset pin ship.**
 
 ## Performance
 
-- **Duration:** 11 min (round-2 continuation; round-1 harness task executed in an earlier wave)
+- **Duration:** 11 min (round-2 continuation; round-1 harness task executed in an earlier wave) + finalization (documentation-only, no code changes)
 - **Started:** 2026-09-27T06:34:10Z
-- **Completed:** 2026-09-27T06:45:15Z
-- **Tasks:** Task 1 done (harness, 201fd8d); Task 2 = BLOCKING checkpoint — round 1 returned a conditional verdict + four owner directives; the amended panel now awaits round-2 owner re-verification
+- **Completed:** 2026-09-26 (checkpoint round 2 APPROVED; plan closed)
+- **Tasks:** 2/2 — Task 1 done (harness, 201fd8d); Task 2 = BLOCKING checkpoint RESOLVED — round 1 conditional verdict + four owner directives applied, round 2 (2026-09-26) owner APPROVED the amended panel
 - **Files modified:** 5 (plot_logic.py, gui_plot.py, test_plot_logic.py, 12_plot_smoke.py, manual_plot_check.py)
 
 ## Checkpoint Round 1 Verdict (2026-09-26)
@@ -69,6 +69,18 @@ Owner amendments (all four applied as binding directives):
 3. **Line color:** blue (default) / red / black, flowing through render_image (route-A PNG parity).
 4. **Size-shrink fix (defect c):** exact min+max pin per preset — grow AND shrink automatic.
 
+## Checkpoint Round 2 Verdict (2026-09-26) — APPROVED
+
+Owner ran `run smoke\manual_plot_check.py` in real Windows PyMOL against the amended panel and typed **approved** (verbatim).
+
+- **h (unit modes)** — intensity (km/mol, default) / absorbance (arb.) / transmittance (arb.) PASS.
+- **i (line colors)** — blue (pinned `#1f4fff` default) / red / black PASS.
+- **j (x-direction + y-invert)** — ascending (default) / descending, y-invert toggle (off default) PASS.
+- **k (defect-c fix + PNG parity)** — preset grow AND shrink automatic via the exact min/max pin; option-state PNG == screen PASS.
+- Round-1 steps a/b/d/e/f remain PASS; round-1 defect c fixed and re-verified (k).
+
+**Status: checkpoint RESOLVED (blocking gate cleared). Plan 07-06 COMPLETE.** Approved look = the panel defaults: intensity unit, ascending x, no y-invert, blue, exact preset size.
+
 ## This Continuation's Commits
 
 1. **RED: TestUnitModes** — `1c811d1` (test) — 7 failing tests for UNIT_MODES/scene_with_unit (24 file tests, 1 failure + 6 errors before GREEN).
@@ -76,7 +88,12 @@ Owner amendments (all four applied as binding directives):
 3. **GUI options + defect-c fix** — `8768577` (feat) — paint_scene/render_image invert_x/invert_y/line_color; IrPlotWidget option state + setters; panel two-row layout with base-scene derivation; exact min/max preset pin at construction and on change.
 4. **Smoke 12 STAGE5 + round-2 checklist** — `d29c9a3` (test) — options parity leg (transmittance + both inverts + red) flushes a valid PNG; manual harness checklist gains steps h–k.
 
-**Plan metadata:** docs commit below.
+**Plan commit ledger:**
+
+- Task 1 harness (earlier wave): `201fd8d` — smoke/manual_plot_check.py staged (PLOT-CHECK-STAGED).
+- Amendment round: `1c811d1` (RED) → `d4d5e3b` (GREEN) → `8768577` (GUI options + exact-size pin) → `d29c9a3` (smoke 12 STAGE5 + round-2 harness).
+- Docs metadata: `49a3ec4` — round-1 verdict + amendments recorded.
+- Finalization: this update ships in `docs(07-06): plot checkpoint APPROVED (round 2) — plan closed` — the commit that carries this line (recorded by message; hash authoritative in git log).
 
 ## Accomplishments
 
@@ -118,9 +135,10 @@ None beyond the above in-cycle fix.
 
 ## Next Phase Readiness
 
-- SpectraPlotPanel has the full amended option surface with PNG parity — 07-08's SpectraTab embed inherits it untouched.
-- Gates re-verified on the amended surface: 836 unittests green; `python3.6 tests/run_gates.py` green; `--smoke` 10/10 required PASS with smoke 12 STAGE0..STAGE5.
-- **BLOCKING:** checkpoint round 2 pending — the owner re-verifies the amended panel via `run smoke\manual_plot_check.py` (steps h–k are the amendment rounds; k covers the defect-c fix and option-state PNG parity). The checkpoint is NOT resolved by the executor.
+- **07-08 embeds SpectraPlotPanel AS-IS.** The owner-approved look is exactly the panel defaults: intensity unit (km/mol), ascending x, no y-invert, blue, exact preset size. The amendment surface (unit/color/x-direction/y-invert combos) must survive the embed untouched — the embed must not fork, wrap-away, or drop any of the approved controls, and route-A PNG parity must hold inside SpectraTab.
+- **[TRAIN] axis-convention item updated:** it now carries the owner's round-1 'b pass' (ascending x accepted as-is) PLUS the shipped direction option (ascending default / descending chemistry-conventional 4000→400) — the convention question is settled by the option surface, not a single pinned direction.
+- Gates held through both rounds: 836 unittests green; `python3.6 tests/run_gates.py` green; `--smoke` 10/10 required PASS with smoke 12 STAGE0..STAGE5.
+- No blockers — blocking human-verify gate cleared (round 2 APPROVED 2026-09-26).
 
 ---
 *Phase: 07-spectra-ui*
