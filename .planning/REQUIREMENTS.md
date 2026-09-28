@@ -11,7 +11,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 > UI note: the popup dialog (tabs, layout, widget patterns) may borrow from `tmp/bioCHEMeleon`'s popup UI — the author's prior PyMOL game plugin.
 
-- [ ] **SETUP-01**: Plugin installs as a standard PyMOL plugin (Plugin Manager or plugin path) and shows a single "serpentrum" menu item that opens one 3-tab dialog (Setup / Game / Spectra)
+- [x] **SETUP-01**: Plugin installs as a standard PyMOL plugin (Plugin Manager or plugin path) and shows a single "serpentrum" menu item that opens one 3-tab dialog (Setup / Game / Spectra)
 - [x] **SETUP-02**: Setup tab lets the user choose the demo set from a dropdown (v1 ships Set A) or upload their own small-molecule SDF/mol2 set
 - [x] **SETUP-03**: Setup tab offers preset box sizes via dropdown
 - [x] **SETUP-04**: Setup tab lets the user select the head molecule from the set, with "random" as default
@@ -43,7 +43,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **STACK-03**: A pickup without a verified dataset entry is skipped (not placed), with the info box stating why — no invented chemistry
 - [x] **STACK-04**: Info box shows per-pickup structured content (interaction name, distance, one-line explanation, citation short-code), plus idle chemistry tips, early controls hints, and an end-of-run interaction breakdown
 - [x] **STACK-05**: A clash gate rejects stacking placements that would collide (protecting xtb from inferring spurious covalent bonds)
-- [ ] **STACK-06**: User-consented generic π-stack fallback for uploads carrying a canonical planar 6-ring — placement reuses the already-approved idealized Set-A geometry (3.60 Å @ 20°), every in-game surface labels it "generic (illustrative geometry — user-approved)", consent is OFF by default and persisted; uploads without a planar 6-ring still skip *(promoted from v2 with Phase 5.2, 2026-09-20 — owner request)*
+- [x] **STACK-06**: User-consented generic π-stack fallback for uploads carrying a canonical planar 6-ring — placement reuses the already-approved idealized Set-A geometry (3.60 Å @ 20°), every in-game surface labels it "generic (illustrative geometry — user-approved)", consent is OFF by default and persisted; uploads without a planar 6-ring still skip *(promoted from v2 with Phase 5.2, 2026-09-20 — owner request)*
 
 ### Spectra
 
@@ -63,12 +63,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Infrastructure & Environment
 
-- [ ] **INFRA-01**: The full pipeline works in the established environment: WSL python3.6 test suite, headless Windows PyMOL 2.5.0 smokes via cmd.exe, Windows xtb invoked from WSL with path conversion
-- [ ] **INFRA-02**: Pure modules import stdlib + other pure modules only (no pymol/Qt/numpy at module level or in function bodies); Qt imports go through `pymol.Qt` (never `from PyQt5 import`); tests use zero sys.modules stubs
-- [ ] **INFRA-03**: Plugin live state is anchored outside module globals so Plugin-Manager reload or double import never creates duplicate controllers
+- [x] **INFRA-01**: The full pipeline works in the established environment: WSL python3.6 test suite, headless Windows PyMOL 2.5.0 smokes via cmd.exe, Windows xtb invoked from WSL with path conversion
+- [x] **INFRA-02**: Pure modules import stdlib + other pure modules only (no pymol/Qt/numpy at module level or in function bodies); Qt imports go through `pymol.Qt` (never `from PyQt5 import`); tests use zero sys.modules stubs
+- [x] **INFRA-03**: Plugin live state is anchored outside module globals so Plugin-Manager reload or double import never creates duplicate controllers
 - [x] **INFRA-04**: All game-generated objects live in an `srp_*` namespace; Cleanup model removes only game-generated objects and works in a fresh process after a session save/reload
-- [ ] **INFRA-05**: The dialog is modeless; the Qt main thread is never blocked (no modal dialogs during play, no synchronous xtb waits, no threads calling cmd.*)
-- [ ] **INFRA-06**: All code parses under python3.6 (py_compile gate) and matches the Windows conda runtime discipline
+- [x] **INFRA-05**: The dialog is modeless; the Qt main thread is never blocked (no modal dialogs during play, no synchronous xtb waits, no threads calling cmd.*)
+- [x] **INFRA-06**: All code parses under python3.6 (py_compile gate) and matches the Windows conda runtime discipline
 
 ### Documentation & Audit
 
@@ -170,6 +170,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCS-03 | Phase 8 | Pending | mech: tests/test_help_text.py; code: serpentrum/help_text.py + gui wiring (08-09 game/spectra/before-apply/after-apply hints rendered); human: GATE V (08-11) approval |
 | DOCS-04 | Phase 8 | Pending | mech: tools/check_docs.py (7 check families) + tests/test_docs_audit.py (23 tests); code: tools/check_docs.py (doc-vs-code harness, gate-3 discovered); human: GATE V (08-11) reproduce steps (Section C) |
 | DOCS-05 | Phase 8 | Pending | mech: smoke/14_release_e2e_smoke.py SMOKE-OK RELEASE-E2E + tools/audit_requirements.py; code: tools/audit_requirements.py (4 checks + --release) + tests/test_audit_requirements.py; human: GATE V (08-11) closing checkpoint |
+
+*Reconciled 2026-09-28 (UTC) — Phase 8 plan 08-10: checkbox list aligned with table statuses; Evidence column added; Phase-8 rows flip at the GATE V (08-11) closing checkpoint.*
 
 **Coverage:**
 - v1 requirements: 46 total (44 original + GAME-11 with Phase 5.1 + STACK-06 promoted from v2 with Phase 5.2, 2026-09-20)
