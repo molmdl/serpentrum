@@ -71,8 +71,8 @@ from pymol.Qt import QtWidgets, QtCore
 # (06-02 — imported, never re-pinned). pymol_bridge is the BRIDGE seam
 # for the viewer overlay (GUI -> BRIDGE import is the 06-09 precedent,
 # check_purity.py:95-98).
-from . import (cgo_build, plot_logic, pymol_bridge, setup_logic, spectra,
-               spectra_ui, xtb_run)
+from . import (cgo_build, help_text, plot_logic, pymol_bridge, setup_logic,
+               spectra, spectra_ui, xtb_run)
 from .gui_plot import SpectraPlotPanel
 
 
@@ -127,9 +127,13 @@ class SpectraTab(QtWidgets.QWidget):
 
     def _build_widgets(self):
         """Create the four surfaces (PINNED order per the contract)."""
+        # DOCS-03 (plan 08-09): the pre-run initial status is
+        # single-sourced from help_text.spectra_hint('pre_run') - the
+        # 08-06 pins prove the string byte-identical to the literal it
+        # replaces. The 'xtb running...' started line stays inline
+        # (pinned by 06-09; the audit pins it in place).
         self.status_label = QtWidgets.QLabel(
-            'Spectra tab - complete a game, then press Get Spectra on '
-            'the Game tab. Progress streams here.', self)
+            help_text.spectra_hint('pre_run'), self)
         self.status_label.setWordWrap(True)
         # Research Q3 [TRAIN] MEDIUM: QPlainTextEdit + 500-block cap ==
         # the controller's tail — flat memory while streaming; human-
@@ -356,11 +360,25 @@ class SpectraTab(QtWidgets.QWidget):
         self._spectrum_note = source_note
         # The SAME parse drives the SPECTRA-05 table (07-09).
         self._populate_table()
+        # DOCS-03 (plan 08-09): a successful populate lands the
+        # done-state next-action hint on the status line; the
+        # vibspectrum-fallback advisory takes precedence when there is
+        # one (the pre-08-09 behavior for that footnote, kept).
         if source_note:
             self.set_status_line(source_note)
+        else:
+            self.set_status_line(help_text.spectra_hint('done'))
         caption = plot_logic.mode_caption(scene)
         if caption:
             self.append_log_line(caption)
+        # DOCS-03 (plan 08-09): the GATE D two-tier negative-frequency
+        # guidance (spectra_ui.imaginary_note, 08-06) appends one log
+        # line beside the mode caption via the SAME append seam; None
+        # (no imaginary modes) appends nothing.
+        note = spectra_ui.imaginary_note(
+            [mode.freq for mode in spectrum.modes])
+        if note is not None:
+            self.append_log_line(note)
 
     # --- SPECTRA-05 frequency table + mode vectors (07-09) -------------
 
