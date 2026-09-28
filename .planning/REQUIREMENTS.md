@@ -122,54 +122,54 @@ Explicitly excluded. Documented to prevent scope creep.
 
 Which phases cover which requirements. Updated during roadmap creation.
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| SETUP-01 | Phase 1 | Complete |
-| SETUP-02 | Phase 3 | Complete |
-| SETUP-03 | Phase 3 | Complete |
-| SETUP-04 | Phase 3 | Complete |
-| SETUP-05 | Phase 3 | Complete |
-| SETUP-06 | Phase 3 | Complete |
-| SETUP-07 | Phase 8 | Pending |
-| SETUP-08 | Phase 8 | Pending |
-| GAME-01 | Phase 4 | Complete |
-| GAME-02 | Phase 4 | Complete |
-| GAME-03 | Phase 4 | Complete |
-| GAME-04 | Phase 5 | Complete |
-| GAME-05 | Phase 5 | Complete |
-| GAME-06 | Phase 5 | Complete |
-| GAME-07 | Phase 4 | Complete |
-| GAME-08 | Phase 4 | Complete |
-| GAME-09 | Phase 5 | Complete |
-| GAME-10 | Phase 5 | Complete (owner-amended contract — see note) |
-| GAME-11 | Phase 5.1 | Complete |
-| STACK-01 | Phase 5 | Complete |
-| STACK-02 | Phase 2 | Complete |
-| STACK-03 | Phase 5 | Complete |
-| STACK-04 | Phase 5 | Complete |
-| STACK-05 | Phase 5 | Complete |
-| STACK-06 | Phase 5.2 | Complete |
-| SPECTRA-01 | Phase 7 | Complete |
-| SPECTRA-02 | Phase 6 | Complete |
-| SPECTRA-03 | Phase 7 | Complete |
-| SPECTRA-04 | Phase 7 | Complete |
-| SPECTRA-05 | Phase 7 | Complete |
-| SPECTRA-06 | Phase 6 | Complete |
-| DATA-01 | Phase 8 | Pending |
-| DATA-02 | Phase 8 | Pending |
-| DATA-03 | Phase 3 | Complete |
-| DATA-04 | Phase 8 | Pending |
-| INFRA-01 | Phase 1 | Complete |
-| INFRA-02 | Phase 1 | Complete |
-| INFRA-03 | Phase 1 | Complete |
-| INFRA-04 | Phase 3 | Complete |
-| INFRA-05 | Phase 1 | Complete |
-| INFRA-06 | Phase 1 | Complete |
-| DOCS-01 | Phase 8 | Pending |
-| DOCS-02 | Phase 8 | Pending |
-| DOCS-03 | Phase 8 | Pending |
-| DOCS-04 | Phase 8 | Pending |
-| DOCS-05 | Phase 8 | Pending |
+| Requirement | Phase | Status | Evidence |
+|-------------|-------|--------|----------|
+| SETUP-01 | Phase 1 | Complete | mech: tests/test_skeleton.py + smoke/01_skeleton_smoke.py; code: serpentrum/__init__.py lazy pmg_tk.startup.serpentrum entry; human: 01-06 live checkpoint APPROVED 2026-09-06 (3 clean launches, single menu item, 3-tab dialog) |
+| SETUP-02 | Phase 3 | Complete | mech: tests/test_setup_logic.py + smoke/04_demo_e2e_smoke.py; code: serpentrum/gui_setup.py demo-set dropdown + upload path; human: 03-08 live checkpoint APPROVED (10 of 10 steps) 2026-09-12 |
+| SETUP-03 | Phase 3 | Complete | mech: tests/test_setup_logic.py (box-preset pins) + smoke/03_viewer_bridge_smoke.py; code: serpentrum/gui_setup.py preset dropdown + serpentrum/pymol_bridge.py srp_box (BOX_DISPLAY_Z); human: 03-08 live checkpoint APPROVED (10 of 10) 2026-09-12 |
+| SETUP-04 | Phase 3 | Complete | mech: tests/test_setup_logic.py + tests/test_gui_pins.py (eager head-combo pin, 08-08); code: serpentrum/gui_setup.py head dropdown with random default; human: 03-08 live checkpoint APPROVED (10 of 10) 2026-09-12 |
+| SETUP-05 | Phase 3 | Complete | mech: tests/test_xtbenv.py + tests/test_winpath.py; code: serpentrum/xtbenv.py validate_binary_path (xtb + xtb.exe) + tools/winpath.py; human: 03-08 live checkpoint (xtb auto + manual legs) APPROVED 2026-09-12 |
+| SETUP-06 | Phase 3 | Complete | mech: tests/test_setup_logic.py + tests/test_budget_guard.py; code: serpentrum/gui_setup.py win-cap control + hessian warning + serpentrum/budget_guard.py; human: 03-08 live checkpoint (win-cap warning step) APPROVED 2026-09-12 |
+| SETUP-07 | Phase 8 | Pending | mech: tests/test_gui_pins.py (6-label order + single Start-route pins, 08-08); code: serpentrum/gui.py 6-button bottom row (Reset, Randomize, Save Setup, Load Setup, Cleanup model, Start); human: GATE V (08-11) approval |
+| SETUP-08 | Phase 8 | Pending | mech: tests/test_setup_logic.py save/load round-trip + smoke/14_release_e2e_smoke.py stage7 setup_roundtrip; code: serpentrum/setup_logic.py save_setup/load_setup/merge_defaults; human: GATE V (08-11) approval |
+| GAME-01 | Phase 4 | Complete | mech: tests/test_gui_pins.py (single setCurrentIndex(1) Start-route pin); code: serpentrum/gui_game.py 3-2-1 countdown + movement start; human: 04-09 closing checkpoint APPROVED (12 of 12 live steps) 2026-09-14 |
+| GAME-02 | Phase 4 | Complete | mech: smoke/05_loop_camera_smoke.py; code: serpentrum/pymol_bridge.py camera lock (GAME-02 scope) + srp_box boundary display; human: 04-09 closing checkpoint APPROVED (12 of 12) 2026-09-14 |
+| GAME-03 | Phase 4 | Complete | mech: tests/test_engine_core.py + smoke/06_input_smoke.py; code: serpentrum/input.py KeySteerWizard (do_special route) + serpentrum/pymol_bridge.py head spheres / pickup sticks; human: 04-07 keys checkpoint APPROVED 2026-09-13 |
+| GAME-04 | Phase 5 | Complete | mech: tests/test_phase5_integration.py + smoke/08_stack_place_smoke.py + smoke/10_chain_count_smoke.py; code: serpentrum/game_engine.py capture + serpentrum/placement.py + serpentrum/pymol_bridge.py chain_atom_counts; human: 05-16 7-round live checkpoint APPROVED 2026-09-18..20 |
+| GAME-05 | Phase 5 | Complete | mech: tests/test_engine_rules.py (boundary + body-crash legs); code: serpentrum/game_engine.py collision checks + complete-snake-on-crash; human: 05-16 deliberate-crash rounds APPROVED 2026-09-18..20 |
+| GAME-06 | Phase 5 | Complete | mech: tests/test_engine_win_desync.py; code: serpentrum/game_engine.py cap -> won emission; human: cap-3 win at 06-12 live checkpoint APPROVED (12 of 12) 2026-09-26 |
+| GAME-07 | Phase 4 | Complete | mech: tests/test_hud_logic.py + tests/test_hud_content.py; code: serpentrum/hud_logic.py + serpentrum/gui_game.py info box, timer, remaining-before-win, pause/resume, restart; human: 04-09 closing checkpoint APPROVED (12 of 12) 2026-09-14 |
+| GAME-08 | Phase 4 | Complete | mech: tests/test_engine_speed.py; code: serpentrum/game_engine.py constant speed_a_per_s within a run; human: 04-09 closing checkpoint APPROVED (12 of 12) 2026-09-14 |
+| GAME-09 | Phase 5 | Complete | mech: smoke/10_chain_count_smoke.py (completion count channel); code: serpentrum/gui_game.py completion view + camera focus + info recap + Get Spectra arming; human: 05-16 win/crash completion rounds APPROVED 2026-09-18..20 |
+| GAME-10 | Phase 5 | Complete (owner-amended contract — see note) | mech: tests/test_engine_turns.py + tests/test_engine_tail_follow.py + smoke/07_transform_sweep_smoke.py; code: serpentrum/game_engine.py rigid chain sweep + train-follow tail (immutable 3.60 A spacing); human: 05-16 7-round live checkpoint APPROVED 2026-09-18..20 (owner-amended: 180-deg refuse only, REFUSE_WALL removed) |
+| GAME-11 | Phase 5.1 | Complete | mech: tests/test_engine_speed.py + tests/test_phase51_integration.py; code: serpentrum/setup_logic.py SPEED_TIERS (relaxed/normal/fast/expert) + persistence; human: 5.1-06 feel-check APPROVED 2026-09-25 (owner-amended values 3.0/6.0/7.5/9.0 A/s, default normal 6.0) |
+| STACK-01 | Phase 5 | Complete | mech: tests/test_stacking_math.py + tests/test_placement.py; code: serpentrum/stacking.py ring_frame + serpentrum/placement.py deterministic transform; human: 05-16 live DBG pins (dot=1.000000 d=3.6000) APPROVED 2026-09-18..20 |
+| STACK-02 | Phase 2 | Complete | mech: tests/test_stacking_dataset.py; code: serpentrum/data/stacking_pi_stack.json (data file with citations, not code); human: pi-stack geometry APPROVED 2026-09-10 (3.60 A @ 20 deg, distance_a 3.383, lateral_offset_a 1.231) |
+| STACK-03 | Phase 5 | Complete | mech: tests/test_generic_stack.py + tests/test_phase5_integration.py (skip taxonomy); code: serpentrum/generic_stack.py pre-resolved skips + serpentrum/hud_logic.py reasoned HUD lines; human: 05-16 skip/refuse rounds APPROVED 2026-09-18..20 (no invented chemistry) |
+| STACK-04 | Phase 5 | Complete | mech: tests/test_hud_content.py; code: serpentrum/hud_logic.py structured pickup content + idle tips + early hints + end-of-run recap; human: 05-16 info-box content accepted APPROVED 2026-09-18..20 |
+| STACK-05 | Phase 5 | Complete | mech: tests/test_placement.py (clash-refuse pins) + smoke/08_stack_place_smoke.py; code: serpentrum/placement.py REFUSE_ATOM clash gate (biphenyl 1.87 A demonstrator); human: 05-16 rounds 3-4 APPROVED 2026-09-20 (REFUSE_WALL removed, clash gate kept) |
+| STACK-06 | Phase 5.2 | Complete | mech: tests/test_generic_stack.py + tests/test_phase52_integration.py; code: serpentrum/generic_stack.py consent-gated generic pi-stack entry (OFF default, persisted, labeled illustrative); human: 5.2-09 feel-check APPROVED (11 of 11 steps) 2026-09-26 |
+| SPECTRA-01 | Phase 7 | Complete | mech: tests/test_gui_pins.py (wiring pins); code: serpentrum/gui.py Get Spectra -> live SpectraTab tab switch; human: 07-10 consolidated checkpoint APPROVED round 2 2026-09-26 ("approved, well done") |
+| SPECTRA-02 | Phase 6 | Complete | mech: tests/test_xtb_run.py + smoke/11_xtb_runner_smoke.py (informational real-xtb success/cancel contracts); code: serpentrum/xtb_runner.py QProcess controller + serpentrum/xtb_run.py verdict/state contract; human: 06-12 live checkpoint APPROVED (12 of 12) 2026-09-26 ("xtb finished: ok") |
+| SPECTRA-03 | Phase 7 | Complete | mech: smoke/12_plot_smoke.py STAGE2 (PNG magic bytes + reload) + tests/test_plot_logic.py; code: serpentrum/gui_plot.py route-A paint_scene/render_image + save-plot; human: 07-06 round-2 APPROVED 2026-09-26 + 07-10 final sign-off 2026-09-26 |
+| SPECTRA-04 | Phase 7 | Complete | mech: smoke/11_xtb_runner_smoke.py (informational streaming legs) + tests/test_xtb_run.py; code: serpentrum/xtb_runner.py log_tail + serpentrum/gui_spectra.py 500-block log panel (replay-first); human: 06-12 live-log responsive verdict APPROVED 2026-09-26 |
+| SPECTRA-05 | Phase 7 | Complete | mech: tests/test_spectra_ui.py + smoke/13_mode_arrows_smoke.py; code: serpentrum/spectra_ui.py table/arrow seams + serpentrum/gui_spectra.py row-click -> srp_mode_vec on srp_xtbopt; human: 07-10 APPROVED round 2 incl. optimized-frame sign-off 2026-09-26 |
+| SPECTRA-06 | Phase 6 | Complete | mech: tests/test_budget_guard.py; code: serpentrum/budget_guard.py + serpentrum/gui.py pre-launch count gate; human: 06-12 head-inclusive counts (54 + 12 = 66) APPROVED (12 of 12) 2026-09-26 |
+| DATA-01 | Phase 8 | Pending | mech: tests/test_demo_data.py TestLoadDemoSetEndToEnd (08-02) + smoke/04_demo_e2e_smoke.py; code: serpentrum/data/ manifest.json + 5 PubChem 3D SDFs (CID-cited); human: GATE V (08-11) data approval |
+| DATA-02 | Phase 8 | Pending | mech: tests/test_stacking_dataset.py pinned literals; code: serpentrum/data/stacking_pi_stack.json (3.60 A @ 20 deg from verified sources); human: partial approval 2026-09-10 (Phase 2 pi-stack), full sign-off GATE V (08-11) |
+| DATA-03 | Phase 3 | Complete | mech: tests/test_setloader.py + tests/test_molfile.py; code: serpentrum/setloader.py <=3-ring gate + upload skip policy (STACK-03); human: 03-08 live checkpoint (upload reject + accept legs) APPROVED 2026-09-12 |
+| DATA-04 | Phase 8 | Pending | mech: tools/check_docs.py data-citation checks + tests/test_docs_audit.py; code: serpentrum/data/DATA_SOURCES.md bioCHEMeleon-format checklist (08-02 edits); human: GATE V (08-11) data approval |
+| INFRA-01 | Phase 1 | Complete | mech: tests/run_gates.py full battery (gates + 11 REQUIRED smokes + --xtb leg); code: tools/ gate and path toolchain (check_purity.py, check_docs.py, winpath.py); human: full env exercised at every live checkpoint (01-06, 03-08, 04-09, 05-16, 06-12, 07-10; 2026-09-06..2026-09-26) |
+| INFRA-02 | Phase 1 | Complete | mech: tools/check_purity.py AST gate + tests/test_purity_gates.py; code: tools/check_purity.py GUI/BRIDGE allowlists (everything else pure, zero pymol/Qt/numpy); human: purity gate green at every phase close since 01-06 (2026-09-06) |
+| INFRA-03 | Phase 1 | Complete | mech: tests/test_skeleton.py (anchor + single-instance pins); code: serpentrum/__init__.py anchor pmg_tk.startup._serpentrum (never module globals); human: 01-06 reload survival verified APPROVED 2026-09-06 |
+| INFRA-04 | Phase 3 | Complete | mech: smoke/04_demo_e2e_smoke.py cleanup + user-object sentinel leg; code: serpentrum/pymol_bridge.py cleanup_srp (srp_* namespace only); human: 03-08 .pse fresh-process survival APPROVED 2026-09-12 |
+| INFRA-05 | Phase 1 | Complete | mech: tools/check_purity.py exec-token ban + tests/test_xtb_run.py (async runner contract); code: serpentrum/xtb_runner.py QProcess async + modeless dialog (show() only); human: 01-06 modelessness APPROVED 2026-09-06 + 06-12 responsive live-log verdict 2026-09-26 |
+| INFRA-06 | Phase 1 | Complete | mech: tests/run_gates.py gate 1 py_compile walk; code: py3.6 discipline across serpentrum/ (stdlib-compatible, no newer syntax); human: gates green at every phase close through 07-10 (2026-09-26) |
+| DOCS-01 | Phase 8 | Pending | mech: tools/check_docs.py README-claims families + tests/test_docs_audit.py; code: README.md (08-07 rewrite; vibe block pinned byte-exact); human: GATE V (08-11) approval |
+| DOCS-02 | Phase 8 | Pending | mech: tools/check_docs.py DATA_SOURCES citation checks + tests/test_docs_audit.py; code: serpentrum/data/DATA_SOURCES.md (08-02 CID/DOI edits); human: GATE V (08-11) data approval |
+| DOCS-03 | Phase 8 | Pending | mech: tests/test_help_text.py; code: serpentrum/help_text.py + gui wiring (08-09 game/spectra/before-apply/after-apply hints rendered); human: GATE V (08-11) approval |
+| DOCS-04 | Phase 8 | Pending | mech: tools/check_docs.py (7 check families) + tests/test_docs_audit.py (23 tests); code: tools/check_docs.py (doc-vs-code harness, gate-3 discovered); human: GATE V (08-11) reproduce steps (Section C) |
+| DOCS-05 | Phase 8 | Pending | mech: smoke/14_release_e2e_smoke.py SMOKE-OK RELEASE-E2E + tools/audit_requirements.py; code: tools/audit_requirements.py (4 checks + --release) + tests/test_audit_requirements.py; human: GATE V (08-11) closing checkpoint |
 
 **Coverage:**
 - v1 requirements: 46 total (44 original + GAME-11 with Phase 5.1 + STACK-06 promoted from v2 with Phase 5.2, 2026-09-20)
