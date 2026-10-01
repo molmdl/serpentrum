@@ -14,15 +14,18 @@ PINNED POLICY (stated explicitly per the planning mandate):
     molecule (``next_after``), gated by a live-pickup ceiling
     MAX_LIVE_PICKUPS = 4 so refusal-lingering pickups cannot accumulate
     unbounded while the game keeps progressing (see ``can_spawn``).
-  - CYCLIC molecule order: records in anchored list order, wrapping
-    forever (set_a has 5 species; cap default 10 requires species
-    reuse -- chemically valid, probe-verified 6-segment same-molecule
-    chains are clash-safe).
+  - CYCLIC molecule order: the ELIGIBLE records in anchored list order,
+    wrapping forever (GAMEPLAY_EXCLUDED_MOLS filtered at construction --
+    2026-10-01 quick-001; set_a serves 4 species; cap default 10
+    requires species reuse -- chemically valid, probe-verified
+    6-segment same-molecule chains are clash-safe).
   - DEMOTE-AFTER-REFUSE (2026-09-20, 05-16 re-test fix): the controller
     calls ``note_resolution(molecule_id, refused)`` after EVERY capture
     resolution. A refused/skipped molecule is moved to the BACK of the
-    round-robin serve order (never permanently excluded -- the 5-mol
-    pool + cap 10 REQUIRES repeats), so the NEXT spawn is a DIFFERENT
+    round-robin serve order (never permanently excluded (within the
+    pool; the ONE upstream gameplay exclusion is GAMEPLAY_EXCLUDED_MOLS,
+    quick-001 2026-10-01) -- the 4-mol pool + cap 10 REQUIRES repeats),
+    so the NEXT spawn is a DIFFERENT
     molecule; a placed capture resets the consecutive-refuse counter.
     If refuses in a     row reach the pool size (every candidate refused
     consecutively), spawning PAUSES for a resumable COOLDOWN of
@@ -126,6 +129,33 @@ EXHAUST_COOLDOWN_TICKS = 100  # exhaust pause window in movement ticks
                               # auto-resumes; ANY placed capture or a
                               # completed cooldown resets the streak
 
+# 2026-10-01 (quick-001, owner-approved): the SHIPPED set_a biphenyl is
+# EXCLUDED from gameplay pools (pickup spawn serve order + head
+# selection). Probe-proven root cause: the shipped conformer's two
+# rings are locked at 90.00 deg (documented permanent-refuse decision),
+# so EVERY biphenyl stack at dataset geometry clashes (min
+# 0.688-2.145 A < the 2.5 A gate -> always REFUSE_ATOM, never stacks
+# after pickup) and a biphenyl HEAD makes every first capture refuse
+# (min 1.715-1.944 A as head target, 1.279-1.283 A as segment target)
+# -> a run can never progress. The manifest/dataset entry is KEPT (TDD
+# + smoke fixtures + viewer display; tests/test_demo_data.py contract
+# unchanged). (set, id) pairs -- SET-AWARE so an UPLOADED molecule that
+# happens to carry the id 'biphenyl' keeps its DESIGNED cycle-and-skip
+# pedagogy (03-04: uploads never inherit set_a's stacking entry) and
+# its generic-consent stacking path.
+GAMEPLAY_EXCLUDED_MOLS = (('set_a', 'biphenyl'),)
+
+
+def is_gameplay_excluded(record):
+    """True iff the record is gameplay-excluded (GAMEPLAY_EXCLUDED_MOLS).
+
+    Keyed on (record['set'], record['id']): the manifest loader stamps
+    'set' on every record and uploads carry '__upload__' (03-04).
+    Missing keys -> (None, ...) -> never matches (safe default:
+    unlisted records are never excluded). PURE.
+    """
+    return (record.get('set'), record.get('id')) in GAMEPLAY_EXCLUDED_MOLS
+
 # Heading name -> unit vector in the xy plane. Deliberately a PRIVATE
 # mirror of game_engine.DIRS (this module is fully decoupled -- it must
 # not import the engine; the contract is one of the four axis names).
@@ -183,7 +213,9 @@ class PickupSpawner(object):
 
       records:     molecule records in ANCHORED list order (the cycle
                    order -- setloader.load_demo_set / load_upload output,
-                   uploads included on purpose).
+                   uploads included on purpose). Gameplay-excluded
+                   records (GAMEPLAY_EXCLUDED_MOLS, quick-001) are
+                   dropped from the serve order at construction.
       box_min:     (x0, y0) box lower corner (setup_logic.BOX_PRESETS).
       box_max:     (x1, y1) box upper corner.
       seed:        int (see seed_from_setup) feeding a PRIVATE
@@ -233,7 +265,14 @@ class PickupSpawner(object):
                 max(MIN_HEAD_DIST_FACTOR * h, HEAD_CLEARANCE_A),
                 MIN_HEAD_DIST_CAP_FACTOR * h)
         self._atoms_by_id = atoms_by_id
-        self._order = list(records)  # round-robin serve order (front first)
+        # 2026-10-01 quick-001: the serve pool is the ELIGIBLE records --
+        # GAMEPLAY_EXCLUDED_MOLS filtering happens HERE (single choke
+        # point) so every caller inherits it. Filtering runs BEFORE any
+        # rng draw, so the seed-stream shape for the surviving pool is
+        # unchanged (GAME-07 determinism intact). self._records stays the
+        # UNFILTERED input.
+        self._order = [record for record in records
+                       if not is_gameplay_excluded(record)]
         self._issued = 0
         # Demote-after-refuse state (2026-09-20): consecutive refused
         # resolutions; reaching the pool size PAUSES spawning for

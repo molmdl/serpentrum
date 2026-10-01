@@ -1,6 +1,6 @@
 """spawn tests: deterministic seeded pickup-spawn policy pins (G3, 05-03).
 
-Eleven pin groups mirror the plan's behavior cases:
+Twelve pin groups mirror the plan's behavior cases:
 
   1. Determinism  -- two same-seed spawners produce identical
      first()/next_after() sequences (positions + ids); a different seed
@@ -43,6 +43,11 @@ Eleven pin groups mirror the plan's behavior cases:
      count) and wraps, so different seeds land at DIFFERENT legal cells
      (the corner-bias clustering is gone) while the same seed stays
      byte-identical (GAME-07 holds on the fallback path too).
+ 12. Exclusion   -- GAMEPLAY_EXCLUDED_MOLS (2026-10-01 quick-001,
+     owner-approved): the shipped set_a biphenyl is excluded from the
+     serve pool (the spawner self-filters at construction, single choke
+     point); the predicate is SET-AWARE so an uploaded 'biphenyl' keeps
+     its designed cycle-and-skip pedagogy.
 
 Spawners are built from the REAL demo records (setloader.load_demo_set
 with the shipped stacking dataset) and origin-centered synthetic atoms (6
@@ -127,6 +132,12 @@ class SpawnTestBase(unittest.TestCase):
             stacking_path=setloader.default_stacking_path())
         assert cls.errors == [], cls.errors
         assert len(cls.records) == 5  # set_a has 5 species
+        # 2026-10-01 quick-001: the SERVE pool is the eligible records
+        # (biphenyl excluded at spawner construction); make_spawner
+        # still passes all 5 -- the self-filter IS what the pins prove.
+        cls.eligible = [r for r in cls.records
+                        if not spawn.is_gameplay_excluded(r)]
+        assert len(cls.eligible) == 4
         cls.atoms_by_id = dict(
             (record['id'], _dummy_atoms('C')) for record in cls.records)
 
@@ -368,10 +379,12 @@ class TestCycleAndIds(SpawnTestBase):
 
     def test_cycle_records_in_list_order_wrapping(self):
         spawner = self.make_spawner(2026)
-        expected_ids = [r['id'] for r in self.records]
+        # 2026-10-01 quick-001: the cycle runs over the ELIGIBLE records
+        # (the spawner self-filters biphenyl out of the serve order).
+        expected_ids = [r['id'] for r in self.eligible]
         live = []
         seen = []
-        # 8 spawns = one full cycle of 5 + 3 wrapped.
+        # 8 spawns = one full cycle of 4 + 4 wrapped.
         result = spawner.first((0.0, 0.0), 'right')
         self.assertIsNotNone(result)
         seen.append(result)
@@ -446,7 +459,7 @@ class TestDemoteAfterRefuse(SpawnTestBase):
 
     def test_single_refuse_is_not_permanent_exclusion(self):
         # One transient refuse must NOT permanently exclude a molecule
-        # (pool of 5, cap 10 REQUIRES repeats): after the rest of the
+        # (pool of 4, cap 10 REQUIRES repeats): after the rest of the
         # pool cycles once, the refused molecule is served again.
         spawner = self.make_spawner(1234)
         record, _pid, centroid = spawner.first((0.0, 0.0), 'right')
@@ -454,7 +467,7 @@ class TestDemoteAfterRefuse(SpawnTestBase):
         spawner.note_resolution(refused_id, refused=True)
         live = [centroid]
         served = []
-        for _ in range(len(self.records)):
+        for _ in range(len(self.eligible)):
             result = spawner.next_after((0.0, 0.0), 'right', [], live)
             self.assertIsNotNone(result)
             served.append(result[0]['id'])
@@ -474,7 +487,7 @@ class TestDemoteAfterRefuse(SpawnTestBase):
             self.records, BOX_MIN, BOX_MAX, 1234, self.atoms_by_id,
             exhaust_cooldown_ticks=3)
         self.assertFalse(spawner.spawn_paused)
-        ids = [r['id'] for r in self.records]
+        ids = [r['id'] for r in self.eligible]
         # Drive one issue per refusal: each refused spawn rotates the
         # order; after len(pool) consecutive refuses the pause fires.
         result = spawner.first((0.0, 0.0), 'right')
@@ -515,7 +528,7 @@ class TestDemoteAfterRefuse(SpawnTestBase):
             live.append(result[2])
             spawner.note_resolution(result[0]['id'], refused=False)
             self.assertFalse(spawner.spawn_paused)
-            for _ in range(len(self.records) - 1):
+            for _ in range(len(self.eligible) - 1):
                 result = spawner.next_after((0.0, 0.0), 'right', [], live)
                 self.assertIsNotNone(result)
                 live.append(result[2])
@@ -526,7 +539,8 @@ class TestDemoteAfterRefuse(SpawnTestBase):
     def test_unknown_molecule_id_is_ignored(self):
         spawner = self.make_spawner(1234)
         spawner.note_resolution('no_such_molecule', refused=True)
-        self.assertEqual(spawner.pool_size, len(self.records))
+        # 2026-10-01 quick-001: pool_size is the ELIGIBLE pool (4).
+        self.assertEqual(spawner.pool_size, len(self.eligible))
         result = spawner.first((0.0, 0.0), 'right')
         self.assertIsNotNone(result)
         self.assertEqual(result[0]['id'], self.records[0]['id'])
@@ -556,7 +570,7 @@ class TestExhaustCooldown(SpawnTestBase):
         assert result is not None
         live = [result[2]]
         spawner.note_resolution(result[0]['id'], refused=True)
-        for _ in range(len(self.records) - 1):
+        for _ in range(len(self.eligible) - 1):
             result = spawner.next_after((0.0, 0.0), 'right', [], live)
             assert result is not None
             live.append(result[2])
@@ -623,7 +637,7 @@ class TestExhaustCooldown(SpawnTestBase):
         live = [result[2]]
         spawner.note_resolution(result[0]['id'], refused=True)
         self.assertFalse(spawner.spawn_paused)  # 1 refuse: no pause
-        for _ in range(len(self.records) - 1):
+        for _ in range(len(self.eligible) - 1):
             result = spawner.next_after((0.0, 0.0), 'right', [], live)
             self.assertIsNotNone(result)
             live.append(result[2])
@@ -750,6 +764,69 @@ class TestFallbackOffset(SpawnTestBase):
             first = self.shape(self._drive(seed))
             second = self.shape(self._drive(seed))
             self.assertEqual(first, second)
+
+
+class TestGameplayExclusion(SpawnTestBase):
+    """Case 12: GAMEPLAY_EXCLUDED_MOLS (2026-10-01 quick-001,
+    owner-approved) -- the shipped set_a biphenyl is excluded from the
+    pickup serve pool; the predicate is set-aware so uploads keep their
+    designed cycle-and-skip behavior."""
+
+    def test_excluded_constant_pins_set_a_biphenyl(self):
+        self.assertEqual(spawn.GAMEPLAY_EXCLUDED_MOLS,
+                         (('set_a', 'biphenyl'),))
+
+    def test_predicate_is_set_aware(self):
+        biphenyl = [r for r in self.records if r['id'] == 'biphenyl']
+        self.assertEqual(len(biphenyl), 1)
+        self.assertTrue(spawn.is_gameplay_excluded(biphenyl[0]))
+        benzene = [r for r in self.records if r['id'] == 'benzene']
+        self.assertEqual(len(benzene), 1)
+        self.assertFalse(spawn.is_gameplay_excluded(benzene[0]))
+        # An UPLOAD with the same id is NOT excluded (03-04 pedagogy).
+        self.assertFalse(spawn.is_gameplay_excluded(
+            {'id': 'biphenyl', 'set': '__upload__'}))
+        # Missing 'set' never matches (safe default).
+        self.assertFalse(spawn.is_gameplay_excluded({'id': 'biphenyl'}))
+
+    def test_spawner_never_serves_biphenyl_across_seeds(self):
+        served = []
+        for seed in (1, 42, 2026, 1234):
+            spawner = self.make_spawner(seed)
+            result = spawner.first((0.0, 0.0), 'right')
+            self.assertIsNotNone(result)
+            served.append(result[0]['id'])
+            live = [result[2]]
+            for _ in range(7):  # 8 legal spawns per seed total
+                result = spawner.next_after((0.0, 0.0), 'right', [], live)
+                self.assertIsNotNone(result)
+                served.append(result[0]['id'])
+                live.append(result[2])
+        self.assertNotIn('biphenyl', served)
+        eligible_ids = set(r['id'] for r in self.eligible)
+        self.assertEqual(set(served), eligible_ids)
+
+    def test_upload_biphenyl_still_served(self):
+        # A synthetic UPLOADED molecule with the id 'biphenyl' must NOT
+        # be filtered (set-aware exclusion): both records are served
+        # within len(records) spawns.
+        records = [{'id': 'mol_a', 'set': 'set_a'},
+                   {'id': 'biphenyl', 'set': '__upload__'}]
+        atoms_by_id = dict((r['id'], _dummy_atoms('C')) for r in records)
+        spawner = spawn.PickupSpawner(records, BOX_MIN, BOX_MAX, 42,
+                                      atoms_by_id)
+        self.assertEqual(spawner.pool_size, 2)
+        served = []
+        result = spawner.first((0.0, 0.0), 'right')
+        self.assertIsNotNone(result)
+        served.append(result[0]['id'])
+        live = [result[2]]
+        for _ in range(len(records) - 1):
+            result = spawner.next_after((0.0, 0.0), 'right', [], live)
+            self.assertIsNotNone(result)
+            served.append(result[0]['id'])
+            live.append(result[2])
+        self.assertEqual(set(served), set(['mol_a', 'biphenyl']))
 
 
 if __name__ == '__main__':
