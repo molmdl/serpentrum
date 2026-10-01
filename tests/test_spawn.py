@@ -1,6 +1,6 @@
 """spawn tests: deterministic seeded pickup-spawn policy pins (G3, 05-03).
 
-Twelve pin groups mirror the plan's behavior cases:
+Thirteen pin groups mirror the plan's behavior cases:
 
   1. Determinism  -- two same-seed spawners produce identical
      first()/next_after() sequences (positions + ids); a different seed
@@ -48,6 +48,10 @@ Twelve pin groups mirror the plan's behavior cases:
      serve pool (the spawner self-filters at construction, single choke
      point); the predicate is SET-AWARE so an uploaded 'biphenyl' keeps
      its designed cycle-and-skip pedagogy.
+ 13. Head resolver -- effective_head_id (2026-10-01 quick-001): the PURE
+     gameplay head pre-pass; a stale excluded head degrades to the first
+     eligible record, every other id passes through (the viewer
+     materialize path is NOT routed through it).
 
 Spawners are built from the REAL demo records (setloader.load_demo_set
 with the shipped stacking dataset) and origin-centered synthetic atoms (6
@@ -827,6 +831,47 @@ class TestGameplayExclusion(SpawnTestBase):
             served.append(result[0]['id'])
             live.append(result[2])
         self.assertEqual(set(served), set(['mol_a', 'biphenyl']))
+
+
+class TestEffectiveHeadId(SpawnTestBase):
+    """Case 13: effective_head_id (2026-10-01 quick-001) -- the PURE
+    gameplay head-resolution pre-pass: a stale saved setup naming the
+    excluded set_a biphenyl degrades to the FIRST eligible record
+    (anchored order); every other id passes through untouched."""
+
+    def test_excluded_head_falls_back_to_first_eligible(self):
+        # Anchored order: benzene first.
+        self.assertEqual(
+            spawn.effective_head_id({'head_molecule': 'biphenyl'},
+                                    self.records),
+            'benzene')
+
+    def test_random_and_eligible_ids_pass_through(self):
+        self.assertEqual(
+            spawn.effective_head_id({'head_molecule': 'random'},
+                                    self.records),
+            'random')
+        self.assertEqual(spawn.effective_head_id({}, self.records),
+                         'random')  # missing key
+        self.assertEqual(
+            spawn.effective_head_id({'head_molecule': 'naphthalene'},
+                                    self.records),
+            'naphthalene')
+
+    def test_missing_id_stays_unchanged(self):
+        # The bridge resolver keeps its advisory + box-only degradation.
+        self.assertEqual(
+            spawn.effective_head_id({'head_molecule': 'no_such_mol'},
+                                    self.records),
+            'no_such_mol')
+
+    def test_upload_biphenyl_head_not_excluded(self):
+        # Generic-consent upload path preserved (set-aware predicate).
+        records = [{'id': 'biphenyl', 'set': '__upload__'}]
+        self.assertEqual(
+            spawn.effective_head_id({'head_molecule': 'biphenyl'},
+                                    records),
+            'biphenyl')
 
 
 if __name__ == '__main__':

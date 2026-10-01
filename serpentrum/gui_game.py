@@ -542,7 +542,10 @@ class GameTab(QtWidgets.QWidget):
 
         Selects the head record the SAME way materialize does
         (pymol_bridge._select_head_record; errors discarded - Apply
-        already surfaced them). Returns (None, None) when the scene has
+        already surfaced them), after the quick-001 gameplay head
+        pre-pass (spawn_mod.effective_head_id degrades a stale
+        gameplay-excluded head to the first eligible record).
+        Returns (None, None) when the scene has
         no head (box-only Apply) or the record has no stack_ring
         (ring-less uploads degrade flat, matching the Apply path; since
         2026-09-20c fix G2 uploads WITH a canonical planar 6-ring carry
@@ -551,8 +554,17 @@ class GameTab(QtWidgets.QWidget):
         edge_on_atoms EXTENT-CENTERED in pure math - the exact pose
         edge_on_m16 + place_head gives srp_head - so mirror == viewer.
         """
-        record = pymol_bridge._select_head_record(
-            setup, list(records_by_id.values()), [])
+        # 2026-10-01 quick-001 (owner-approved): a stale saved setup
+        # naming a gameplay-excluded molecule degrades to the FIRST
+        # ELIGIBLE record (probe-proven: a biphenyl head makes every
+        # first capture REFUSE_ATOM -> a run can never progress). The
+        # VIEWER materialize path is untouched - biphenyl stays
+        # viewable from the manifest.
+        records = list(records_by_id.values())
+        effective = dict(setup)
+        effective['head_molecule'] = spawn_mod.effective_head_id(
+            setup, records)
+        record = pymol_bridge._select_head_record(effective, records, [])
         if record is None or 'stack_ring' not in record:
             return (None, None)
         parsed = _read_record(record['file'])

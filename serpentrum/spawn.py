@@ -156,6 +156,34 @@ def is_gameplay_excluded(record):
     """
     return (record.get('set'), record.get('id')) in GAMEPLAY_EXCLUDED_MOLS
 
+
+def effective_head_id(setup, records):
+    """Gameplay head-resolution pre-pass (quick-001, 2026-10-01).
+
+    Returns the head id the GAMEPLAY head path should resolve:
+      - 'random' (or a missing key) -> 'random' unchanged;
+      - a named id with NO gameplay-excluded record among ``records``
+        -> unchanged (INCLUDING ids absent from records entirely --
+        the bridge resolver keeps its advisory + box-only degradation);
+      - a named id matching a gameplay-excluded record (a stale saved
+        setup naming set_a biphenyl) -> the id of the FIRST record
+        (anchored order) that is not excluded; when no eligible record
+        exists the original id is returned (box-only scene).
+
+    The VIEWER materialize path (pymol_bridge._select_head_record) is
+    deliberately NOT routed through this -- biphenyl stays loadable and
+    viewable from the manifest. PURE.
+    """
+    head_id = setup.get('head_molecule', 'random')
+    excluded_ids = set(record['id'] for record in records
+                       if is_gameplay_excluded(record))
+    if head_id not in excluded_ids:
+        return head_id
+    for record in records:
+        if not is_gameplay_excluded(record):
+            return record['id']
+    return head_id
+
 # Heading name -> unit vector in the xy plane. Deliberately a PRIVATE
 # mirror of game_engine.DIRS (this module is fully decoupled -- it must
 # not import the engine; the contract is one of the four axis names).

@@ -54,6 +54,7 @@ from . import molfile
 from . import orientation
 from . import pymol_bridge
 from . import setloader
+from . import spawn
 from . import setup_logic
 from . import xtbenv
 
@@ -532,6 +533,14 @@ class SetupTab(QtWidgets.QWidget):
         self.head_combo.clear()
         self.head_combo.addItem('Random', 'random')
         for record in records:
+            if spawn.is_gameplay_excluded(record):
+                # 2026-10-01 quick-001: the gameplay-excluded demo
+                # molecule is never OFFERED as a head (never selectable
+                # -> collect_state can never emit it; _head_candidates/
+                # Randomize inherit the filter for free; a stale saved
+                # setup naming it degrades to Random via apply_state's
+                # findData miss). The VIEWER path is untouched.
+                continue
             self.head_combo.addItem(record['name'], record['id'])
         restored = False
         if prev is not None:
@@ -564,7 +573,9 @@ class SetupTab(QtWidgets.QWidget):
         'random' excluded -- this is exactly the id list the combo was
         populated from (the current demo set, or the uploaded records),
         reused by the Randomize click so randomize_setup never sees a
-        second, invented candidate list.
+        second, invented candidate list. Gameplay-excluded demo
+        molecules (2026-10-01 quick-001) are absent from the combo, so
+        the candidate list (and randomize_setup) inherits the exclusion.
         """
         candidates = []
         for index in range(self.head_combo.count()):

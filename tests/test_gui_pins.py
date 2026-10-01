@@ -139,5 +139,41 @@ class TestEagerHeadPopulation(unittest.TestCase):
             'no eager _populate_head_combo call site outside _on_apply')
 
 
+class TestGameplayExclusionWiring(unittest.TestCase):
+    """quick-001 (2026-10-01, owner-approved): the set_a biphenyl
+    gameplay-exclusion wiring pins, source-scan style (headless widget
+    construction is a dead end -- decision 01-05).
+
+    gui_setup.py: imports the pure spawn module AND the head-combo
+    populator skips gameplay-excluded records (single seam -- display,
+    _head_candidates/Randomize, and collect_state all inherit the
+    filter).
+
+    gui_game.py: the gameplay head path resolves through
+    spawn_mod.effective_head_id (the stale-saved-setup fallback,
+    upstream of the untouched bridge resolver).
+    """
+
+    @staticmethod
+    def _method_body(source, needle):
+        start = source.find(needle)
+        assert start >= 0, '%r not found' % (needle,)
+        end = source.find('\n    def ', start + 1)
+        if end < 0:
+            end = len(source)
+        return source[start:end]
+
+    def test_gui_setup_combo_filters_excluded_records(self):
+        source = _read(os.path.join('serpentrum', 'gui_setup.py'))
+        self.assertIn('from . import spawn', source)
+        body = self._method_body(source, 'def _populate_head_combo(')
+        self.assertIn('is_gameplay_excluded', body)
+
+    def test_gui_game_head_path_uses_effective_head_id(self):
+        source = _read(os.path.join('serpentrum', 'gui_game.py'))
+        body = self._method_body(source, 'def _build_head_state(')
+        self.assertIn('spawn_mod.effective_head_id', body)
+
+
 if __name__ == '__main__':
     unittest.main()
