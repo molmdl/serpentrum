@@ -94,6 +94,14 @@ DEFAULTS = {
 # chain may stack past the box in any axis; only the head is box-bound
 # via GAME-05, and biphenyl's genuine atom clash stays the designed
 # refuse demonstrator).
+# 2026-10-01 (quick-001, owner-approved): set_a biphenyl is now EXCLUDED
+#   from the gameplay spawn pool + head selection (serpentrum/spawn.py
+#   GAMEPLAY_EXCLUDED_MOLS) -- the refuse path is TEST-only from here
+#   on: REFUSE_ATOM stays reachable via the direct-seeded fixtures
+#   (tests/test_placement.py TestBiphenylRefusal,
+#   tests/test_phase5_integration.py test_s4), which BYPASS the spawn
+#   pool and stay green UNCHANGED. Placement machinery
+#   (placement.REFUSE_ATOM) is untouched.
 BOX_PRESETS = {
     'small': ((-35.0, -35.0), (35.0, 35.0)),
     'medium': ((-55.0, -55.0), (55.0, 55.0)),
