@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 Phase: 7 of 8 (Spectra UI) — COMPLETE + CHECKPOINT-APPROVED (2026-09-26, 07-10 round 2 "approved, well done")
 Plan: 10 of 10 COMPLETE (07-10 — phase-close: full gate battery green first try → consolidated human-verify APPROVED round 2 with BOTH sign-offs)
 Status: SPECTRA-01/03/04/05 delivered (live tab incl. streaming log + cancel/Run-again, broadened plot w/ route-A PNG save, every-mode table, row-click vectors on OWNER-SIGNED-OFF optimized frame); plot options owner-amended at 07-06 (unit modes absorbance/transmittance, colors blue/red/black, x-direction, y-invert, exact-preset sizing); compact tab (log 110px/table 150px scroll) + dialog screen cap from the 07-10 r1 fix
-Last activity: 2026-09-27 — 07-10 post-approval owner follow-up: sphere-head occlusion of mode vectors fixed via show_srp_sticks() sweep; gates re-green (840 unittests + 10/10 required smokes)
+Last activity: 2026-10-01 - Completed quick task 001: Remove biphenyl from gameplay spawn pool
 
 Progress: [██████████] 100% (95 of 95 planned plans fully closed — Phases 1-5 + 5.1 + 5.2 + 5.3 + 6 + 7 COMPLETE; Phase 8 unplanned/TBD)
 
@@ -117,6 +117,7 @@ Recent decisions affecting current work:
 - Demo-data FULL DATA_SOURCES.md checklist sign-off (all molecules + attribution) remains Phase 8-gated — Set A data placement is done (03-05), not the full DATA-02/04 approval.
 - **2026-09-20 (owner flag):** Janiak 2000 scope transferability — SCOPE CAVEAT added to DATA_SOURCES.md [JAN2000]: its corpus is metal-complex crystal structures (N-ligands), not free neutral hydrocarbons; aqueous/solution-phase geometry NOT verified. Shipped 3.60 Å is pinned by the measured CC0 COD organics (Janiak supplies only the qualitative ~20° parallel-displaced rule). Phase 8 TODO: check geometry in aqueous/solvated conditions (verified solution-phase study) or use explicit crystalline-state framing in UI/help text.
 - `tmp/upload_test/` holds the human-checkpoint upload test files (reject_4_rings.sdf tetracene C18H12, reject_no_h.sdf, accept_naphthalene.sdf, accept_benzene.mol2) — gitignored, disposable, regenerate per 03-08-SUMMARY if needed.
+- **2026-10-01 (quick-001 follow-up, owner directive "go back to phase 8 for updating phase8 related files later"):** Phase-8 files need a reconciliation pass — biphenyl is now EXCLUDED from real gameplay (spawn pool + head selection; probe-proven always-clash as pickup AND as head/segment target). Note file: .planning/quick/001-remove-biphenyl-from-gameplay-spawn-pool/PHASE8-NOTE.md. Any 08-* plans/docs/requirements text presenting biphenyl as a stackable gameplay molecule must be updated when Phase 8 work resumes; the dataset/manifest and TDD/smoke fixtures KEEP biphenyl (refuse-path demonstrator, TEST-only).
 
 ### Blockers/Concerns
 
@@ -124,6 +125,12 @@ Recent decisions affecting current work:
 - Offscreen route closed (01-05): headless dialog assertions impossible in PyMOL 2.5.0's Qt build — smoke 02 stays informational (non-blocking FAIL); GUI verdicts are human-verify only.
 - RESOLVED 2026-09-19: ghost-point turn-lock (key silence was same-dir/180° design + real chain-vs-wall veto; veto then owner-overridden to head-only — cd04525) and lagging tail (stationary-per-tick chain → rigid train-follow — 76d74b3). Distance question settled: 3.60 Å @ 20° is DATA-02-approved and stays; benzene-crystal-specific distance would need verified source + human re-approval (repo rule).
 - Old concern superseded: "Phase 5 consumes setloader ring_atoms / placement math / GAME-10 sweep" — landed (05-01 ring_cycle shim, 05-02/05-10 edge-on, 05-13/05-14 seams); only the 2026-09-19 owner directives in Decisions remain live for Phase 5 behavior.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 001 | Remove biphenyl from gameplay spawn pool | 2026-10-01 | 884fed6 | [001-remove-biphenyl-from-gameplay-spawn-pool](./quick/001-remove-biphenyl-from-gameplay-spawn-pool/) |
 
 ## Session Continuity
 
