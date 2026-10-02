@@ -1,6 +1,6 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-09-27
+**Analysis Date:** 2026-10-02
 
 ## Directory Layout
 
@@ -8,10 +8,10 @@
 serpentrum/                          # repo root
 ├── serpentrum/                      # the installable PyMOL plugin package (first-party code)
 │   ├── __init__.py                  # ENTRY: plugin registration + live-state anchor
-│   ├── gui.py                       # GUI: PluginDialog (3-tab shell, composition root)
-│   ├── gui_setup.py                 # GUI: SetupTab
+│   ├── gui.py                       # GUI: PluginDialog (3-tab shell, composition root, bottom row)
+│   ├── gui_setup.py                 # GUI: SetupTab (config form + persistence handlers)
 │   ├── gui_game.py                  # GUI: GameTab (engine tick + HUD, largest file)
-│   ├── gui_spectra.py               # GUI: SpectraTab
+│   ├── gui_spectra.py               # GUI: SpectraTab (status/log/plot/table surface)
 │   ├── gui_plot.py                  # GUI: QPainter IR plot widget + save route
 │   ├── xtb_runner.py                # GUI: XtbRunController (async QProcess)
 │   ├── pymol_bridge.py              # BRIDGE: the single pymol.cmd seam
@@ -34,6 +34,7 @@ serpentrum/                          # repo root
 │   ├── plot_logic.py                # PURE: paint-ready Scene builder
 │   ├── spectra_ui.py                # PURE: Spectra display/label/row decisions
 │   ├── hud_logic.py                 # PURE: Game HUD string/count builders
+│   ├── help_text.py                 # PURE: single-sourced in-game help/hint strings
 │   ├── cgo_build.py                 # PURE: CGO float-list builders (box, arrows)
 │   └── data/                        # shipped demo data (JSON + SDF + attribution)
 │       ├── manifest.json            # Set A molecule manifest
@@ -43,16 +44,18 @@ serpentrum/                          # repo root
 │       └── DATA_SOURCES.md          # verified citations for shipped data
 ├── tests/                           # WSL python3.6 unittest suite (dev-side, not a plugin)
 │   ├── run_gates.py                 # single gate entry point (syntax/purity/unittest/smoke/xtb)
-│   ├── test_*.py                    # unit + integration tests (pure layer)
+│   ├── test_*.py                    # 47 unit + integration tests (pure layer + dev tools)
 │   └── fixtures/                    # committed test data
 │       ├── xtb/                     # g98.out, vibspectrum, logs, xyz fixtures
 │       ├── molfile/                 # SDF/mol2 fixtures
 │       └── calib_snake_52.xyz, calib_snake_104.xyz
 ├── smoke/                           # headless Windows PyMOL scripts (dev-side, not a plugin)
-│   ├── NN_*_smoke.py                # required + informational smokes
+│   ├── NN_*_smoke.py                # required + informational smokes (01..14)
 │   └── manual_*.py                  # real-GUI human-verify harnesses
-├── tools/                           # dev-side helpers + the purity checker (not a plugin)
+├── tools/                           # dev-side helpers + checkers (not a plugin)
 │   ├── check_purity.py              # AST purity/hygiene checker (gate 2)
+│   ├── check_docs.py                # doc-vs-code audit harness (DOCS-04)
+│   ├── audit_requirements.py        # requirements-ledger integrity checker (DOCS-05)
 │   ├── winpath.py                   # WSL -> Windows path conversion
 │   ├── build_demo_manifest.py       # one-off manifest builder
 │   ├── build_calibration_snake.py   # deterministic calibration fixture builder
@@ -87,9 +90,10 @@ as part of the plugin: `pymol-src -> ../bioCHEMeleon/tmp/pymol-src` (PyMOL sourc
 
 **`tests/`:**
 - Purpose: WSL `python3.6` unit + integration tests for the PURE layer and dev tools.
-- Contains: `run_gates.py` and 40+ `test_*.py` files. No `__init__.py` (module discovery by
+- Contains: `run_gates.py` and 47 `test_*.py` files. No `__init__.py` (module discovery by
   filename under `-s tests`).
-- Key files: `tests/run_gates.py`, `tests/test_purity_gates.py`, `tests/test_engine_*.py`.
+- Key files: `tests/run_gates.py`, `tests/test_purity_gates.py`, `tests/test_engine_*.py`,
+  `tests/test_docs_audit.py`, `tests/test_audit_requirements.py`.
 
 **`tests/fixtures/`:**
 - Purpose: committed, verified input/expected data.
@@ -98,13 +102,15 @@ as part of the plugin: `pymol-src -> ../bioCHEMeleon/tmp/pymol-src` (PyMOL sourc
 
 **`smoke/`:**
 - Purpose: headless Windows-PyMOL scenario scripts for cmd-coupled behavior.
-- Contains: numbered `NN_*_smoke.py` plus `manual_*.py` human-verify harnesses. No
+- Contains: 14 numbered `NN_*_smoke.py` plus 2 `manual_*.py` human-verify harnesses. No
   `__init__.py`.
-- Key files: `smoke/01_skeleton_smoke.py` (template), `smoke/12_plot_smoke.py`.
+- Key files: `smoke/01_skeleton_smoke.py` (template), `smoke/12_plot_smoke.py`,
+  `smoke/14_release_e2e_smoke.py`.
 
 **`tools/`:**
 - Purpose: dev-only harness/helpers; run in WSL, never loaded by PyMOL.
-- Contains: `check_purity.py`, `winpath.py`, and one-off builders/probes. No `__init__.py`.
+- Contains: `check_purity.py`, `check_docs.py`, `audit_requirements.py`, `winpath.py`, and
+  one-off builders/probes. No `__init__.py`.
 
 **`.planning/`:**
 - Purpose: GSD workflow source of truth (PROJECT/ROADMAP/STATE/REQUIREMENTS, research,
@@ -126,13 +132,15 @@ as part of the plugin: `pymol-src -> ../bioCHEMeleon/tmp/pymol-src` (PyMOL sourc
 
 **Core Logic:**
 - `serpentrum/game_engine.py`: snake state machine (823 lines).
-- `serpentrum/gui_game.py`: tick loop + HUD orchestration (1538 lines, largest file).
-- `serpentrum/gui.py`: `PluginDialog` composition root + cross-tab launch pipeline.
+- `serpentrum/gui_game.py`: tick loop + HUD orchestration (1572 lines, largest file).
+- `serpentrum/gui.py`: `PluginDialog` composition root + cross-tab launch pipeline +
+  canonical 6-button bottom row.
 - `serpentrum/pymol_bridge.py`: all `cmd.*` side effects.
 - `serpentrum/xtb_runner.py`: async QProcess controller.
 - `serpentrum/xtbenv.py` + `serpentrum/xtb_run.py`: xtb rules (PURE).
 - `serpentrum/spectra.py` + `serpentrum/plot_logic.py` + `serpentrum/gui_plot.py`:
   parse → Scene → pixels.
+- `serpentrum/help_text.py`: single-sourced in-game help/hint strings.
 
 **Testing:**
 - `tests/run_gates.py`: gate 1 (syntax+plugin-path safety), gate 2 (purity),
@@ -147,14 +155,15 @@ as part of the plugin: `pymol-src -> ../bioCHEMeleon/tmp/pymol-src` (PyMOL sourc
 
 **Files (plugin package):**
 - Pure logic modules: lowercase, descriptive noun (`game_engine.py`, `stacking.py`,
-  `placement.py`, `spectra.py`, `xyzio.py`).
+  `placement.py`, `spectra.py`, `xyzio.py`, `help_text.py`).
 - GUI modules: `gui_<tab>_<role>.py` (`gui_setup.py`, `gui_game.py`, `gui_spectra.py`,
   `gui_plot.py`); the dialog shell is `gui.py`; the async runner is `xtb_runner.py`.
 - Bridge modules: purpose-named (`pymol_bridge.py`, `input.py`).
-- Test files: `test_<unit>.py`, grouped by plan (`test_engine_*.py`, `test_phase5_*.py`).
+- Test files: `test_<unit>.py`, grouped by plan (`test_engine_*.py`, `test_phase5_*.py`,
+  `test_phase51_integration.py`, `test_phase52_integration.py`).
 - Smoke files: `NN_<scenario>_smoke.py`; manual harnesses `manual_<scenario>_check.py`.
-- Tools: `build_<thing>.py`, `measure_<thing>.py`, `check_<thing>.py`, or a single word
-  (`winpath.py`).
+- Tools: `build_<thing>.py`, `measure_<thing>.py`, `check_<thing>.py`,
+  `audit_<thing>.py`, or a single word (`winpath.py`).
 
 **Files (data):**
 - JSON: `manifest.json`, `stacking_pi_stack.json`.
@@ -162,7 +171,7 @@ as part of the plugin: `pymol-src -> ../bioCHEMeleon/tmp/pymol-src` (PyMOL sourc
 
 **Functions:**
 - Pure builders/composers return plain data: `build_scene`, `build_argv`,
-  `build_run_input`, `box_cgo`, `mode_arrows`.
+  `build_run_input`, `box_cgo`, `mode_arrows`, `game_hint`.
 - Validators return problem lists: `validate`, `validate_binary_path`.
 - Predicates: `can_start`, `can_spawn`, `has_stack_entry`.
 - Bridge verbs mirror PyMOL actions: `load_molecule`, `materialize`, `cleanup_srp`,
@@ -177,7 +186,8 @@ as part of the plugin: `pymol-src -> ../bioCHEMeleon/tmp/pymol-src` (PyMOL sourc
 **Variables / constants:**
 - `snake_case` locals; `UPPER_SNAKE` module constants (`XTB_OHESS`, `SRP_PREFIX`,
   `SPECTRA_RUN_KEYS`, `REQUIRED_SMOKES`, `CLASH_THRESHOLD_A`).
-- Reserved object names: `srp_` prefix (`srp_head`, `srp_box`, `srp_seg_*`).
+- Reserved object names: `srp_` prefix (`srp_head`, `srp_box`, `srp_seg_*`,
+  `srp_mode_vec`, `srp_xtbopt`).
 
 **Types:**
 - `namedtuple` for immutable records (`Mode`, `Atom`, `Spectrum`, `Scene`); plain tuples
@@ -190,10 +200,9 @@ The dev install points PyMOL's plugin loader at the **repo root**, so the loader
 startup. `tests/run_gates.py::gate_syntax_safety` (gate 1) enforces:
 
 - **NO `__init__.py` in `tests/`, `smoke/`, or `tools/`** — checked by
-  `SAFETY_DIRS = ('tests', 'smoke', 'tools')` (`tests/run_gates.py:52`, `:107-115`).
-- **NO top-level `*.py` at the repo root** — checked by
-  `glob(ROOT/*.py)` (`tests/run_gates.py:100-106`). Root scripts must be `.sh` or live
-  under `tools/`/`smoke/`/`tests/`.
+  `SAFETY_DIRS = ('tests', 'smoke', 'tools')` (`tests/run_gates.py:52`).
+- **NO top-level `*.py` at the repo root** — checked by `glob(ROOT/*.py)`. Root scripts
+  must be `.sh` or live under `tools/`/`smoke/`/`tests/`.
 - Gate 1 also runs `py_compile` over `serpentrum/`, `tools/`, `tests/`, `smoke/`
   (`WALK_DIRS`, `tests/run_gates.py:49`).
 
@@ -225,6 +234,10 @@ plugin, and its `__init__.py` is the ENTRY module.
 **New xtb behavior:**
 - Rules → `serpentrum/xtbenv.py` or `serpentrum/xtb_run.py` (PURE, WSL-testable);
   Qt wiring only → `serpentrum/xtb_runner.py`.
+
+**New user-visible help/hint text:**
+- Add the string/constant to `serpentrum/help_text.py` (PURE); render it verbatim in the
+  GUI tab. Pin it with a test so `tools/check_docs.py` doc-vs-code audit stays honest.
 
 **New shipped data:**
 - `serpentrum/data/`, with verified attribution in `serpentrum/data/DATA_SOURCES.md` and
@@ -265,4 +278,4 @@ plugin, and its `__init__.py` is the ENTRY module.
 
 ---
 
-*Structure analysis: 2026-09-27*
+*Structure analysis: 2026-10-02*

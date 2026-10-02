@@ -1,12 +1,12 @@
 # Architecture
 
-**Analysis Date:** 2026-09-27
+**Analysis Date:** 2026-10-02
 
 ## Pattern Overview
 
 **Overall:** Pure-core / game-engine with a thin PyMOL + Qt bridge layer, enforced by an AST purity gate.
 
-The architecture is a strict-layered plugin split into four module classes that are
+The architecture is a strict-layered PyMOL plugin split into four module classes that are
 **machine-enforced** by `tools/check_purity.py` (run as gate 2 by `tests/run_gates.py`).
 Dependency direction is `PURE ← BRIDGE ← GUI/ENTRY`. Pure modules do all math and data
 parsing; bridge modules are the only code that calls `pymol.cmd`; GUI modules are the only
@@ -14,7 +14,8 @@ code that imports Qt (via `pymol.Qt`, never bare `PyQt5`).
 
 **Key Characteristics:**
 - Module class is decided by path in `tools/check_purity.py` (`classify()`), not by
-  convention — a new file defaults to the strictest class (PURE) unless deliberately added.
+  convention — a new file defaults to the strictest class (PURE) unless deliberately added
+  to `GUI_MODULES` / `BRIDGE_MODULES`.
 - `serpentrum/__init__.py` is the ENTRY module: stdlib-only at module level, with
   `pymol`/`pmg_tk` imported lazily inside function bodies only (`_anchor()`,
   `__init_plugin__()`, `run_plugin_gui()`).
@@ -24,6 +25,8 @@ code that imports Qt (via `pymol.Qt`, never bare `PyQt5`).
 - Modeless rule: the main dialog opens via `.show()` only; `.exec_()` is an AST failure.
 - All game PyMOL objects live under the reserved `srp_` name prefix; cleanup is by name
   pattern (`pymol_bridge.cleanup_srp`), fresh-process-safe.
+- User-visible help/hint strings are single-sourced in the PURE `help_text.py` (DOCS-03);
+  GUI modules render them verbatim and never re-derive wording.
 
 ## Layers
 
@@ -39,9 +42,9 @@ code that imports Qt (via `pymol.Qt`, never bare `PyQt5`).
 **PURE (all other `serpentrum/*.py` not listed as GUI/BRIDGE):**
 - Purpose: engine, geometry, parsing, formatting, data loading, decision logic.
 - Location: `serpentrum/game_engine.py`, `stacking.py`, `placement.py`,
-  `orientation.py`, `plot_logic.py`, `spectra.py`, `budget_guard.py`,
+  `orientation.py`, `plot_logic.py`, `spectra.py`, `spectra_ui.py`, `budget_guard.py`,
   `generic_stack.py`, `setup_logic.py`, `spawn.py`, `molfile.py`, `xyzio.py`,
-  `molecule_data.py`, `setloader.py`, `hud_logic.py`, `cgo_build.py`, `spectra_ui.py`,
+  `molecule_data.py`, `setloader.py`, `hud_logic.py`, `help_text.py`, `cgo_build.py`,
   `xtb_run.py`, `xtbenv.py`.
 - Contains: plain Python functions/classes returning data (tuples, dicts, namedtuples).
 - Depends on: stdlib (`math`, `json`, `os`, `random`, `copy`, `collections`) + relative
@@ -62,7 +65,7 @@ code that imports Qt (via `pymol.Qt`, never bare `PyQt5`).
 - Purpose: the single `cmd.*` seam + keyboard steering wizard.
 - Location: `serpentrum/pymol_bridge.py`, `serpentrum/input.py`.
 - Contains: object load/materialize/move/transform/camera/cleanup functions
-  (`pymol_bridge`); `KeySteerWizard` (`input.py`).
+  (`pymol_bridge`); `KeySteerWizard` + `install`/`set_active`/`teardown` (`input.py`).
 - Depends on: `pymol.cmd` / `pymol.wizard` at module level; PURE modules for data.
   Qt and numpy are banned.
 - Used by: GUI modules.
@@ -76,18 +79,19 @@ code that imports Qt (via `pymol.Qt`, never bare `PyQt5`).
 | BRIDGE | `serpentrum/pymol_bridge.py`, `serpentrum/input.py` | `pymol`/`pmg_tk` allowed at any level; `PyQt5`/`numpy` never |
 | PURE (default) | every other `.py` under `serpentrum/` | `pymol`/`pmg_tk`/`PyQt5`/`numpy` never, anywhere |
 
-The allowlists are `GUI_MODULES` and `BRIDGE_MODULES` in `tools/check_purity.py`.
-Everything else is PURE by default-strict classification. `.exec_()` calls are banned in
-every class (`tools/check_purity.py:200-207`).
+The allowlists are `GUI_MODULES` (`tools/check_purity.py:72-74`) and `BRIDGE_MODULES`
+(`tools/check_purity.py:84`). Everything else is PURE by default-strict classification.
+`.exec_()` calls are banned in every class (`tools/check_purity.py:200-207`).
 
 ## Data Flow
 
 **Game loop (main Qt thread, 100 ms tick):**
 
 1. `SetupTab` (`serpentrum/gui_setup.py`) collects the setup dict and emits
-   `start_requested(setup)`.
-2. `PluginDialog._on_start_requested` (`serpentrum/gui.py`) switches to tab 1 and calls
-   `GameTab.begin_game(setup)`.
+   `start_requested(setup)`; the canonical 6-button bottom row lives in
+   `PluginDialog` (`serpentrum/gui.py:149-171`) and calls the page's handlers.
+2. `PluginDialog._on_start_requested` (`serpentrum/gui.py:173-183`) switches to tab 1 and
+   calls `GameTab.begin_game(setup)`.
 3. `GameTab` (`serpentrum/gui_game.py`) tears down any prior round, builds the
    round-robin spawner via `serpentrum/spawn.py`, seeds `GameEngine(pickups=...)`, and runs
    the epoch-guarded 3-2-1 countdown via `QtCore.QTimer.singleShot`.
@@ -101,8 +105,8 @@ every class (`tools/check_purity.py:200-207`).
    `pymol_bridge` applies it via `cmd.transform_selection`.
 7. CGO graphics float-lists come from `serpentrum/cgo_build.py` (PURE box edges and
    vibrational-mode arrows) and are handed to `pymol_bridge` → `cmd.load_cgo`.
-8. HUD strings/labels are composed by `serpentrum/hud_logic.py` (PURE); widgets live in
-   `GameTab`.
+8. HUD strings/labels are composed by `serpentrum/hud_logic.py` (PURE) and
+   `serpentrum/help_text.py` (PURE); widgets live in `GameTab`.
 9. On win/crash: `_teardown_round` restores the prior wizard and camera, then builds the
    `last_run` handoff record — including head-inclusive `snake_xyz` via
    `xtb_run.build_run_input` (`serpentrum/xtb_run.py`) — and anchors it on
@@ -111,13 +115,14 @@ every class (`tools/check_purity.py:200-207`).
 **Spectra pipeline (async, QProcess):**
 
 1. `GameTab.spectra_requested` → `PluginDialog._on_spectra_requested`
-   (`serpentrum/gui.py`): switches to tab 2, guards the anchor/`last_run`/`snake_xyz`,
+   (`serpentrum/gui.py:185-273`): switches to tab 2, guards the anchor/`last_run`/`snake_xyz`,
    counts atoms via `xyzio.read_xyz_text`, cross-checks viewer counts via
    `pymol_bridge.chain_atom_counts`, logs `budget_guard` lines (warn-and-proceed), resolves
    the binary via `xtbenv.detect_binary`.
-2. `_launch_spectra_run`: create-or-reuse the anchored `XtbRunController`
-   (`serpentrum/xtb_runner.py`) on `_serpentrum.spectra_runner`; `_connect_runner` replays
-   `controller.log_tail()` then connects `started`/`log_line`/`run_finished`.
+2. `_launch_spectra_run` (`serpentrum/gui.py:275-306`): create-or-reuse the anchored
+   `XtbRunController` (`serpentrum/xtb_runner.py`) on `_serpentrum.spectra_runner`;
+   `_connect_runner` replays `controller.log_tail()` then connects
+   `started`/`log_line`/`run_finished`.
 3. `XtbRunController.start(...)`: guard via `xtb_run.can_start`; fresh spray dir via
    `xtbenv.new_run_dir` (under `tempfile.gettempdir()`); writes `snake.xyz`; argv via
    `xtbenv.build_argv` (`snake.xyz --ohess -P 4`); launches `QProcess` with `cwd` = spray
@@ -132,8 +137,8 @@ every class (`tools/check_purity.py:200-207`).
    `spectra.broaden` → build a paint-ready `Scene` via `plot_logic.build_scene` (PURE) →
    hand to `SpectraPlotPanel` (`serpentrum/gui_plot.py`) whose `paint_scene` maps pixels.
 6. Frequency table rows and mode-arrow selectors come from `serpentrum/spectra_ui.py`
-   (PURE); selected mode → `cgo_build.mode_arrows` → `pymol_bridge` loads the `srp_` CGO
-   overlay.
+   (PURE); selected mode → `cgo_build.mode_arrows` → `pymol_bridge` loads the `srp_`
+   CGO overlay.
 
 **xtb subprocess lifecycle:**
 
@@ -171,25 +176,34 @@ every class (`tools/check_purity.py:200-207`).
 
 **`XtbRunController`:**
 - Purpose: async single-owner xtb process controller.
-- Location: `serpentrum/xtb_runner.py`.
+- Location: `serpentrum/xtb_runner.py:76`.
 - Pattern: anchored (not module-level) instance so reload cannot duplicate it; Qt signals
   `started`, `log_line(str)`, `run_finished(str, list)`.
 
 **`PluginDialog` (composition root):**
-- Purpose: dialog shell, tab switch orchestration, cross-tab launch pipeline.
-- Location: `serpentrum/gui.py:36`.
-- Pattern: tabs never reach up to their parent; the dialog owns all `QTabWidget` switches
-  and the xtb launch flow. **Note:** the original research proposed a separate
+- Purpose: dialog shell, tab switch orchestration, cross-tab launch pipeline, canonical
+  bottom action row.
+- Location: `serpentrum/gui.py:37`.
+- Pattern: tabs never reach up to their parent; the dialog owns all `QTabWidget` switches,
+  the xtb launch flow, and the 6-button row (`Reset`/`Randomize`/`Save Setup`/`Load Setup`/
+  `Cleanup model`/`Start`). **Note:** the original research proposed a separate
   `controller.py`; the shipped code has NO `controller.py` — `PluginDialog` and `GameTab`
   fill that role.
 
 **`pymol_bridge` (single cmd seam):**
 - Purpose: the only module (besides `input.py`) that calls `pymol.cmd`.
 - Location: `serpentrum/pymol_bridge.py`; reserved prefix constant `SRP_PREFIX = 'srp_'`;
-  canonical names `BOX_NAME='srp_box'`, `HEAD_NAME='srp_head'`.
+  canonical names `BOX_NAME='srp_box'`, `HEAD_NAME='srp_head'`, `MODE_VEC_NAME='srp_mode_vec'`,
+  `XTBOPT_NAME='srp_xtbopt'`.
 - Pattern: thin — no parsing/gating (that is `molfile`/`setloader`'s PURE job).
-  `cleanup_srp()` is a pure function of object names (no state args), so it works in a
-  fresh process after `.pse` reload.
+  `cleanup_srp()` (`pymol_bridge.py:129`) is a pure function of object names (no state
+  args), so it works in a fresh process after `.pse` reload.
+
+**`help_text` (single-sourced user text):**
+- Purpose: every testable help/hint string (DOCS-03), rendered verbatim by GUI tabs.
+- Location: `serpentrum/help_text.py`.
+- Pattern: `GAME_FOCUS_HINT`, `CONTROLS_RECAP`, `SETUP_HINTS`, `game_hint(state)` — GUI
+  never re-derives wording; pinned by the doc-vs-code audit (`tools/check_docs.py`).
 
 ## Entry Points
 
@@ -207,16 +221,20 @@ every class (`tools/check_purity.py:200-207`).
   `activateWindow()` (modeless).
 
 **Smoke scripts (executable scenarios):**
-- Location: `smoke/*.py` (e.g. `smoke/01_skeleton_smoke.py`, `smoke/04_demo_e2e_smoke.py`,
-  `smoke/11_xtb_runner_smoke.py`, `smoke/12_plot_smoke.py`, `smoke/13_mode_arrows_smoke.py`).
+- Location: `smoke/*.py` — numbered `smoke/01_skeleton_smoke.py` … `smoke/14_release_e2e_smoke.py`
+  plus manual harnesses `smoke/manual_plot_check.py`, `smoke/manual_wizard_keys_check.py`.
 - Triggers: `tests/run_gates.py --smoke` via
   `cmd.exe /c C:\src\run-conda-pymol.bat -cq smoke\NN_*.py`.
 - Responsibilities: headless Windows-PyMOL verification. Verdict = flushed `SMOKE-OK`
-  sentinels only, never exit codes. `REQUIRED_SMOKES` in `tests/run_gates.py:55-72`.
+  sentinels only, never exit codes. `REQUIRED_SMOKES` in `tests/run_gates.py:55-75`
+  is smokes 01, 03, 04, 05, 06, 07, 08, 10, 12, 13, 14; other numbered smokes and manual
+  harnesses are informational (run, never fail the gate).
 
 **Dev tools (not plugin):**
 - Location: `tools/build_demo_manifest.py`, `tools/build_calibration_snake.py`,
-  `tools/measure_calib_qprocess.py`, `tools/winpath.py`, `tools/check_purity.py`.
+  `tools/measure_calib_qprocess.py`, `tools/winpath.py`, `tools/check_purity.py`,
+  `tools/check_docs.py` (DOCS-04 doc-vs-code audit), `tools/audit_requirements.py`
+  (DOCS-05 requirements-ledger integrity).
 
 ## Error Handling
 
@@ -237,11 +255,14 @@ every class (`tools/check_purity.py:200-207`).
 
 **Logging:** GUI-level streaming; `XtbRunController` emits `log_line` and keeps a bounded
 500-line tail (`_LOG_TAIL`) with `log_tail()` replay for late/reloading tabs. `GameTab`
-has a read-only rolling info box fed by `hud_logic` builders and `log_external`.
+has a read-only rolling info box fed by `hud_logic` builders and `log_external`; the
+Spectra launch pipeline mirrors lines into it (`gui.py:_log_spectra_line`).
 
 **Validation:** `setup_logic.validate` (per-key errors + hessian warning),
 `setloader` (manifest cross-verification and gate enforcement), `molfile` (parse + gate),
 `molecule_data` (structural JSON validation), `budget_guard` (pre-launch re-check).
+Doc/requirements drift is caught by `tools/check_docs.py` and
+`tools/audit_requirements.py`.
 
 **Authentication:** Not applicable (desktop plugin; no network/auth).
 
@@ -250,4 +271,4 @@ has a read-only rolling info box fed by `hud_logic` builders and `log_external`.
 
 ---
 
-*Architecture analysis: 2026-09-27*
+*Architecture analysis: 2026-10-02*
