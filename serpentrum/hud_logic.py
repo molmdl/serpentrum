@@ -247,13 +247,18 @@ def generic_consent_note(consent):
 def completion_lines(result, molecules, snake_molecules, atoms_total):
     """The four completion summary lines (GAME-09 / SPECTRA-06).
 
-    Counts are REVEALED here -- completion is when the hidden counters
-    become visible.
+    Counts are REVEALED here -- completion is when the hidden
+    counters become visible. The fourth line reveals the STACKED
+    atoms (engine counter, head excluded; D2 honesty fix, plan
+    08-12): this number is the stacked-only count, NOT the xtb
+    run input size -- the true head-inclusive run input (what xtb
+    actually reads) renders on the Spectra tab's launch counts
+    line (budget_guard.launch_counts_line, gui.py).
     """
     return ['result: %s' % result,
             'score: %d molecule(s) stacked' % molecules,
             'snake: %d molecules (incl. head)' % snake_molecules,
-            'atoms: %d (spectra input size)' % atoms_total]
+            'atoms: %d (stacked molecules, head excluded)' % atoms_total]
 
 
 def breakdown_lines(history):

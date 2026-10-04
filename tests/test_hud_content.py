@@ -178,12 +178,15 @@ class TestCompletionLines(unittest.TestCase):
     """completion_lines: counts REVEALED at completion (GAME-09)."""
 
     def test_four_lines(self):
+        # D2 (plan 08-12): the atom line labels the STACKED (engine,
+        # head-EXCLUDED) count honestly; the head-inclusive xtb run
+        # input is the Spectra tab's launch counts line.
         self.assertEqual(
             hud_logic.completion_lines('won', 3, 4, 79),
             ['result: won',
              'score: 3 molecule(s) stacked',
              'snake: 4 molecules (incl. head)',
-             'atoms: 79 (spectra input size)'])
+             'atoms: 79 (stacked molecules, head excluded)'])
 
     def test_crash_result_renders(self):
         self.assertEqual(
@@ -191,7 +194,7 @@ class TestCompletionLines(unittest.TestCase):
             ['result: crashed (boundary)',
              'score: 1 molecule(s) stacked',
              'snake: 2 molecules (incl. head)',
-             'atoms: 41 (spectra input size)'])
+             'atoms: 41 (stacked molecules, head excluded)'])
 
 
 class TestBreakdownLines(unittest.TestCase):
