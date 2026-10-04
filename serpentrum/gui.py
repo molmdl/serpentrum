@@ -12,13 +12,16 @@ Phase 4); page 2 (Spectra) is the live SpectraTab from gui_spectra
 signal contracts survive intact). Plans 07-08/07-09 add the plot panel
 and the frequency table at SpectraTab's PINNED layout indices. Plan
 08-08 landed the canonical 6-button bottom action row (SETUP-07) in
-the QHBoxLayout reserved here since Phase 1.
+the QHBoxLayout reserved here since Phase 1; plan 08-13 gives every
+button a student hover tooltip from help_text.BUTTON_TOOLTIPS
+(QWidget.setToolTip, wired verbatim beside each construction).
 """
 import tempfile
 
 from pymol.Qt import QtWidgets
 
 from . import budget_guard
+from . import help_text
 from . import pymol_bridge
 from . import setup_logic
 from . import xtb_run
@@ -151,21 +154,27 @@ class PluginDialog(QtWidgets.QDialog):
         buttons.addStretch(1)
         reset_btn = QtWidgets.QPushButton('Reset', self)
         reset_btn.clicked.connect(self.setup_page._on_reset)
+        reset_btn.setToolTip(help_text.BUTTON_TOOLTIPS['reset'])
         buttons.addWidget(reset_btn)
         randomize_btn = QtWidgets.QPushButton('Randomize', self)
         randomize_btn.clicked.connect(self.setup_page._on_randomize)
+        randomize_btn.setToolTip(help_text.BUTTON_TOOLTIPS['randomize'])
         buttons.addWidget(randomize_btn)
         save_btn = QtWidgets.QPushButton('Save Setup', self)
         save_btn.clicked.connect(self.setup_page._on_save_setup)
+        save_btn.setToolTip(help_text.BUTTON_TOOLTIPS['save'])
         buttons.addWidget(save_btn)
         load_btn = QtWidgets.QPushButton('Load Setup', self)
         load_btn.clicked.connect(self.setup_page._on_load_setup)
+        load_btn.setToolTip(help_text.BUTTON_TOOLTIPS['load'])
         buttons.addWidget(load_btn)
         cleanup_btn = QtWidgets.QPushButton('Cleanup model', self)
         cleanup_btn.clicked.connect(self.setup_page._on_cleanup)
+        cleanup_btn.setToolTip(help_text.BUTTON_TOOLTIPS['cleanup'])
         buttons.addWidget(cleanup_btn)
         start_btn = QtWidgets.QPushButton('Start', self)
         start_btn.clicked.connect(self.setup_page._on_start)
+        start_btn.setToolTip(help_text.BUTTON_TOOLTIPS['start'])
         buttons.addWidget(start_btn)
         outer = QtWidgets.QVBoxLayout(self)
         outer.addWidget(self.tabs)

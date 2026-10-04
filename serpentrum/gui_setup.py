@@ -115,39 +115,56 @@ class SetupTab(QtWidgets.QWidget):
     # --- widget construction ----------------------------------------------
 
     def _build_widgets(self):
-        """Create all widgets and populate combo box items."""
+        """Create all widgets and populate combo box items.
+
+        Q1 (plan 08-13): every hoverable Setup control gets its tooltip
+        wired ADJACENT TO ITS CONSTRUCTION, explicitly (no loop/getattr
+        indirection) and on ONE line -- the contiguous pattern of
+        setToolTip followed immediately by the SETUP_TOOLTIPS dict
+        reference is the house-greppable coverage token (13 wires;
+        help_text is the single word source).
+        """
         # --- Molecule set section ---
         self.demo_combo = QtWidgets.QComboBox(self)
         for set_id in setup_logic.KNOWN_SETS:
             label = 'Demo ' + set_id.replace('_', ' ').title()
             self.demo_combo.addItem(label, set_id)
         self.demo_combo.addItem('Upload...', _UPLOAD_SENTINEL)
+        self.demo_combo.setToolTip(help_text.SETUP_TOOLTIPS['demo_combo'])
 
         self.upload_path_field = QtWidgets.QLineEdit(self)
         self.upload_path_field.setReadOnly(True)
         self.upload_path_field.setPlaceholderText(
             'Click Browse to choose a .sdf or .mol2 file')
+        self.upload_path_field.setToolTip(help_text.SETUP_TOOLTIPS['upload_path_field'])
         self.browse_upload_btn = QtWidgets.QPushButton('Browse', self)
+        self.browse_upload_btn.setToolTip(help_text.SETUP_TOOLTIPS['browse_upload_btn'])
 
         # --- Box section ---
         self.box_combo = QtWidgets.QComboBox(self)
         for preset in setup_logic.BOX_PRESETS:
             self.box_combo.addItem(preset.title(), preset)
+        self.box_combo.setToolTip(help_text.SETUP_TOOLTIPS['box_combo'])
 
         # --- Head molecule section ---
         self.head_combo = QtWidgets.QComboBox(self)
         self.head_combo.addItem('Random', 'random')
+        self.head_combo.setToolTip(help_text.SETUP_TOOLTIPS['head_combo'])
 
         # --- xtb section ---
         self.xtb_auto_check = QtWidgets.QCheckBox(
             'Auto-detect (use xtb from PATH)', self)
+        self.xtb_auto_check.setToolTip(help_text.SETUP_TOOLTIPS['xtb_auto_check'])
         self.xtb_path_field = QtWidgets.QLineEdit(self)
         self.xtb_path_field.setPlaceholderText('Manual xtb executable path')
+        self.xtb_path_field.setToolTip(help_text.SETUP_TOOLTIPS['xtb_path_field'])
         self.browse_xtb_btn = QtWidgets.QPushButton('Browse', self)
+        self.browse_xtb_btn.setToolTip(help_text.SETUP_TOOLTIPS['browse_xtb_btn'])
 
         # --- Win cap section ---
         self.win_cap_spin = QtWidgets.QSpinBox(self)
         self.win_cap_spin.setRange(1, 20)
+        self.win_cap_spin.setToolTip(help_text.SETUP_TOOLTIPS['win_cap_spin'])
         self.hessian_label = QtWidgets.QLabel(self)
         self.hessian_label.setWordWrap(True)
         self.hessian_label.setStyleSheet('color: #cc6600;')
@@ -158,15 +175,18 @@ class SetupTab(QtWidgets.QWidget):
         self.atom_budget_spin = QtWidgets.QSpinBox(self)
         # UI constraint only - setup_logic.validate() has no hard max.
         self.atom_budget_spin.setRange(1, 9999)
+        self.atom_budget_spin.setToolTip(help_text.SETUP_TOOLTIPS['atom_budget_spin'])
         self.threads_spin = QtWidgets.QSpinBox(self)
         # UI constraint only (256 >= any plausible core count).
         self.threads_spin.setRange(1, 256)
+        self.threads_spin.setToolTip(help_text.SETUP_TOOLTIPS['threads_spin'])
 
         # --- Speed section (Phase 5.1, plan 5.1-04; 1:1 box_combo
         #     pattern copy over setup_logic.SPEED_TIERS) ---
         self.speed_combo = QtWidgets.QComboBox(self)
         for name, aps in setup_logic.SPEED_TIERS:
             self.speed_combo.addItem('%s (%.1f A/s)' % (name, aps), aps)
+        self.speed_combo.setToolTip(help_text.SETUP_TOOLTIPS['speed_combo'])
 
         # --- Generic stacking consent section (Phase 5.2, plan 5.2-05;
         #     1:1 xtb_auto_check QCheckBox pattern copy; sub-line is a
@@ -176,6 +196,7 @@ class SetupTab(QtWidgets.QWidget):
         self.generic_stack_check = QtWidgets.QCheckBox(
             'Allow generic pi-stack for uploads '
             '(illustrative geometry - user-approved)', self)
+        self.generic_stack_check.setToolTip(help_text.SETUP_TOOLTIPS['generic_stack_check'])
         self.generic_stack_note_label = QtWidgets.QLabel(
             'reuses the approved Set A pi-stack geometry '
             '(3.60 A @ 20 deg off-normal) for uploads carrying a '
