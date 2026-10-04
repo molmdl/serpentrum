@@ -422,29 +422,49 @@ def real_modes(spectrum, threshold=10.0):
 # Plan 02-12: Gaussian broadening, unified parse dispatcher, loud-failure
 # hardening. Appended below the g98 core (02-01) and the vibspectrum
 # fallback (02-09); existing parser behavior is unchanged.
+#
+# GATE V AMENDMENT (owner directive, recorded 2026-10-04 mid-walk-through):
+# the plotted IR curve must match Multiwfn's default export EXACTLY, so
+# broaden() was converted from the pre-parity Gaussian (FWHM 16, each
+# mode's Gaussian PEAKING at I_i) to the Multiwfn-parity Lorentzian
+# below (FWHM 8, unit-area weighting, CURVE_SCALE x100).
 # ---------------------------------------------------------------------------
 
-# sigma = fwhm / (2*sqrt(2*ln(2)))  (~ fwhm/2.35482; 16 -> 6.794574,
-# 32 -> 13.58915). Precomputed once at import; broaden() multiplies fwhm
-# by this factor, never hardcodes the decimal.
-_SIGMA_PER_FWHM = 1.0 / (2.0 * math.sqrt(2.0 * math.log(2.0)))
+# Multiwfn's default 'scale ratio for curve' (100.00000 in its IR
+# broadening dialog). Fitted numerically to the owner's Multiwfn 3.x
+# default export (Lorentzian, FWHM 8, scale ratio 100) on 2026-10-04:
+# max relative error 4.9e-7 over 1000 sampled points of the
+# srp_spectra/run_1 reference curve. The curve y-axis therefore carries
+# the Multiwfn-scaled convention, NOT raw km/mol.
+CURVE_SCALE = 100.0
 
 
-def broaden(modes, fwhm=16.0, x_min=0.0, x_max=None, n_points=800):
-    """Sum of Gaussians, one per mode: y(x) = sum(I_i * exp(-0.5*((x-f_i)/sigma)^2)).
+def broaden(modes, fwhm=8.0, x_min=0.0, x_max=None, n_points=800):
+    """Multiwfn-parity IR curve: one unit-area Lorentzian per mode, x100.
 
-    sigma = fwhm / (2*sqrt(2*ln(2)))  (~ fwhm/2.35482; 16 -> 6.794574,
-    32 -> 13.58915).
+    y(x) = CURVE_SCALE * sum_i  I_i * (1/pi) * g / ((x - f_i)^2 + g^2),
+    with g = fwhm / 2.0 (owner directive 2026-10-04, GATE V amendment:
+    the plotted curve must reproduce Multiwfn's default export —
+    Lorentzian mode, FWHM 8.00000 cm^-1, scale ratio for curve
+    100.00000; the pre-parity convention was a Gaussian of FWHM 16
+    with each mode's PEAK set to I_i). Each mode's intensity is carried
+    as AREA by its Lorentzian: a single mode's curve peaks at
+    CENTRAL = (100/pi)*(I/g) at x = f and falls to exactly CENTRAL/2 at
+    x = f +- g (the FWHM half-height points), decaying ~x^-2 in the
+    tails.
+
     Grid: xs[i] = x_min + (x_max - x_min) * i / (n_points - 1), i in
     0..n_points-1 (both ends inclusive). x_max default:
-    max(3600.0, max(freq) + 5*sigma) — the 3600 floor keeps the plotted
-    axis at the xtb display range; with NO modes the default grid is
+    max(3600.0, max(freq) + 5*g) — the 3600 floor keeps the plotted
+    axis at the xtb display range (the Lorentzian half-width g replaces
+    the old 5*sigma tail allowance); with NO modes the default grid is
     [x_min, 3600.0].
     EMPTY MODES -> (grid, [0.0]*n_points): the PINNED zero-curve semantics
     (a silent spectrum plots as a flat zero line, never an exception).
-    Negatives are NOT special-cased (their in-grid tail is negligible:
-    exp(-11) at -31.9 with fwhm 16); zero-intensity modes contribute
-    exactly 0 by arithmetic.
+    Negatives are NOT special-cased (their profile is the same formula —
+    heavy Lorentzian tails keep the in-grid contribution small; the
+    committed broaden suite pins the measured bound); zero-intensity
+    modes contribute exactly 0 by arithmetic.
     Raises ValueError on fwhm <= 0 or n_points < 2.
     """
     if fwhm <= 0.0:
@@ -453,24 +473,25 @@ def broaden(modes, fwhm=16.0, x_min=0.0, x_max=None, n_points=800):
     if n_points < 2:
         raise ValueError(
             'broaden: n_points must be >= 2, got %r' % (n_points,))
-    sigma = fwhm * _SIGMA_PER_FWHM
+    g = fwhm / 2.0
     if x_max is None:
         if modes:
             x_max = max(3600.0,
-                        max(m.freq for m in modes) + 5.0 * sigma)
+                        max(m.freq for m in modes) + 5.0 * g)
         else:
             x_max = 3600.0
     span = x_max - x_min
     xs = [x_min + span * i / (n_points - 1) for i in range(n_points)]
     if not modes:
         return xs, [0.0] * n_points
-    inv_sigma_sq = 1.0 / (sigma * sigma)
+    inv_pi = 1.0 / math.pi
     ys = []
     for x in xs:
         total = 0.0
         for m in modes:
             dx = x - m.freq
-            total += m.intensity * math.exp(-0.5 * dx * dx * inv_sigma_sq)
+            total += CURVE_SCALE * (m.intensity * inv_pi) * g \
+                / (dx * dx + g * g)
         ys.append(total)
     return xs, ys
 

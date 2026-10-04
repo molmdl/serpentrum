@@ -31,8 +31,9 @@ Families:
                       BOX_PRESETS / win-cap bounds / HESSIAN_WARNING, the
                       stacking dataset and manifest.json (both loaded
                       through molecule_data) — never hardcoded here.
-                      Bare numbers are digit-guarded ('6.0' cannot hide
-                      inside '16.0'). The banned pre-calibration
+                      Bare numbers are digit-guarded (a bare '6.0'
+                      cannot hide inside a longer number like '16.0').
+                      The banned pre-calibration
                       '30-90 s' phrasing must stay gone.
 5.  install-recipe    'Add plugin directory' AND 'restart PyMOL'
                       present; 'Install New Plugin' absent.
@@ -274,8 +275,9 @@ def expected_numeric_tokens(context):
 
 def _contains_token(text, token):
     """Token present in text. Bare numbers are digit-guarded so e.g.
-    '6.0' cannot masquerade as the tail of '16.0' (word-boundary style:
-    no digit or '.' immediately before, no digit immediately after).
+    '6.0' cannot masquerade as the tail of a longer number like '16.0'
+    (word-boundary style: no digit or '.' immediately before, no digit
+    immediately after).
     """
     if _BARE_NUMBER.match(token):
         pattern = r'(?<![\d.])' + re.escape(token) + r'(?![\d])'

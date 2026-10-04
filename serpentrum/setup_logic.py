@@ -59,7 +59,12 @@ DEFAULTS = {
                                    # in-game settable; absent key = 4
                                    # via merge_defaults (additive key,
                                    # no schema bump)
-    'broadening_fwhm': 16.0,       # cm^-1; STACK.md §6: ~10-20 typical
+    'broadening_fwhm': 8.0,        # cm^-1. Owner directive 2026-10-04
+                                   # (GATE V amendment): Multiwfn's
+                                   # default FWHM 8 — the plotted curve
+                                   # is Multiwfn-parity (Lorentzian,
+                                   # unit-area x100; spectra.CURVE_SCALE).
+                                   # The pre-parity value was 16.0.
     'speed': 6.0,                  # A/s = the 'normal' tier (owner-final
                                    # 2026-09-25 feel-check; game_engine's
                                    # SPEED_A_PER_S stays 3.0 as the v1
@@ -395,8 +400,11 @@ def load_setup(text):
 RANDOMIZE_WIN_CAP_MIN = 1
 RANDOMIZE_WIN_CAP_MAX = 20
 #   broadening_fwhm   : validate pins > 0 only; typical linewidths are
-#                       ~10-20 cm^-1 (DEFAULTS 16.0, STACK.md section 6),
-#                       so concrete choices are DEFAULTS's value scaled.
+#                       ~10-20 cm^-1 (STACK.md section 6), so concrete
+#                       choices are DEFAULTS's value scaled — DEFAULTS
+#                       moved 16.0 -> 8.0 with the 2026-10-04 GATE V
+#                       amendment (Multiwfn default FWHM) and the
+#                       factors below stay coherent unchanged.
 RANDOMIZE_FWHM_FACTORS = (0.5, 0.75, 1.0, 1.25, 1.5)
 
 

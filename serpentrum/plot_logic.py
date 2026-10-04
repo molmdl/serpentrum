@@ -1,12 +1,14 @@
 """The broadened-IR plot's PURE data half (plan 07-02 — SPECTRA-03).
 
 This module builds paint-ready Scenes over the committed
-``spectra.broaden`` (spectra.py:433-475): the Gaussian broadening, the
-y_max headroom + floor, nice-tick selection, axis labels, size-preset
-data, and the imaginary-mode caption. The GUI renderer (plan 07-05,
-``gui_plot.paint_scene``) maps a Scene to pixels and NEVER recomputes
-(07-RESEARCH-qt-plot.md pitfall 2: paintEvent must paint, not compute —
-paint stays O(points) and every numeric decision is unit-testable here).
+``spectra.broaden`` (the Multiwfn-parity Lorentzian curve — unit-area
+per-mode weighting x spectra.CURVE_SCALE; GATE V amendment 2026-10-04):
+the broadening, the y_max headroom + floor, nice-tick selection, axis
+labels, size-preset data, and the imaginary-mode caption. The GUI
+renderer (plan 07-05, ``gui_plot.paint_scene``) maps a Scene to pixels
+and NEVER recomputes (07-RESEARCH-qt-plot.md pitfall 2: paintEvent must
+paint, not compute — paint stays O(points) and every numeric decision
+is unit-testable here).
 
 Pure stdlib module (``math`` + the intra-package ``from . import
 spectra``, which the purity gate exempts): no pymol/pmg_tk/PyQt5/numpy
@@ -35,7 +37,9 @@ Scene = namedtuple(
 # n_modes/n_imaginary: mode counts for the caption/status framing.
 # fwhm: the broadening actually used (echoed for display/debug).
 
-# y-axis floor in km/mol. The PINNED empty-modes case (spectra.py:465-466)
+# y-axis floor in Multiwfn-scaled curve units (GATE V amendment
+# 2026-10-04: the curve is unit-area Lorentzian x100, not raw km/mol).
+# The PINNED empty-modes case (broaden's zero curve)
 # returns the zero curve, so max(ys) == 0.0 — an unfloored y_max == 0.0
 # gives a zero-range axis and blows up tick math (07-RESEARCH-qt-plot.md
 # pitfall 5). The floor gives the silent spectrum a sane 0..1 axis.
@@ -88,7 +92,7 @@ def nice_ticks(lo, hi, target=8):
     return [(value, _fmt(value, step)) for value in values]
 
 
-def build_scene(modes, fwhm=16.0, x_min=0.0, x_max=None, n_points=800):
+def build_scene(modes, fwhm=8.0, x_min=0.0, x_max=None, n_points=800):
     """Build the paint-ready Scene over spectra.broaden ->
     Scene(xs, ys, x_min, x_max, y_max, x_ticks, y_ticks, x_label,
     y_label, n_modes, n_imaginary, fwhm).
@@ -127,7 +131,7 @@ def build_scene(modes, fwhm=16.0, x_min=0.0, x_max=None, n_points=800):
         x_ticks=x_ticks,
         y_ticks=y_ticks,
         x_label='wavenumber (cm-1)',
-        y_label='IR intensity (km/mol)',
+        y_label='IR curve (km/mol, Multiwfn scale 100)',
         n_modes=n_modes,
         n_imaginary=n_imaginary,
         fwhm=fwhm)
@@ -136,7 +140,11 @@ def build_scene(modes, fwhm=16.0, x_min=0.0, x_max=None, n_points=800):
 # Owner amendment (07-06 checkpoint round 1, 2026-09-26): the y-axis
 # DISPLAY unit is selectable in the panel. (label, mode) combo data for
 # the house addItem(label, data) pattern; the FIRST entry is the
-# default (the approved look, unchanged from v1).
+# default. The combo labels name the UNIT MODE; the intensity-mode
+# AXIS label itself is set by build_scene to the Multiwfn-scaled
+# convention (GATE V amendment 2026-10-04). The absorbance/transmittance
+# transforms below normalize by the curve peak, so the x100 curve scale
+# cancels — they are convention-invariant and were NOT retouched.
 UNIT_MODES = (('IR intensity (km/mol)', 'intensity'),
               ('absorbance (arb.)', 'absorbance'),
               ('transmittance (arb.)', 'transmittance'))
@@ -149,12 +157,15 @@ def scene_with_unit(scene, mode):
 
     Modes (UNIT_MODES):
       - 'intensity': passthrough — the Scene is returned unchanged
-        (km/mol, the v1 approved look and the pinned default).
+        (the y_label it passes through is build_scene's Multiwfn-
+        scaled convention, GATE V amendment 2026-10-04; the pinned
+        default).
       - 'absorbance': intensity normalized to peak = 1. Rationale:
         xtb IR intensities (km/mol) are proportional to absorbance via
         Beer-Lambert linearity, so the relative absorbance curve is
         the intensity curve up to an unknown constant; normalizing the
         peak to 1 keeps it honest — arbitrary units, labeled '(arb.)'.
+        (The GATE V x100 curve scale cancels in the normalization.)
       - 'transmittance': T = 10**(-A) of the NORMALIZED absorbance
         (T in (0, 1]; peaks point DOWN at T = 0.1; far from peaks
         T ~ 1). Also '(arb.)' — this recomputes nothing physical, it

@@ -53,7 +53,9 @@ EXPECTED_DEFAULTS = {
     # xtb '-P' thread cap (plan 08-12, owner insertion Q2 2026-10-01):
     # additive key, NO schema bump; absent key = 4 via merge_defaults.
     'xtb_threads': 4,
-    'broadening_fwhm': 16.0,
+    # Multiwfn-parity FWHM (owner directive 2026-10-04, GATE V
+    # amendment): the pre-parity value was 16.0.
+    'broadening_fwhm': 8.0,
     'speed': 6.0,
     # STACK-06 consent (Phase 5.2): OFF by default; absent key = OFF via
     # merge_defaults.

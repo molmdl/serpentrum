@@ -93,8 +93,8 @@ print('  2. (you just ran: run smoke\\manual_plot_check.py)', flush=True)
 print('  3. on the staged panel, verify in order:', flush=True)
 print('     a. broadened curve renders smoothly (antialiased); axes + '
       'tick labels legible;', flush=True)
-print("        y label 'IR intensity (km/mol)' readable (rotated); "
-      "x label 'wavenumber (cm-1)' below", flush=True)
+print("        y label 'IR curve (km/mol, Multiwfn scale 100)' readable "
+      "(rotated); x label 'wavenumber (cm-1)' below", flush=True)
 print('     b. x axis runs ASCENDING 0 -> 3600 (v1 convention - say so '
       'in your verdict)', flush=True)
 print('     c. switch the size combo (medium/large/wide) - the widget '

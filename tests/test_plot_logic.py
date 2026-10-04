@@ -1,15 +1,23 @@
 """Tests for the IR plot's PURE data half (serpentrum/plot_logic.py,
 plan 07-02 — the SPECTRA-03 pure half).
 
-Every numeric anchor below is pinned to VERIFIED values probed against the
-committed fixtures on 2026-09-06/07 (02-RESEARCH-pure-core.md S2 + the
-02-12 plan's load-bearing facts; restated in spectra.py:12-15 docstring):
+Every numeric anchor below is pinned to VERIFIED values probed against
+the committed fixtures (02-RESEARCH-pure-core.md S2, the 02-12
+load-bearing facts, re-probed 2026-10-04 for the GATE V amendment):
 
-  - g98.out (26-atom phenol pi-dimer, 72 modes): global max-intensity mode
-    1150.6639 cm-1 @ 257.1018 km/mol (isolated — nearest sizable neighbor
-    37.65 @ 1109.44, 41 cm-1 away); default grid exactly [0.0, 3600.0];
-    negatives at modes 1-3 (-31.9175 / -23.0766 / -18.1086 -> n_imaginary
-    == 3); EMPTY modes -> the pinned zero curve (spectra.py:465-466).
+  - g98.out (26-atom phenol pi-dimer, 72 modes): max-intensity mode
+    1150.6639 cm-1 @ 257.1018 km/mol (isolated — nearest sizable
+    neighbor 37.65 @ 1109.44, 41 cm-1 away); second-strongest mode
+    405.1591 @ 235.5447; negatives at modes 1-3 (-31.9175 / -23.0766 /
+    -18.1086 -> n_imaginary == 3); EMPTY modes -> the pinned zero curve
+    (broaden's empty-modes contract).
+  - GATE V amendment (owner directive 2026-10-04): the curve is the
+    Multiwfn-parity Lorentzian (FWHM 8, unit-area x100), so the scene
+    peaks at the strong mode the grid samples best — the 235.5447 mode
+    (measured argmax 405.506884 @ 1873.257563 = 0.9994 of its (100/pi)*
+    (I/g) center 1874.3476) — and the y axis reads 'IR curve (km/mol,
+    Multiwfn scale 100)' (the values are the x100 convention, not raw
+    km/mol).
 
 Tick-selection anchors (plan-pinned): nice_ticks(0, 3600, 8) -> step 500;
 nice_ticks(0, 10, 4) -> step 2.5 (1-decimal labels); zero-range and
@@ -28,6 +36,7 @@ Convention: every test file in tests/ repeats the sys.path self-insert
 below; tests/ deliberately has NO __init__.py (plugin-path safety), and
 tests/fixtures/xtb/ is a plain data directory (never a package).
 """
+import math
 import os
 import sys
 import unittest
@@ -39,10 +48,12 @@ from serpentrum import plot_logic, spectra  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 G98_PATH = os.path.join(ROOT, 'tests', 'fixtures', 'xtb', 'g98.out')
 
-# Verified fixture anchors (02-12 plan load-bearing facts).
+# Verified fixture anchors (probe-verified 2026-10-04).
 PEAK_FREQ = 1150.6639
 PEAK_INTEN = 257.1018
-FWHM = 16.0
+SECOND_FREQ = 405.1591
+SECOND_INTEN = 235.5447
+FWHM = 8.0
 
 
 def _is_ascii(text):
@@ -132,15 +143,18 @@ class TestBuildScene(unittest.TestCase):
     def test_peak_localization(self):
         scene = self.scene
         k = max(range(len(scene.ys)), key=lambda i: scene.ys[i])
-        self.assertGreaterEqual(scene.xs[k], PEAK_FREQ - FWHM)
-        self.assertLessEqual(scene.xs[k], PEAK_FREQ + FWHM)
-        # Amplitude anchor: grid step = 3600/799 ~ 4.506, so the argmax
-        # sits at most half a step (~2.25 cm-1) from 1150.6639; a
-        # Gaussian at sigma 6.794574 retains >= 0.946 of its center
-        # amplitude there (the 02-12-verified arithmetic; the committed
-        # broaden suite pins the same quantity at 0.9 * PEAK_INTEN with
-        # ~0.05 of neighbor lift). Measured 249.12 for this grid.
-        self.assertGreaterEqual(scene.ys[k], 0.9 * PEAK_INTEN)
+        # GATE V amendment (2026-10-04): under the Multiwfn-parity
+        # Lorentzian (unit-area x100, FWHM 8) the fixture scene peaks at
+        # the second-strongest mode 405.1591 @ 235.5447 (grid-sampled at
+        # dx = +0.348), NOT at the max-intensity 1150.6639 mode (whose
+        # nearest grid point sits dx = -1.7277 away, value 1732.0 =
+        # 0.847 of its center). Measured argmax value 1873.257563 =
+        # 0.9994 * CENTRAL, where CENTRAL = (100/pi)*(235.5447/4).
+        self.assertGreaterEqual(scene.xs[k], SECOND_FREQ - FWHM)
+        self.assertLessEqual(scene.xs[k], SECOND_FREQ + FWHM)
+        central = (100.0 / math.pi) * (SECOND_INTEN / (FWHM / 2.0))
+        self.assertGreaterEqual(scene.ys[k], 0.9 * central)
+        self.assertLessEqual(scene.ys[k], 1.1 * central)
 
     def test_y_max_headroom(self):
         scene = self.scene
@@ -177,7 +191,11 @@ class TestBuildScene(unittest.TestCase):
     def test_ascii_labels(self):
         scene = self.scene
         self.assertEqual(scene.x_label, 'wavenumber (cm-1)')
-        self.assertEqual(scene.y_label, 'IR intensity (km/mol)')
+        # GATE V amendment (2026-10-04): the curve values are the
+        # Multiwfn-scaled convention (unit-area Lorentzian x100), so the
+        # y axis must NOT claim raw km/mol.
+        self.assertEqual(scene.y_label,
+                         'IR curve (km/mol, Multiwfn scale 100)')
         self.assertTrue(_is_ascii(scene.x_label))
         self.assertTrue(_is_ascii(scene.y_label))
 
@@ -185,8 +203,9 @@ class TestBuildScene(unittest.TestCase):
         scene32 = plot_logic.build_scene(self.spectrum.modes, fwhm=32.0)
         self.assertEqual(scene32.fwhm, 32.0)
         self.assertNotEqual(scene32.ys, self.scene.ys,
-                            'fwhm=32 must differ from fwhm=16 at the '
-                            'peak shoulders — fwhm is a live parameter')
+                            'fwhm=32 must differ from the default fwhm=8 '
+                            'at the peak shoulders — fwhm is a live '
+                            'parameter')
 
     def test_invalid_fwhm_raises(self):
         with self.assertRaises(ValueError):
