@@ -70,9 +70,9 @@ _UPLOAD_SENTINEL = '__upload__'
 class SetupTab(QtWidgets.QWidget):
     """The Setup configuration form.
 
-    Seven QGroupBox sections (Molecule set, Box, Head molecule, xtb,
-    Win cap, Speed, Generic stacking) + a persistent status QLabel.
-    collect_state()/apply_state()
+    Eight QGroupBox sections (Molecule set, Box, Head molecule, xtb,
+    Win cap, Performance, Speed, Generic stacking) + a persistent
+    status QLabel. collect_state()/apply_state()
     round-trip is the established pattern: collect_state reads widgets
     into the setup dict; apply_state populates widgets from the dict. A
     _loading flag guards apply_state against cascading signal recompute.
@@ -153,6 +153,15 @@ class SetupTab(QtWidgets.QWidget):
         self.hessian_label.setStyleSheet('color: #cc6600;')
         self.hessian_label.hide()
 
+        # --- Performance section (owner insertion Q2, 2026-10-01, plan
+        #     08-12): atom budget + xtb thread count, in-game settable ---
+        self.atom_budget_spin = QtWidgets.QSpinBox(self)
+        # UI constraint only - setup_logic.validate() has no hard max.
+        self.atom_budget_spin.setRange(1, 9999)
+        self.threads_spin = QtWidgets.QSpinBox(self)
+        # UI constraint only (256 >= any plausible core count).
+        self.threads_spin.setRange(1, 256)
+
         # --- Speed section (Phase 5.1, plan 5.1-04; 1:1 box_combo
         #     pattern copy over setup_logic.SPEED_TIERS) ---
         self.speed_combo = QtWidgets.QComboBox(self)
@@ -187,7 +196,7 @@ class SetupTab(QtWidgets.QWidget):
         # _on_load_setup/_on_cleanup/_on_start).
 
     def _build_layout(self):
-        """Arrange widgets into 7 QGroupBox sections + status (no buttons
+        """Arrange widgets into 8 QGroupBox sections + status (no buttons
         since plan 08-08 -- the action row is dialog-owned)."""
         layout = QtWidgets.QVBoxLayout(self)
 
@@ -240,8 +249,17 @@ class SetupTab(QtWidgets.QWidget):
         cap_form.addRow('', self.hessian_label)
         layout.addWidget(cap_group)
 
-        # --- Speed group (Phase 5.1, plan 5.1-04; appended AFTER the
-        #     Win cap group as a new sibling section) ---
+        # --- Performance group (owner insertion Q2, 2026-10-01, plan
+        #     08-12; appended AFTER the Win cap group, BEFORE the
+        #     Speed group - the 5.1-04 sibling-section pattern) ---
+        perf_group = QtWidgets.QGroupBox('Performance', self)
+        perf_form = QtWidgets.QFormLayout(perf_group)
+        perf_form.addRow('Atom budget (atoms):', self.atom_budget_spin)
+        perf_form.addRow('xtb threads:', self.threads_spin)
+        layout.addWidget(perf_group)
+
+        # --- Speed group (Phase 5.1, plan 5.1-04; a new sibling section
+        #     after Win cap - Performance (08-12) now sits between) ---
         speed_group = QtWidgets.QGroupBox('Speed', self)
         speed_form = QtWidgets.QFormLayout(speed_group)
         speed_form.addRow('Tier:', self.speed_combo)
@@ -276,6 +294,12 @@ class SetupTab(QtWidgets.QWidget):
         self.upload_path_field.textChanged.connect(self._refresh_status)
         self.win_cap_spin.valueChanged.connect(self._on_cap_changed)
         self.win_cap_spin.valueChanged.connect(self._refresh_status)
+        # Owner insertion Q2 (plan 08-12): the atom-budget spin also
+        # feeds the hessian label (validate's warning leg fires on
+        # cap > 10 OR budget > 100 - exact parity, setup_logic.py).
+        self.atom_budget_spin.valueChanged.connect(self._on_cap_changed)
+        self.atom_budget_spin.valueChanged.connect(self._refresh_status)
+        self.threads_spin.valueChanged.connect(self._refresh_status)
         self.speed_combo.currentIndexChanged.connect(self._refresh_status)
         # House-minimum wire: _refresh_status's own _loading guard
         # covers apply_state restores, so no dedicated handler.
@@ -292,9 +316,11 @@ class SetupTab(QtWidgets.QWidget):
         (self._last_real_set) so the dict stays valid. Speed is
         widget-written via the tier combo (Phase 5.1, plan 5.1-04);
         generic_stack_consent is widget-written via the consent
-        checkbox (Phase 5.2, plan 5.2-05). The remaining non-widget
-        fields (schema_version, atom_budget, broadening_fwhm) are
-        preserved from the existing dict via a shallow copy.
+        checkbox (Phase 5.2, plan 5.2-05); atom_budget and xtb_threads
+        are widget-written via the Performance spinboxes (plan 08-12,
+        owner insertion Q2). The remaining non-widget fields
+        (schema_version, broadening_fwhm) are preserved from the
+        existing dict via a shallow copy.
         """
         setup = dict(self._setup)
         source = self.demo_combo.currentData()
@@ -317,6 +343,8 @@ class SetupTab(QtWidgets.QWidget):
         else:
             setup['xtb_path'] = self.xtb_path_field.text().strip()
         setup['win_cap_molecules'] = self.win_cap_spin.value()
+        setup['atom_budget'] = self.atom_budget_spin.value()
+        setup['xtb_threads'] = self.threads_spin.value()
         setup['generic_stack_consent'] = self.generic_stack_check.isChecked()
         self._setup = setup
         if self._anchor is not None:
@@ -381,6 +409,13 @@ class SetupTab(QtWidgets.QWidget):
             self.xtb_path_field.setText(xtb_path)
         # Win cap.
         self.win_cap_spin.setValue(setup.get('win_cap_molecules', 10))
+        # Performance (plan 08-12, owner insertion Q2): atom budget +
+        # xtb threads restore under the same _loading guard, with the
+        # DEFAULTS fallback for absent keys (pre-08-12 files).
+        self.atom_budget_spin.setValue(
+            setup.get('atom_budget', setup_logic.DEFAULTS['atom_budget']))
+        self.threads_spin.setValue(
+            setup.get('xtb_threads', setup_logic.DEFAULTS['xtb_threads']))
         self._loading = False
         self._on_cap_changed()
         self._refresh_status()
@@ -406,10 +441,13 @@ class SetupTab(QtWidgets.QWidget):
         self._refresh_status()
 
     def _on_cap_changed(self):
-        """Show the hessian warning QLabel when win cap > 10, else hide."""
+        """Show the hessian warning QLabel when win cap > 10 OR atom
+        budget > 100 (exact parity with validate's warning leg,
+        setup_logic.py), else hide."""
         if self._loading:
             return
-        if self.win_cap_spin.value() > 10:
+        if (self.win_cap_spin.value() > 10
+                or self.atom_budget_spin.value() > 100):
             self.hessian_label.setText(setup_logic.HESSIAN_WARNING)
             self.hessian_label.show()
         else:

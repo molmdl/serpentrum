@@ -21,6 +21,7 @@ from pymol.Qt import QtWidgets
 from . import budget_guard
 from . import pymol_bridge
 from . import setup_logic
+from . import xtb_run
 from . import xtb_runner
 from . import xtbenv
 from . import xyzio
@@ -284,6 +285,15 @@ class PluginDialog(QtWidgets.QDialog):
         PyMOL (never a /mnt/c path at runtime - STACK.md:168);
         snake_id comes from the frozen last_run record.
 
+        Thread cap (owner insertion Q2, plan 08-12): extra_args carries
+        the setup's thread cap via xtb_run's PURE thread_arg seam -
+        the documented caller-override mechanism (the runner's own
+        default fires only when extra_args is None). An absent/invalid
+        key degrades to DEFAULT_THREAD_ARG (the shipped '-P 4' cap),
+        so argv is byte-identical to the old default whenever the key
+        is missing (all 06 runner pins stay green; the runner itself
+        is UNTOUCHED).
+
         A False return from start() (no-double-run guard or a preflight
         failure - the controller already emitted its own log line)
         re-enables Get Spectra and notes the no-start: the disarm from
@@ -294,9 +304,13 @@ class PluginDialog(QtWidgets.QDialog):
             controller = xtb_runner.XtbRunController(anchor)
             anchor.spectra_runner = controller
         self._connect_runner(controller)
+        setup = getattr(anchor, 'setup', None)
+        threads = setup.get('xtb_threads') if setup else None
+        extra_args = (xtbenv.XTB_OHESS,) + xtb_run.thread_arg(threads)
         started = controller.start(record['snake_xyz'], exe,
                                    tempfile.gettempdir(),
-                                   record['snake_id'])
+                                   record['snake_id'],
+                                   extra_args=extra_args)
         if not started:
             game_tab = getattr(self, 'game_tab', None)
             if game_tab is not None:

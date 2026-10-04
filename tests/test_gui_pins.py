@@ -175,5 +175,59 @@ class TestGameplayExclusionWiring(unittest.TestCase):
         self.assertIn('spawn_mod.effective_head_id', body)
 
 
+class TestPerformanceControls(unittest.TestCase):
+    """Plan 08-12 (owner insertion Q2, recorded 2026-10-01 at the
+    paused GATE V checkpoint): the Setup tab's Performance group (atom
+    budget + xtb threads) and the launch argv seam, pinned source-scan
+    style (house 08-08 pattern; headless widget construction is a dead
+    end -- decision 01-05).
+
+    gui_setup.py: BOTH Performance spins are widget-written INSIDE
+    collect_state's body (Save/Load/Reset/Randomize/Start all flow
+    through it) and the Performance group exists.
+
+    gui.py: the launch seam builds extra_args through xtb_run's
+    thread_arg with EXACTLY ONE call site, and NO inline '-P' literal
+    may appear in gui.py -- the ONLY '-P' argv source stays
+    xtb_run.py (DEFAULT_THREAD_ARG / thread_arg).
+    """
+
+    @staticmethod
+    def _method_body(source, needle):
+        start = source.find(needle)
+        assert start >= 0, '%r not found' % (needle,)
+        end = source.find('\n    def ', start + 1)
+        if end < 0:
+            end = len(source)
+        return source[start:end]
+
+    def test_performance_pins_and_launch_thread_seam(self):
+        # gui_setup.py: collect_state writes both keys from the
+        # Performance widgets; the group itself exists.
+        gui_setup_src = _read(os.path.join('serpentrum', 'gui_setup.py'))
+        collect_body = self._method_body(gui_setup_src,
+                                         '    def collect_state(')
+        self.assertIn("setup['atom_budget'] = "
+                      'self.atom_budget_spin.value()', collect_body)
+        self.assertIn("setup['xtb_threads'] = "
+                      'self.threads_spin.value()', collect_body)
+        self.assertIn("'Performance'", gui_setup_src)
+        # gui.py: exactly ONE thread_arg call site (the desk-seam
+        # producer), and no inline '-P' argv literal may leak in.
+        gui_src = _read(os.path.join('serpentrum', 'gui.py'))
+        self.assertEqual(gui_src.count('xtb_run.thread_arg'), 1,
+                         'exactly one xtb thread_arg call site '
+                         '(_launch_spectra_run)')
+        self.assertNotIn("'-P'", gui_src,
+                         "gui.py must not carry an inline '-P' argv "
+                         "literal (the only '-P' source is xtb_run.py)")
+        # Purity discipline unchanged: no blocking-modal token in
+        # gui_setup.py (belt-and-braces alongside TestModelessBan's
+        # repo-wide scan; token written split so THIS file stays
+        # clean).
+        token = 'ex' + 'ec_'
+        self.assertNotIn(token, gui_setup_src)
+
+
 if __name__ == '__main__':
     unittest.main()
