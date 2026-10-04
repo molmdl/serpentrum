@@ -9,7 +9,7 @@
       "lateral_offset_a": 1.231,
       "uncertainty_a": null,
       "citation": "janiak2000",
-      "explanation": "Aromatic rings stack face-to-face but slightly offset (~20 deg off the ring normal), not eclipsed. distance_a is the perpendicular separation component and lateral_offset_a the lateral component consumed directly by stacking.place_pickup; together they encode a centroid-centroid distance of sqrt(3.383^2 + 1.231^2) = 3.60 A at atan2(1.231, 3.383) = 20.0 deg off-normal. Basis: measured parallel-displaced stacks 3.555/3.570/3.580 A (COD 4003564, 2100607, 2100608) all round to 3.6 A; Janiak 2000 abstract: usual stacking is parallel-displaced, ring-normal angle ~20 deg, centroid-centroid up to 3.8 A. Idealized pairwise geometry - neat Set A crystals are herringbone (see DATA_SOURCES.md).",
+      "explanation": "Two flat aromatic rings stack face-to-face but slightly offset - about 20 deg off the ring normal, like playing cards slid a little apart. In this game the ring planes sit 3.38 A apart and the ring centers 3.60 A apart. Real crystals of these molecules usually pack herringbone (edge-to-face) instead - see serpentrum/data/DATA_SOURCES.md - so this idealized face-to-face geometry is a game approximation. The rule of thumb (parallel-displaced stacking, roughly 20 deg, centroid-centroid up to 3.8 A) comes from Janiak 2000, measured on crystalline metal complexes.",
       "applies_to": {"sets": ["set_a"]},
       "status": "APPROVED"
     }
