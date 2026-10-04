@@ -11,6 +11,13 @@ existing seams (SetupTab initial/_on_reset status, the Game tab
 hint_label, the Spectra status/log flow). 08-06 ships only the PURE
 module plus these pins.
 
+Q1 EXTENSION (owner insertion, plan 08-13, same file): the hover
+tooltip contract — key-set pins for help_text.SETUP_TOOLTIPS (13
+Setup widget-attribute keys) and help_text.BUTTON_TOOLTIPS (6 bottom-
+row button roles), the ASCII sweep extension, and the
+single-source drift alarms pinning the gui_setup/gui wiring
+references (GAME_FOCUS_HINT precedent).
+
 Discovery command (verified on 3.6.9 — '-t .' FAILS on python3.6):
 
     python3.6 -m unittest discover -s tests -p "test_help_text.py" -v
@@ -42,6 +49,22 @@ RUNNING_LITERAL = 'xtb running... (async - the dialog stays responsive)'
 
 GAME_STATES = ('idle', 'countdown', 'playing', 'paused', 'over')
 SPECTRA_STATES = ('pre_run', 'running', 'done', 'failed')
+
+# Q1 (plan 08-13): the two tooltip key SETS, pinned exhaustively. The 13
+# Setup keys are the widget-attribute names constructed in
+# gui_setup.SetupTab._build_widgets; the 6 button roles are the
+# Setup-handler buttons built in gui.PluginDialog (Reset/Randomize/
+# Save Setup/Load Setup/Cleanup model/Start). A missing key = an
+# unexplained control = fail; an extra key = tooltip text nobody
+# renders = also fail (both directions of the equality below).
+SETUP_TOOLTIP_KEYS = (
+    'demo_combo', 'upload_path_field', 'browse_upload_btn', 'box_combo',
+    'head_combo', 'xtb_auto_check', 'xtb_path_field', 'browse_xtb_btn',
+    'win_cap_spin', 'speed_combo', 'generic_stack_check',
+    'atom_budget_spin', 'threads_spin',
+)
+BUTTON_TOOLTIP_KEYS = ('reset', 'randomize', 'save', 'load', 'cleanup',
+                       'start')
 
 
 def _is_ascii(text):
@@ -181,6 +204,10 @@ class TestAsciiSweep(unittest.TestCase):
     def test_every_public_string_is_ascii(self):
         strings = [help_text.GAME_FOCUS_HINT, help_text.CONTROLS_RECAP]
         strings.extend(sorted(help_text.SETUP_HINTS.values()))
+        # Q1 (plan 08-13): the tooltip dicts join the ASCII sweep — every
+        # value of both dicts is user-visible shipped text.
+        strings.extend(sorted(help_text.SETUP_TOOLTIPS.values()))
+        strings.extend(sorted(help_text.BUTTON_TOOLTIPS.values()))
         strings.extend(help_text.game_hint(state)
                        for state in GAME_STATES)
         strings.extend(help_text.spectra_hint(state)
@@ -188,6 +215,33 @@ class TestAsciiSweep(unittest.TestCase):
         for text in strings:
             self.assertTrue(_is_ascii(text),
                             'non-ASCII help text: %r' % text)
+
+
+class TestTooltips(unittest.TestCase):
+    """Q1 (plan 08-13): the SETUP_TOOLTIPS / BUTTON_TOOLTIPS contract.
+
+    Key-set pins: a missing key = an unexplained control = fail (and an
+    invented key = unreferenced text = fail too). Values must be
+    non-empty strings — the drift alarms pin the GUI wiring.
+    """
+
+    def test_setup_tooltip_key_set(self):
+        self.assertEqual(sorted(help_text.SETUP_TOOLTIPS),
+                         sorted(SETUP_TOOLTIP_KEYS))
+
+    def test_button_tooltip_key_set(self):
+        self.assertEqual(sorted(help_text.BUTTON_TOOLTIPS),
+                         sorted(BUTTON_TOOLTIP_KEYS))
+
+    def test_values_are_nonempty_strings(self):
+        for name, text in sorted(help_text.SETUP_TOOLTIPS.items()):
+            self.assertTrue(
+                isinstance(text, str) and text,
+                'bad SETUP_TOOLTIPS[%r]: %r' % (name, text))
+        for name, text in sorted(help_text.BUTTON_TOOLTIPS.items()):
+            self.assertTrue(
+                isinstance(text, str) and text,
+                'bad BUTTON_TOOLTIPS[%r]: %r' % (name, text))
 
 
 class TestDriftAlarms(unittest.TestCase):
@@ -220,6 +274,49 @@ class TestDriftAlarms(unittest.TestCase):
                   'r') as fh:
             source = fh.read()
         self.assertNotIn('Apply / Show in Viewer', source)
+
+    def test_setup_tooltip_reference_in_gui_setup(self):
+        # Q1 drift alarm (plan 08-13, GAME_FOCUS_HINT precedent):
+        # gui_setup.py wires Setup controls to help_text.SETUP_TOOLTIPS
+        # - the dict reference must be present in source, and a
+        # distinctive tooltip fragment must NOT re-materialize inline
+        # beside it (single-source contract).
+        with open(os.path.join(
+                ROOT, 'serpentrum', 'gui_setup.py'), 'r') as fh:
+            source = fh.read()
+        self.assertIn(
+            'help_text.SETUP_TOOLTIPS', source,
+            'gui_setup.py lost the help_text.SETUP_TOOLTIPS reference '
+            '- single-source drift')
+        # Fragment pinned TO THE DICT first (so the fragment pin cannot
+        # rot if the wording is later tightened), then banned inline.
+        fragment = 'comfortably fits the default win cap'
+        self.assertIn(fragment,
+                      help_text.SETUP_TOOLTIPS['box_combo'])
+        self.assertNotIn(
+            fragment, source,
+            'gui_setup.py re-inlined a SETUP_TOOLTIPS fragment beside '
+            'the dict reference - single-source drift')
+
+    def test_button_tooltip_reference_in_gui(self):
+        # Q1 drift alarm (plan 08-13, GAME_FOCUS_HINT precedent):
+        # gui.py wires the bottom-row buttons to
+        # help_text.BUTTON_TOOLTIPS - same both-directions pin over a
+        # second, different tooltip's distinctive fragment.
+        with open(os.path.join(
+                ROOT, 'serpentrum', 'gui.py'), 'r') as fh:
+            source = fh.read()
+        self.assertIn(
+            'help_text.BUTTON_TOOLTIPS', source,
+            'gui.py lost the help_text.BUTTON_TOOLTIPS reference '
+            '- single-source drift')
+        fragment = 'materialize the box and head, and start the countdown'
+        self.assertIn(fragment,
+                      help_text.BUTTON_TOOLTIPS['start'])
+        self.assertNotIn(
+            fragment, source,
+            'gui.py re-inlined a BUTTON_TOOLTIPS fragment beside the '
+            'dict reference - single-source drift')
 
 
 if __name__ == '__main__':
