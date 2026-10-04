@@ -1,7 +1,8 @@
 """setup_logic contract tests: defaults, validation matrix, save/load
 round-trip, seeded head randomize (plan 02-07), speed tiers +
 defaults-merge backcompat (plan 5.1-02), generic upload pi-stack
-consent schema key (plan 5.2-01).
+consent schema key (plan 5.2-01), xtb threads setup key (plan 08-12,
+owner insertion Q2 at the paused GATE V checkpoint).
 
 Covers the pure half of SETUP-03/04/05/06 and SPECTRA-06's pre-xtb
 warning. validate() produces per-key errors and the single exact N-cubed
@@ -49,6 +50,9 @@ EXPECTED_DEFAULTS = {
     'xtb_path': None,
     'win_cap_molecules': 10,
     'atom_budget': 100,
+    # xtb '-P' thread cap (plan 08-12, owner insertion Q2 2026-10-01):
+    # additive key, NO schema bump; absent key = 4 via merge_defaults.
+    'xtb_threads': 4,
     'broadening_fwhm': 16.0,
     'speed': 6.0,
     # STACK-06 consent (Phase 5.2): OFF by default; absent key = OFF via
@@ -495,13 +499,17 @@ class TestGenericStackConsent(unittest.TestCase):
         self.assertIn('boolean', cerrors[0])
 
     def test_missing_key_merges_to_off(self):
-        # The 9 OLD keys only (no consent key) -> merged consent is
-        # False and the merged dict validates clean.
+        # The 9 OLD keys only (neither the 5.2 consent key nor the
+        # 08-12 xtb_threads key) -> merged consent is False, merged
+        # xtb_threads is the documented default, and the merged dict
+        # validates clean (both additive keys share the merge_defaults
+        # backcompat seam).
         old_setup = {k: v for k, v in new_setup().items()
-                     if k != 'generic_stack_consent'}
+                     if k not in ('generic_stack_consent', 'xtb_threads')}
         self.assertEqual(len(old_setup), 9)
         merged = merge_defaults(old_setup)
         self.assertIs(merged['generic_stack_consent'], False)
+        self.assertEqual(merged['xtb_threads'], DEFAULTS['xtb_threads'])
         self.assertEqual(validate(merged), ([], []))
 
     def test_round_trip_preserves_true(self):
@@ -519,6 +527,78 @@ class TestGenericStackConsent(unittest.TestCase):
         s['generic_stack_consent'] = object()
         errors, _warnings = validate(s)  # must not raise
         self.assertTrue(any('generic_stack_consent' in e for e in errors))
+
+
+class TestXtbThreads(unittest.TestCase):
+    """xtb_threads schema key (plan 08-12 — owner insertion Q2,
+    recorded 2026-10-01 at the paused GATE V checkpoint): the xtb '-P'
+    thread cap is in-game settable ("a students' pc can have only 2 or
+    even 1 cpus, or sometimes can afford more").
+
+    Additive key, NO SCHEMA_VERSION bump (the 5.2-01 consent
+    precedent): absent key = 4 via merge_defaults; validate enforces a
+    whole number >= 1 with NO hard max (the spinbox range is a UI
+    constraint only); randomize_setup carries it through UNCHANGED (the
+    08-05 carried-key contract). The argv-side mapping lives in
+    xtb_run.thread_arg (pinned in tests/test_xtb_run.py).
+    """
+
+    def _threads_errors(self, setup):
+        errors, _warnings = validate(setup)
+        return [e for e in errors if 'xtb_threads' in e]
+
+    def test_default_is_four_no_schema_bump(self):
+        self.assertEqual(DEFAULTS['xtb_threads'], 4)
+        self.assertEqual(SCHEMA_VERSION, 1)
+
+    def test_absent_key_passes_and_merges_to_four(self):
+        # Backcompat: a setup dict WITHOUT the key (any pre-08-12 file)
+        # gets NO xtb_threads error, and merge_defaults fills it in.
+        old_setup = dict(new_setup())
+        del old_setup['xtb_threads']
+        self.assertEqual(self._threads_errors(old_setup), [])
+        merged = merge_defaults(old_setup)
+        self.assertEqual(merged['xtb_threads'], 4)
+        self.assertEqual(validate(merged), ([], []))
+
+    def test_valid_thread_counts_pass_clean(self):
+        for value in (4, 1, 2, 16):
+            self.assertEqual(
+                self._threads_errors(_mutated(xtb_threads=value)), [],
+                'xtb_threads=%r must pass clean' % (value,))
+
+    def test_invalid_thread_counts_error_exactly_once(self):
+        # 0 / -1 are below 1; '4' is the wrong type; 2.5 is not whole;
+        # True is the py3.6 bool-is-int trap (isinstance(True, int) is
+        # True). Each yields EXACTLY ONE error with the pinned literal.
+        for value in (0, -1, '4', 2.5, True):
+            terrors = self._threads_errors(_mutated(xtb_threads=value))
+            self.assertEqual(len(terrors), 1,
+                             'expected exactly one xtb_threads error '
+                             'for %r, got %r' % (value, terrors))
+            self.assertEqual(terrors[0],
+                             'xtb_threads %r must be a whole number >= 1'
+                             % (value,))
+
+    def test_no_hard_max(self):
+        # validate() has no hard max — only the UI spinbox caps input.
+        self.assertEqual(
+            self._threads_errors(_mutated(xtb_threads=256)), [])
+
+    def test_randomize_carries_threads_and_budget_unchanged(self):
+        # The 08-05 carried-UNCHANGED contract (5.2-01 consent
+        # precedent): randomize redraws head/box/cap/speed/fwhm ONLY —
+        # xtb_threads and atom_budget pass through untouched.
+        base = _mutated(xtb_threads=2, atom_budget=55)
+        result = setup_logic.randomize_setup(base, ['benzene'],
+                                             seed=11)
+        self.assertEqual(result['xtb_threads'], 2)
+        self.assertEqual(result['atom_budget'], 55)
+        self.assertEqual(base['xtb_threads'], 2,
+                         'randomize must not mutate the input dict')
+
+    def test_default_setup_validates_clean_with_key(self):
+        self.assertEqual(self._threads_errors(new_setup()), [])
 
 
 class TestRandomizeHead(unittest.TestCase):

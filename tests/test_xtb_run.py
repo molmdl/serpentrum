@@ -22,6 +22,11 @@ pinned here:
   xyzio.read_xyz_text — text IS the handoff seam (EQ-xyz-1).
 - the spectra_run record shape frozen as data (EQ-artifact-1):
   SPECTRA_RUN_KEYS + new_spectra_run initial dict.
+- thread_arg (plan 08-12, owner insertion Q2): setup key 'xtb_threads'
+  -> ('-P', '<n>'), with the DEFAULT_THREAD_ARG fallback for anything
+  unusable (None = key absent, wrong type, < 1) — the argv-side
+  defensive half of the in-game thread cap; validation is
+  setup_logic.validate()'s job.
 
 Discovery command (verified on python3.6.9 — NOTE: `-t .` FAILS on
 python3.6 with a non-package start dir; do not add it):
@@ -129,6 +134,43 @@ class TestBuildEnv(unittest.TestCase):
         # controller (plan 06-05) consumes this when extra_args is None;
         # an explicit caller extra_args still wins.
         self.assertEqual(xtb_run.DEFAULT_THREAD_ARG, ('-P', '4'))
+
+
+class TestThreadArg(unittest.TestCase):
+    """thread_arg: setup key 'xtb_threads' -> argv tuple for the -P cap
+    (plan 08-12, owner insertion Q2, recorded 2026-10-01 at the paused
+    GATE V checkpoint: "a students' pc can have only 2 or even 1 cpus,
+    or sometimes can afford more").
+
+    The argv-side defensive half: a valid int >= 1 maps to
+    ('-P', '<n>'); ANYTHING else (None = key absent, wrong type, < 1)
+    falls back to the pinned DEFAULT_THREAD_ARG ('-P', '4') so every
+    caller without a usable key keeps the 06-CALIBRATION behavior
+    byte-identical. Loud validation is setup_logic.validate()'s job
+    (at edit/load time); this is the silent fallback (PURE).
+    """
+
+    def test_none_falls_back_to_pinned_default(self):
+        # None = setup key absent (pre-08-12 state) — the argv stays
+        # byte-identical to the old default via DEFAULT_THREAD_ARG.
+        self.assertEqual(xtb_run.thread_arg(None),
+                         xtb_run.DEFAULT_THREAD_ARG)
+        self.assertEqual(xtb_run.thread_arg(None), ('-P', '4'))
+
+    def test_valid_ints_map_to_minus_p_argv(self):
+        self.assertEqual(xtb_run.thread_arg(4), ('-P', '4'))
+        self.assertEqual(xtb_run.thread_arg(1), ('-P', '1'))
+        self.assertEqual(xtb_run.thread_arg(2), ('-P', '2'))
+        self.assertEqual(xtb_run.thread_arg(16), ('-P', '16'))
+
+    def test_invalid_values_fall_back_to_default(self):
+        # 0 / -3 below 1; '4' wrong type; 2.5 not whole; True is the
+        # py3.6 bool-is-int trap (never a legal thread count).
+        for value in (0, -3, '4', 2.5, True):
+            self.assertEqual(xtb_run.thread_arg(value),
+                             xtb_run.DEFAULT_THREAD_ARG,
+                             'thread_arg(%r) must degrade to the '
+                             'shipped cap' % (value,))
 
 
 class TestBuildRunInput(unittest.TestCase):
