@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 
 ## Current Position
 
-Phase: 7 of 8 (Spectra UI) — COMPLETE + CHECKPOINT-APPROVED (2026-09-26, 07-10 round 2 "approved, well done")
-Plan: 10 of 10 COMPLETE (07-10 — phase-close: full gate battery green first try → consolidated human-verify APPROVED round 2 with BOTH sign-offs)
-Status: SPECTRA-01/03/04/05 delivered (live tab incl. streaming log + cancel/Run-again, broadened plot w/ route-A PNG save, every-mode table, row-click vectors on OWNER-SIGNED-OFF optimized frame); plot options owner-amended at 07-06 (unit modes absorbance/transmittance, colors blue/red/black, x-direction, y-invert, exact-preset sizing); compact tab (log 110px/table 150px scroll) + dialog screen cap from the 07-10 r1 fix
-Last activity: 2026-10-01 - Completed quick task 001: Remove biphenyl from gameplay spawn pool
+Phase: 8 of 8 (Demo Data, Docs & Release Audit) — IN PROGRESS: 12/13 plans complete; GATE V (08-11) blocking checkpoint RESUMED after owner insertions 08-12/08-13
+Plan: 08-01..08-10, 08-12, 08-13 COMPLETE; 08-11 (GATE V) live walk-through in progress — Tasks 2/3 (approval flip + ledger close) conditional on owner "approved"
+Status: GATE V Sections A (data sign-off incl. D3-humanized dataset text) / B (6-button + educator round-trip + new Performance controls + tooltips) / C (release close incl. real xtb) — owner verdict pending
+Last activity: 2026-10-01 -Owner insertions mid-GATE-V landed: 08-12 Performance controls (atom budget + xtb threads settable; D2 honest completion label; 948 tests) + 08-13 student tooltips (13 controls + 6 buttons; help_text single source) + D3 humanized pi-stack explanation + D1 README humanization w/ quick-001 biphenyl reconciliation (953 unittests + doc audit 7/7 green) — GATE V resuming
 
 Progress: [██████████] 100% (95 of 95 planned plans fully closed — Phases 1-5 + 5.1 + 5.2 + 5.3 + 6 + 7 COMPLETE; Phase 8 unplanned/TBD)
 
@@ -117,7 +117,7 @@ Recent decisions affecting current work:
 - Demo-data FULL DATA_SOURCES.md checklist sign-off (all molecules + attribution) remains Phase 8-gated — Set A data placement is done (03-05), not the full DATA-02/04 approval.
 - **2026-09-20 (owner flag):** Janiak 2000 scope transferability — SCOPE CAVEAT added to DATA_SOURCES.md [JAN2000]: its corpus is metal-complex crystal structures (N-ligands), not free neutral hydrocarbons; aqueous/solution-phase geometry NOT verified. Shipped 3.60 Å is pinned by the measured CC0 COD organics (Janiak supplies only the qualitative ~20° parallel-displaced rule). Phase 8 TODO: check geometry in aqueous/solvated conditions (verified solution-phase study) or use explicit crystalline-state framing in UI/help text.
 - `tmp/upload_test/` holds the human-checkpoint upload test files (reject_4_rings.sdf tetracene C18H12, reject_no_h.sdf, accept_naphthalene.sdf, accept_benzene.mol2) — gitignored, disposable, regenerate per 03-08-SUMMARY if needed.
-- **2026-10-01 (quick-001 follow-up, owner directive "go back to phase 8 for updating phase8 related files later"):** Phase-8 files need a reconciliation pass — biphenyl is now EXCLUDED from real gameplay (spawn pool + head selection; probe-proven always-clash as pickup AND as head/segment target). Note file: .planning/quick/001-remove-biphenyl-from-gameplay-spawn-pool/PHASE8-NOTE.md. Any 08-* plans/docs/requirements text presenting biphenyl as a stackable gameplay molecule must be updated when Phase 8 work resumes; the dataset/manifest and TDD/smoke fixtures KEEP biphenyl (refuse-path demonstrator, TEST-only).
+- **2026-10-01 (quick-001 follow-up, owner directive "go back to phase 8 for updating phase8 related files later"):** ~~Phase-8 files need a reconciliation pass~~ DISCHARGED 2026-10-01 by plan 08-13 (commit 054096c): README humanized with the quick-001 biphenyl truth (excluded from live gameplay since 2026-10-01, probe-proven always-clash, permanent refuse-path demonstrator in the test suite, 4 stackable species in play, still loadable/viewable); dataset/manifest + TDD/smoke fixtures KEEP biphenyl. Note file kept for the record: .planning/quick/001-remove-biphenyl-from-gameplay-spawn-pool/PHASE8-NOTE.md.
 
 ### Blockers/Concerns
 
@@ -137,5 +137,5 @@ Recent decisions affecting current work:
 Last session: 2026-09-27 (gsd-executor — 07-10 post-approval follow-up: show_srp_sticks() occlusion fix; gates re-green; docs stamped)
 Stopped at: Phase 7 COMPLETE + CHECKPOINT-APPROVED (07-10 round 2 "approved, well done" 2026-09-26) + post-approval occlusion fix committed — pending orchestrator verifier
 Resume file: None needed
-Next action: /gsd-verify-phase Phase 7, then Phase 8 (Demo Data, Docs & Release Audit) TBD planning — do NOT start plan work outside its own plan
+Next action: GATE V (08-11) resumed — owner finishes the live walk-through (Sections A/B/C, incl. the new Performance controls + tooltips); "approved" → continuation runs Task 2 (DATA_SOURCES DRAFT->APPROVED flip + coupled marker pin) + Task 3 (10-row ledger flip + final battery incl. --smoke/--xtb + ROADMAP close). Do NOT start plan work outside its own plan.
 Date convention: planning-doc dates are UTC (git commit dates authoritative) — the dev shell is HKT (UTC+8); never stamp from the local date.
