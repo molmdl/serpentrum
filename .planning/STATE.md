@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 Phase: 8 of 8 (Demo Data, Docs & Release Audit) — IN PROGRESS: 12/13 plans complete; GATE V (08-11) blocking checkpoint RESUMED after owner insertions 08-12/08-13
 Plan: 08-01..08-10, 08-12, 08-13 COMPLETE; 08-11 (GATE V) live walk-through in progress — Tasks 2/3 (approval flip + ledger close) conditional on owner "approved"
 Status: GATE V Sections A (data sign-off incl. D3-humanized dataset text) / B (6-button + educator round-trip + new Performance controls + tooltips) / C (release close incl. real xtb) — owner verdict pending
-Last activity: 2026-10-01 -Owner insertions mid-GATE-V landed: 08-12 Performance controls (atom budget + xtb threads settable; D2 honest completion label; 948 tests) + 08-13 student tooltips (13 controls + 6 buttons; help_text single source) + D3 humanized pi-stack explanation + D1 README humanization w/ quick-001 biphenyl reconciliation (953 unittests + doc audit 7/7 green) — GATE V resuming
+Last activity: 2026-10-04 - GATE V amendment rounds: 08-12 Performance controls + 08-13 tooltips/copy + Multiwfn-parity IR curve (owner Multiwfn reference reproduced to max rel err 4.9e-9: Lorentzian FWHM 8 unit-area x CURVE_SCALE 100, broadening default 16.0->8.0, commits 5ece303/c9bbc06) + README biphenyl concision; 962 unittests green; owner B14/B15/B13-pass verdicts logged (window blink on move/resize = cosmetic, C10-defer candidate)
 
 Progress: [██████████] 100% (95 of 95 planned plans fully closed — Phases 1-5 + 5.1 + 5.2 + 5.3 + 6 + 7 COMPLETE; Phase 8 unplanned/TBD)
 
