@@ -18,9 +18,10 @@ button a student hover tooltip from help_text.BUTTON_TOOLTIPS
 """
 import tempfile
 
-from pymol.Qt import QtWidgets
+from pymol.Qt import QtCore, QtWidgets
 
 from . import budget_guard
+from . import dialog_fit
 from . import help_text
 from . import pymol_bridge
 from . import setup_logic
@@ -81,14 +82,34 @@ class PluginDialog(QtWidgets.QDialog):
     def __init__(self, parent=None, anchor_state=None):
         super(PluginDialog, self).__init__(parent)
         self.setWindowTitle('serpentrum')
-        self.setMinimumWidth(450)
-        # 07-10 checkpoint round 1 (owner directive: the plugin window
-        # must never exceed the screen): cap the dialog to the available
-        # screen height — content scrolls within tabs; the plot keeps
-        # its approved preset size. The QApplication always exists in
-        # the PyMOL GUI.
-        avail = QtWidgets.QApplication.desktop().availableGeometry(self)
-        self.setMaximumHeight(max(560, int(avail.height() * 0.92)))
+        # Fixed-dialog chrome (round 3, debug session
+        # .planning/debug/06-window-move-resize-quirk.md; owner
+        # follow-up after the round-2 fixed-size patch: dragging the
+        # TOP sizing border "sometimes flicks" and translates the
+        # window). With min == max (freeze_dialog_size), a native
+        # WS_THICKFRAME sizing-border grab can no longer resize
+        # something: Windows clamps the height to the fixed size, so
+        # the drag TRANSLATES the whole window instead. The
+        # MSWindows fixed-size-dialog hint (flag expression below)
+        # gives the dialog the fixed-dialog FRAME: no sizing borders
+        # at all, so every edge and corner is hit-tested as
+        # caption/dead glass and drags are fully inert. MUST be
+        # applied here at construction, BEFORE the entry's .show()
+        # (a setWindowFlags call on a visible widget hides it); OR'd
+        # into the existing flags, never replacing them wholesale.
+        # The thin chrome changes the FRAME margins slightly (the
+        # sizing borders go away; the title bar stays), which is
+        # fine in contract terms: freeze + position work from the
+        # 0.92-headroom basis and the (scale-invariant) title-bar
+        # margin, not from exact frame metrics.
+        self.setWindowFlags(
+            self.windowFlags() | QtCore.Qt.MSWindowsFixedSizeDialogHint)
+        # Dialog sizing: FIXED SIZE, applied once at the END of
+        # __init__ (see freeze_dialog_size below). The old
+        # construction-time envelope (min width 450 + the 07-10
+        # height cap, max(560, 0.92*avail)) is fully SUBSUMED by the
+        # freeze: the 450 min-width promise and the 560 floor /
+        # 0.92-headroom cap basis survive inside it.
         # Live-state anchor (pmg_tk.startup._serpentrum): carries setup,
         # last_run and the Phase-6 spectra_runner; survives Plugin-
         # Manager reload; stripped-down constructions may pass None --
@@ -179,6 +200,122 @@ class PluginDialog(QtWidgets.QDialog):
         outer = QtWidgets.QVBoxLayout(self)
         outer.addWidget(self.tabs)
         outer.addLayout(buttons)
+        # Fixed dialog size (owner directive 2026-10-04, debug session
+        # .planning/debug/06-window-move-resize-quirk.md). 07-10
+        # checkpoint round 1 owner directive, KEPT VERBATIM: "the
+        # plugin window must never exceed the screen". The 07-10
+        # implementation (min-width 450 + max-height cap) left a
+        # 771->811 logical-px min-versus-max envelope; under the
+        # owner's 200% Windows display scaling that slack put Qt and
+        # Windows into a continuous WM geometry negotiation (decoded
+        # SRP_DEBUG=1 console log: mintrack 926x1613 versus maxtrack
+        # 0x1693, native heights oscillating 1622<->1778, frame tops
+        # above the screen top) -- the owner-reported move flicker +
+        # resize bounds escape. Owner decision: disable resize -- a
+        # fixed-size game dialog, the reference-plugin precedent
+        # (biochemeleon; see the debug file for what its dialog
+        # actually ships). The game needs no user resize: the
+        # SpectraTab log (cap 110) and table (cap 150) scroll
+        # internally and the plot keeps its exact preset. setFixedSize
+        # makes minimum == maximum, so WM_GETMINMAXINFO reports
+        # mintrack == maxtrack: zero slack -- no resize handles, no
+        # Qt<->Windows renegotiation at any move/size event. Stock
+        # Windows move behavior stays (the window may be dragged
+        # partially off-screen and back, like every other window):
+        # the 07-10 directive bounds SIZE, not position.
+        self.spectra_tab.plot_panel.dialog_size_refreeze = \
+            self.freeze_dialog_size
+        self.freeze_dialog_size()
+
+    def freeze_dialog_size(self):
+        """Freeze the dialog at its natural laid-out size, capped to
+        the available screen -- the GATE V-approved opening look --
+        and place it so its FRAME fits the screen.
+
+        desired = sizeHint(): called after the top-level layout is
+        complete, this is the same quantity Qt uses to open the
+        dialog, so the frozen size reproduces today's approved
+        on-screen size exactly (including the 640x400 default plot
+        preset pin -- the Spectra tab is part of the layout). Caps
+        use the SAME 07-10 basis (avail * 0.92 headroom, 560 floor)
+        extended to the full RECT, with the 450 min-width promise
+        kept as a floor -- so the frozen size equals today's size on
+        this machine and shrinks on smaller screens.
+
+        Position (round 3): a fixed SIZE was never paired with a
+        POSITION -- Qt's default centers a fresh dialog on its parent
+        (the PyMOL main window), which at ~92% screen height left
+        the frame's bottom edge below the screen. One-shot placement
+        from PURE dialog_fit math on the same available rect:
+        PRE-SHOW (construction) the base is the avail center + frame
+        -- on this screen the 0.92 headroom centers the widget top
+        at ~35 logical px, absorbing the ~29-logical title-bar
+        margin with ~6 px to spare, and the clamp also covers the
+        560-floor regime where centering alone would not (see
+        dialog_fit's docstring arithmetic). POST-SHOW (the
+        plot-preset refreeze) the base is the CURRENT position,
+        clamped under the NEW size with minimal shift so a grown
+        dialog never bottoms out. move() pre-show only records the
+        placement (Qt then opens exactly there -- no parent
+        re-centering, no WM traffic on a hidden window); the
+        refreeze move is one deliberate programmatic move per
+        preset click. NO move/resize event handlers exist anywhere
+        in serpentrum/ (that regression class is closed, test-pinned
+        in tests/test_gui_pins.py) -- pre-show placement plus this
+        hook are the only position code there is.
+
+        Re-frozen on plot-preset changes via the injected hook
+        plot_panel.dialog_size_refreeze (the 07-06 owner-approved
+        exact-preset surface: choosing a larger/smaller preset makes
+        the dialog re-freeze to fit, replacing the old auto-resize
+        -- preset changes are the only post-construction change to
+        the layout's minimums)."""
+        avail = QtWidgets.QApplication.desktop().availableGeometry(self)
+        desired = self.sizeHint()
+        cap_w = int(avail.width() * 0.92)
+        cap_h = max(560, int(avail.height() * 0.92))
+        self.setFixedSize(
+            max(450, min(desired.width(), cap_w)),
+            min(desired.height(), cap_h))
+        # One-shot frame-fit position on the SAME available rect
+        # (round 3): margins from the live native window when it
+        # exists (refreeze, post-show), else the measured fallback
+        # estimates (construction, pre-show: windowHandle() is
+        # None). Pure math in dialog_fit; this is the thin Qt seam.
+        avail_tuple = (avail.x(), avail.y(),
+                       avail.width(), avail.height())
+        frozen_size = (self.width(), self.height())
+        if self.isVisible():
+            base = (self.x(), self.y())
+        else:
+            base = dialog_fit.centered_top_left(avail_tuple,
+                                                frozen_size)
+        x, y = dialog_fit.clamped_position(
+            avail_tuple, frozen_size,
+            self._frame_margins_for_clamp(), base)
+        self.move(x, y)
+
+    def _frame_margins_for_clamp(self):
+        """Native frame margins for the position clamp, or the
+        measured estimates when the native window does not exist.
+
+        windowHandle() exists only once Qt has created the native
+        window (first show); frameMargins() can also stay all-zero
+        on some platforms until the frame is decorated, and a zero
+        TOP margin is impossible for a titled Windows dialog -- both
+        cases degrade to dialog_fit.FALLBACK_FRAME_MARGINS (outward-
+        rounded logical estimates, see its comment). Safe to call at
+        any time: pure attribute reads off the live window, no WM
+        interaction.
+        """
+        handle = self.windowHandle()
+        if handle is not None:
+            margins = handle.frameMargins()
+            top = margins.top()
+            if top > 0:
+                return (margins.left(), top,
+                        margins.right(), margins.bottom())
+        return dialog_fit.FALLBACK_FRAME_MARGINS
 
     def _on_start_requested(self, setup):
         """GAME-01: switch to the Game tab and begin the session.

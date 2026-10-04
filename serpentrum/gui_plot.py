@@ -451,8 +451,19 @@ class SpectraPlotPanel(QtWidgets.QWidget):
         2026-09-26, checkpoint round-1 defect c fix): a preset change
         grows AND shrinks the plot deterministically in the layout —
         the plot always matches the chosen preset exactly, and any
-        extra window space becomes margin. The window itself stays
-        resizable; the plot simply stays preset-sized.
+        extra window space becomes margin. The dialog itself is
+        FIXED-SIZE (2026-10-04 owner directive, debug session
+        .planning/debug/06-window-move-resize-quirk.md): instead of a
+        resizable window auto-growing, the dialog re-freezes to fit
+        the new preset via the injected dialog_size_refreeze hook
+        (set by PluginDialog; absent when this panel is hosted
+        standalone, e.g. the smokes) — the 07-06 approved
+        grow-AND-shrink preset behavior survives the fixed-size
+        dialog unchanged. The same hook call re-applies the round-3
+        POSITION clamp (the hook IS PluginDialog.freeze_dialog_size,
+        which owns size AND placement): a grown dialog re-clamps
+        around its current position with minimal shift and never
+        bottoms out below the screen.
 
         currentData() gives the (w, h) preset tuple directly; the
         scene is x-range data — resize-responsive by construction,
@@ -466,6 +477,9 @@ class SpectraPlotPanel(QtWidgets.QWidget):
         self.plot.setMaximumSize(w, h)
         self.plot.updateGeometry()
         self.plot.update()
+        refreeze = getattr(self, 'dialog_size_refreeze', None)
+        if refreeze is not None:
+            refreeze()
 
     def _on_toggle(self, state):
         self.plot.set_show_labels(self.labels_check.isChecked())
