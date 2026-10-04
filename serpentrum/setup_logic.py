@@ -54,6 +54,11 @@ DEFAULTS = {
     'xtb_path': None,              # SETUP-05: None = auto-detect
     'win_cap_molecules': 10,       # SETUP-06 (~10 mol / ~100 atoms safe)
     'atom_budget': 100,            # warning threshold (hessian ~N^3)
+    'xtb_threads': 4,              # Q2 (2026-10-01 owner insertion,
+                                   # plan 08-12): xtb '-P' thread cap,
+                                   # in-game settable; absent key = 4
+                                   # via merge_defaults (additive key,
+                                   # no schema bump)
     'broadening_fwhm': 16.0,       # cm^-1; STACK.md §6: ~10-20 typical
     'speed': 6.0,                  # A/s = the 'normal' tier (owner-final
                                    # 2026-09-25 feel-check; game_engine's
@@ -236,6 +241,10 @@ def validate(setup):
       box_preset      not in BOX_PRESETS
       win_cap_molecules  not a number, or < 1, or > hard max (20)
       atom_budget        not a number, or < 1   (no hard max — see warning)
+      xtb_threads        not None and not a whole number >= 1
+                         (missing key PASSES: absent = 4 via
+                         merge_defaults, the 5.2-01 consent-precedent
+                         backcompat seam; no hard max)
       xtb_path        set (not None) but _xtb_path_problems non-empty
       speed           not a number, or <= 0
       broadening_fwhm not a number, or <= 0
@@ -279,6 +288,20 @@ def validate(setup):
     if not _is_number(budget) or budget < 1:
         errors.append('atom_budget %r is out of range (must be >= 1)'
                       % (budget,))
+
+    # Q2 (2026-10-01 owner insertion, plan 08-12): the xtb '-P' thread
+    # cap is in-game settable. Missing key PASSES (absent = 4 via
+    # merge_defaults, the 5.2-01 consent-precedent backcompat seam);
+    # an explicit non-None value must be a whole number >= 1 (NO hard
+    # max — the UI spinbox range is the only cap; validate is the loud
+    # edit/load-time half, xtb_run.thread_arg is the argv-side
+    # defensive fallback).
+    threads = setup.get('xtb_threads')
+    if threads is not None and (not isinstance(threads, int)
+                                or isinstance(threads, bool)
+                                or threads < 1):
+        errors.append('xtb_threads %r must be a whole number >= 1'
+                      % (threads,))
 
     xtb_path = setup.get('xtb_path')
     if xtb_path is not None:
@@ -385,10 +408,13 @@ def randomize_setup(setup, candidates, seed=None):
     ``d1-option-c-staleness``, owner 2026-09-28): scope = the FULL
     setup — ``head_molecule`` + ``box_preset`` + ``win_cap_molecules`` +
     ``speed`` + ``broadening_fwhm`` are redrawn; every other key
-    (``schema_version``, ``demo_set``, ``atom_budget``, ``xtb_path``,
-    and crucially ``generic_stack_consent``) is carried through
-    UNCHANGED. Consent is a safety-relevant opt-in (STACK-06) and a
-    Randomize click must never grant or revoke it.
+    (``schema_version``, ``demo_set``, ``atom_budget``,
+    ``xtb_threads`` (plan 08-12), ``xtb_path``, and crucially
+    ``generic_stack_consent``) is carried through UNCHANGED. Consent
+    is a safety-relevant opt-in (STACK-06) and a Randomize click must
+    never grant or revoke it; the thread count and atom budget are
+    machine-tuned performance choices, not rolls (08-12 / 5.2-01
+    consent precedent).
 
     Concreteness (Pitfall D): the result writes only CONCRETE values so
     a Save->Load round-trip reproduces exactly what the user saw —

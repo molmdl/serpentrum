@@ -80,6 +80,22 @@ DEFAULT_RUN_KNOBS = {}
 # an explicit caller-supplied extra_args still overrides it.
 DEFAULT_THREAD_ARG = ('-P', '4')
 
+
+def thread_arg(threads):
+    """Setup key 'xtb_threads' -> argv tuple for the -P thread cap.
+
+    Valid int >= 1 -> ('-P', str(threads)); anything else (None = key
+    absent, wrong type, < 1) -> DEFAULT_THREAD_ARG - the shipped '-P 4'
+    calibration cap, so every caller that has no usable key keeps the
+    06-CALIBRATION behavior byte-identical. Validation is setup_logic.
+    validate()'s job (loud, at edit/load time); this is the defensive
+    argv-side fallback (PURE, plan 08-12).
+    """
+    if (isinstance(threads, int) and not isinstance(threads, bool)
+            and threads >= 1):
+        return ('-P', str(threads))
+    return DEFAULT_THREAD_ARG
+
 # xtb --help env knobs, VERIFIED verbatim from the help capture
 # (tmp/xtb_test/xtb_help.txt:229-231: MKL_NUM_THREADS, OMP_NUM_THREADS,
 # OMP_STACKSIZE). These three are the ONLY verified env knobs — the
