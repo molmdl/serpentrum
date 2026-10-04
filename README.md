@@ -21,7 +21,7 @@ For the viewer and UI:
 - PyQt5 (bundled with PyMOL's Qt GUI via pymol.Qt - no extra install)
 - numpy (PyMOL build dependency - no extra install)
 
-> No external Python dependencies beyond what PyMOL already ships. If any are introduced later, they will be listed for explicit user approval and either user-installed or vendored into the git-ignored 3rd_party_lib/ directory with their license noted.
+> No external Python dependencies beyond what PyMOL already ships. If a new Python library is ever needed, it will be clearly listed here for your review and approval before it is used.
 
 ## Install
 
@@ -35,8 +35,8 @@ Release alternative (no checkout needed): zip -r serpentrum.zip serpentrum/, the
 
 ## Usage
 
-1. **Setup tab** - choose the demo set (head options fill in; Random picks from the set), box preset, head molecule, xtb path (or auto-detect), win cap, and speed tier.
-   Canonical values: speed tiers 3.0 / 6.0 (default) / 7.5 / 9.0 A/s; box presets 35 / 55 / 85 A half-widths (medium default); win cap default 10 (range 1-20); atom budget 100 atoms; broadening 16.0 cm-1 FWHM. Past the atom budget, a hessian-cost warning applies: a ~100-atom snake takes about 1-2 min on a typical 4-core/8-thread laptop (measured 84-101 s; thread-capped runs slower, up to ~5 min single-threaded).
+1. **Setup tab** - choose the demo set (head options fill in; Random picks from the set), box preset, head molecule, xtb path (or auto-detect), win cap, speed tier, and the performance settings (atom budget, xtb threads).
+   Canonical values: speed tiers 3.0 / 6.0 (default) / 7.5 / 9.0 A/s; box presets 35 / 55 / 85 A half-widths (medium default); win cap default 10 (range 1-20); atom budget 100 atoms; broadening 16.0 cm-1 FWHM; xtb threads default 4. How long a spectra run takes: a ~100-atom snake takes about 1-2 min on a typical 4-core/8-thread laptop (measured 84-101 s; thread-capped runs slower, up to ~5 min single-threaded). On a modest PC, set xtb threads to 1 or 2 in the Performance settings - runs take longer but PyMOL stays responsive.
 2. **Start** - Start applies the setup and materializes the box and head first, then a 3-2-1 countdown runs and the dialog switches to the Game tab.
 3. Steer with the 4 arrow keys. If the keys seem dead, click the 3D viewer first; when the dialog takes focus the game auto-pauses.
 4. Completion (win or crash) enables **Get Spectra**.
@@ -54,9 +54,9 @@ Demo Set A ("Aromatic pi-stack") ships five PubChem 3D-conformer SDF records (pu
 - Phenanthrene (CID 995, C14H10, 24 atoms)
 - Biphenyl (CID 7095, C12H10, 22 atoms)
 
-Picked-up molecules stack parallel-displaced: a 3.383 A plane gap plus a 1.231 A lateral offset, composing a 3.60 A centroid-centroid distance at 20.0 deg off-normal. Idealized pairwise geometry - neat Set A crystals are herringbone (see DATA_SOURCES.md). The [JAN2000] rule source is a crystalline corpus - pi-stacking in metal complexes with aromatic nitrogen-containing ligands - so the geometry carries a crystalline-state framing. Biphenyl is non-planar in its ground state: its orthogonal rings clash at the set geometry and the placement is refused - the designed "no invented chemistry" demonstrator.
+Picked-up molecules stack the way aromatic rings often do in the interaction literature: parallel-displaced, face-to-face but slightly slid apart - about 20 deg off the ring normal, like two playing cards shifted on each other. In numbers: a 3.383 A plane gap plus a 1.231 A lateral offset, composing a 3.60 A centroid-centroid distance at 20.0 deg off-normal. That face-to-face geometry is an idealized game approximation - neat crystals of the Set A molecules pack herringbone (edge-to-face) instead (see DATA_SOURCES.md), and the rule of thumb (parallel-displaced, about 20 deg, centroid-centroid up to 3.8 A) comes from Janiak 2000, measured on crystalline metal complexes. Biphenyl is the honest exception: since 2026-10-01 it is excluded from live gameplay (spawn pool and head selection) because its twisted rings always clash at the set geometry (probe-proven), so it remains the permanent refuse-path demonstrator in the test suite; the demo set in play offers 4 stackable species (plus your own uploads), and biphenyl itself stays loadable and viewable.
 
-Full source database / ID / DOI / license per molecule: `serpentrum/data/DATA_SOURCES.md` - the attribution document of record, whose approval is decided at the v1.0 release gate.
+Full source database / ID / DOI / license per molecule: `serpentrum/data/DATA_SOURCES.md` - the attribution document of record (human-approved at the v1.0 release review).
 
 ## Project Structure
 

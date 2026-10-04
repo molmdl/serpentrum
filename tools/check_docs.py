@@ -230,6 +230,7 @@ def collect_numeric_context(repo_root):
         'win_cap_max': setup_logic.RANDOMIZE_WIN_CAP_MAX,
         'atom_budget': setup_logic.DEFAULTS['atom_budget'],
         'broadening_fwhm': setup_logic.DEFAULTS['broadening_fwhm'],
+        'xtb_threads': setup_logic.DEFAULTS['xtb_threads'],
         'stack_gap_a': gap,
         'stack_offset_a': offset,
         'stack_centroid_a': centroid,
@@ -255,6 +256,10 @@ def expected_numeric_tokens(context):
                      context['win_cap_max']))
     tokens.append('atom budget %d atoms' % context['atom_budget'])
     tokens.append('broadening %.1f cm-1' % context['broadening_fwhm'])
+    # Q2/Q1 follow-up (plan 08-13): the 08-12 xtb-threads default is a
+    # composed token too, so a future DEFAULTS drift fails this gate
+    # until the README catches up (compose-don't-hardcode).
+    tokens.append('xtb threads default %d' % context['xtb_threads'])
     tokens.append('a %.3f A plane gap plus a %.3f A lateral offset'
                   % (context['stack_gap_a'], context['stack_offset_a']))
     tokens.append('a %.2f A centroid-centroid distance at %.1f deg '
