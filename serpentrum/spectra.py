@@ -436,6 +436,8 @@ def real_modes(spectrum, threshold=10.0):
 # max relative error 4.9e-7 over 1000 sampled points of the
 # srp_spectra/run_1 reference curve. The curve y-axis therefore carries
 # the Multiwfn-scaled convention, NOT raw km/mol.
+# Owner 2026-10-04: Multiwfn lines are km/mol; the curve is the molar
+# absorption coefficient epsilon (L mol-1 cm-1).
 CURVE_SCALE = 100.0
 
 

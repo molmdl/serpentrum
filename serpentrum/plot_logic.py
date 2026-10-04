@@ -131,7 +131,7 @@ def build_scene(modes, fwhm=8.0, x_min=0.0, x_max=None, n_points=800):
         x_ticks=x_ticks,
         y_ticks=y_ticks,
         x_label='wavenumber (cm-1)',
-        y_label='IR curve (km/mol, Multiwfn scale 100)',
+        y_label='epsilon (L mol-1 cm-1)',
         n_modes=n_modes,
         n_imaginary=n_imaginary,
         fwhm=fwhm)

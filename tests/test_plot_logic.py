@@ -15,9 +15,9 @@ load-bearing facts, re-probed 2026-10-04 for the GATE V amendment):
     Multiwfn-parity Lorentzian (FWHM 8, unit-area x100), so the scene
     peaks at the strong mode the grid samples best — the 235.5447 mode
     (measured argmax 405.506884 @ 1873.257563 = 0.9994 of its (100/pi)*
-    (I/g) center 1874.3476) — and the y axis reads 'IR curve (km/mol,
-    Multiwfn scale 100)' (the values are the x100 convention, not raw
-    km/mol).
+    (I/g) center 1874.3476) — and the y axis reads 'epsilon (L mol-1
+    cm-1)' (owner unit correction 2026-10-04: Multiwfn's discrete lines
+    are km/mol; the curve is the molar absorption coefficient).
 
 Tick-selection anchors (plan-pinned): nice_ticks(0, 3600, 8) -> step 500;
 nice_ticks(0, 10, 4) -> step 2.5 (1-decimal labels); zero-range and
@@ -193,9 +193,12 @@ class TestBuildScene(unittest.TestCase):
         self.assertEqual(scene.x_label, 'wavenumber (cm-1)')
         # GATE V amendment (2026-10-04): the curve values are the
         # Multiwfn-scaled convention (unit-area Lorentzian x100), so the
-        # y axis must NOT claim raw km/mol.
+        # y axis must NOT claim raw km/mol. Owner unit correction (GATE
+        # V, same date): Multiwfn's discrete lines are km/mol; the
+        # curve is the molar absorption coefficient epsilon (L mol-1
+        # cm-1).
         self.assertEqual(scene.y_label,
-                         'IR curve (km/mol, Multiwfn scale 100)')
+                         'epsilon (L mol-1 cm-1)')
         self.assertTrue(_is_ascii(scene.x_label))
         self.assertTrue(_is_ascii(scene.y_label))
 
