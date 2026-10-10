@@ -17,8 +17,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **SETUP-04**: Setup tab lets the user select the head molecule from the set, with "random" as default
 - [x] **SETUP-05**: Setup tab lets the user set the xtb path and xtb env resources, defaulting to auto-detect; detection handles both `xtb` and `xtb.exe`
 - [x] **SETUP-06**: Setup tab lets the user set the win cap (snake molecule count), with a safe default (~10 molecules / ~100 atoms) and a visible warning when raised beyond the safe atom budget (hessian cost ~N³)
-- [ ] **SETUP-07**: Bottom action row has 6 buttons: Reset, Randomize, Save Setup, Load Setup, Cleanup model, Start
-- [ ] **SETUP-08**: Save Setup writes a setup file that another user (e.g. educator) can Load Setup to reproduce the exact game configuration
+- [x] **SETUP-07**: Bottom action row has 6 buttons: Reset, Randomize, Save Setup, Load Setup, Cleanup model, Start
+- [x] **SETUP-08**: Save Setup writes a setup file that another user (e.g. educator) can Load Setup to reproduce the exact game configuration
 
 ### Gameplay
 
@@ -56,10 +56,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Demo Data & Attribution
 
-- [ ] **DATA-01**: v1 ships Demo Set A (aromatic π-stack: benzene, naphthalene, anthracene, phenanthrene, biphenyl) with PubChem 3D SDFs (CID-cited) and the π-stack interaction dataset
-- [ ] **DATA-02**: Every shipped distance number is pinned from a real source (Janiak 2000 full text or a measured COD CIF) and explicitly approved by the human before shipping — no invented data anywhere
+- [x] **DATA-01**: v1 ships Demo Set A (aromatic π-stack: benzene, naphthalene, anthracene, phenanthrene, biphenyl) with PubChem 3D SDFs (CID-cited) and the π-stack interaction dataset
+- [x] **DATA-02**: Every shipped distance number is pinned from a real source (Janiak 2000 full text or a measured COD CIF) and explicitly approved by the human before shipping — no invented data anywhere
 - [x] **DATA-03**: Uploaded molecule sets are size-gated (≤3 rings); uploaded molecules without stacking dataset entries follow the skip policy (STACK-03)
-- [ ] **DATA-04**: DATA_SOURCES.md documents every molecule (source DB, ID, DOI, license, attribution) in the bioCHEMeleon format; CSD/CCDC data is never redistributed (cite published values only; prefer CC0 COD for shipped measurements)
+- [x] **DATA-04**: DATA_SOURCES.md documents every molecule (source DB, ID, DOI, license, attribution) in the bioCHEMeleon format; CSD/CCDC data is never redistributed (cite published values only; prefer CC0 COD for shipped measurements)
 
 ### Infrastructure & Environment
 
@@ -72,11 +72,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Documentation & Audit
 
-- [ ] **DOCS-01**: README documents install, usage, and the demo set, and keeps the vibe-coding warning block at the top; every README claim matches actual behavior
-- [ ] **DOCS-02**: DATA_SOURCES.md ships complete (see DATA-04)
-- [ ] **DOCS-03**: In-game help covers controls, a "click the 3D viewer" focus hint, what negative frequencies mean, and a next-action hint on every screen — clear but sufficient, no walls of text
-- [ ] **DOCS-04**: Documentation audit: docs are verified against actual code behavior (README steps reproduce, UI help text matches real controls and dataset values)
-- [ ] **DOCS-05**: End-to-end release audit: full flow (setup → play → complete → xtb → IR plot → save) verified headless + human checkpoints; all v1 requirements checked and traceability complete
+- [x] **DOCS-01**: README documents install, usage, and the demo set, and keeps the vibe-coding warning block at the top; every README claim matches actual behavior
+- [x] **DOCS-02**: DATA_SOURCES.md ships complete (see DATA-04)
+- [x] **DOCS-03**: In-game help covers controls, a "click the 3D viewer" focus hint, what negative frequencies mean, and a next-action hint on every screen — clear but sufficient, no walls of text
+- [x] **DOCS-04**: Documentation audit: docs are verified against actual code behavior (README steps reproduce, UI help text matches real controls and dataset values)
+- [x] **DOCS-05**: End-to-end release audit: full flow (setup → play → complete → xtb → IR plot → save) verified headless + human checkpoints; all v1 requirements checked and traceability complete
 
 ## v2 Requirements
 
@@ -130,8 +130,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SETUP-04 | Phase 3 | Complete | mech: tests/test_setup_logic.py + tests/test_gui_pins.py (eager head-combo pin, 08-08); code: serpentrum/gui_setup.py head dropdown with random default; human: 03-08 live checkpoint APPROVED (10 of 10) 2026-09-12 |
 | SETUP-05 | Phase 3 | Complete | mech: tests/test_xtbenv.py + tests/test_winpath.py; code: serpentrum/xtbenv.py validate_binary_path (xtb + xtb.exe) + tools/winpath.py; human: 03-08 live checkpoint (xtb auto + manual legs) APPROVED 2026-09-12 |
 | SETUP-06 | Phase 3 | Complete | mech: tests/test_setup_logic.py + tests/test_budget_guard.py; code: serpentrum/gui_setup.py win-cap control + hessian warning + serpentrum/budget_guard.py; human: 03-08 live checkpoint (win-cap warning step) APPROVED 2026-09-12 |
-| SETUP-07 | Phase 8 | Pending | mech: tests/test_gui_pins.py (6-label order + single Start-route pins, 08-08); code: serpentrum/gui.py 6-button bottom row (Reset, Randomize, Save Setup, Load Setup, Cleanup model, Start); human: GATE V (08-11) approval |
-| SETUP-08 | Phase 8 | Pending | mech: tests/test_setup_logic.py save/load round-trip + smoke/14_release_e2e_smoke.py stage7 setup_roundtrip; code: serpentrum/setup_logic.py save_setup/load_setup/merge_defaults; human: GATE V (08-11) approval |
+| SETUP-07 | Phase 8 | Complete | mech: tests/test_gui_pins.py (6-label order + single Start-route pins, 08-08); code: serpentrum/gui.py 6-button bottom row (Reset, Randomize, Save Setup, Load Setup, Cleanup model, Start); human: GATE V (08-11) checkpoint verdict "approved" 2026-10-10 (Section B 6-button live pass, B13 no clipping) |
+| SETUP-08 | Phase 8 | Complete | mech: tests/test_setup_logic.py save/load round-trip + smoke/14_release_e2e_smoke.py stage7 setup_roundtrip; code: serpentrum/setup_logic.py save_setup/load_setup/merge_defaults; human: GATE V (08-11) checkpoint verdict "approved" 2026-10-10 (Section B educator round-trip; one-machine two-session proof, multi-machine acceptance note) |
 | GAME-01 | Phase 4 | Complete | mech: tests/test_gui_pins.py (single setCurrentIndex(1) Start-route pin); code: serpentrum/gui_game.py 3-2-1 countdown + movement start; human: 04-09 closing checkpoint APPROVED (12 of 12 live steps) 2026-09-14 |
 | GAME-02 | Phase 4 | Complete | mech: smoke/05_loop_camera_smoke.py; code: serpentrum/pymol_bridge.py camera lock (GAME-02 scope) + srp_box boundary display; human: 04-09 closing checkpoint APPROVED (12 of 12) 2026-09-14 |
 | GAME-03 | Phase 4 | Complete | mech: tests/test_engine_core.py + smoke/06_input_smoke.py; code: serpentrum/input.py KeySteerWizard (do_special route) + serpentrum/pymol_bridge.py head spheres / pickup sticks; human: 04-07 keys checkpoint APPROVED 2026-09-13 |
@@ -155,23 +155,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SPECTRA-04 | Phase 7 | Complete | mech: smoke/11_xtb_runner_smoke.py (informational streaming legs) + tests/test_xtb_run.py; code: serpentrum/xtb_runner.py log_tail + serpentrum/gui_spectra.py 500-block log panel (replay-first); human: 06-12 live-log responsive verdict APPROVED 2026-09-26 |
 | SPECTRA-05 | Phase 7 | Complete | mech: tests/test_spectra_ui.py + smoke/13_mode_arrows_smoke.py; code: serpentrum/spectra_ui.py table/arrow seams + serpentrum/gui_spectra.py row-click -> srp_mode_vec on srp_xtbopt; human: 07-10 APPROVED round 2 incl. optimized-frame sign-off 2026-09-26 |
 | SPECTRA-06 | Phase 6 | Complete | mech: tests/test_budget_guard.py; code: serpentrum/budget_guard.py + serpentrum/gui.py pre-launch count gate; human: 06-12 head-inclusive counts (54 + 12 = 66) APPROVED (12 of 12) 2026-09-26 |
-| DATA-01 | Phase 8 | Pending | mech: tests/test_demo_data.py TestLoadDemoSetEndToEnd (08-02) + smoke/04_demo_e2e_smoke.py; code: serpentrum/data/ manifest.json + 5 PubChem 3D SDFs (CID-cited); human: GATE V (08-11) data approval |
-| DATA-02 | Phase 8 | Pending | mech: tests/test_stacking_dataset.py pinned literals; code: serpentrum/data/stacking_pi_stack.json (3.60 A @ 20 deg from verified sources); human: partial approval 2026-09-10 (Phase 2 pi-stack), full sign-off GATE V (08-11) |
+| DATA-01 | Phase 8 | Complete | mech: tests/test_demo_data.py TestLoadDemoSetEndToEnd (08-02) + smoke/04_demo_e2e_smoke.py; code: serpentrum/data/ manifest.json + 5 PubChem 3D SDFs (CID-cited); human: GATE V (08-11) data approval 2026-10-10 (Section A) |
+| DATA-02 | Phase 8 | Complete | mech: tests/test_stacking_dataset.py pinned literals; code: serpentrum/data/stacking_pi_stack.json (3.60 A @ 20 deg from verified sources); human: partial approval 2026-09-10 (Phase 2 pi-stack); full sign-off GATE V (08-11) verdict "approved" 2026-10-10 — DATA_SOURCES.md flipped APPROVED (commit 3fd30cf, quarantine intact) |
 | DATA-03 | Phase 3 | Complete | mech: tests/test_setloader.py + tests/test_molfile.py; code: serpentrum/setloader.py <=3-ring gate + upload skip policy (STACK-03); human: 03-08 live checkpoint (upload reject + accept legs) APPROVED 2026-09-12 |
-| DATA-04 | Phase 8 | Pending | mech: tools/check_docs.py data-citation checks + tests/test_docs_audit.py; code: serpentrum/data/DATA_SOURCES.md bioCHEMeleon-format checklist (08-02 edits); human: GATE V (08-11) data approval |
+| DATA-04 | Phase 8 | Complete | mech: tools/check_docs.py data-citation checks + tests/test_docs_audit.py; code: serpentrum/data/DATA_SOURCES.md bioCHEMeleon-format checklist (08-02 edits); human: GATE V (08-11) data approval 2026-10-10 (Section A: no CSD/CCDC redistribution confirmed) |
 | INFRA-01 | Phase 1 | Complete | mech: tests/run_gates.py full battery (gates + 11 REQUIRED smokes + --xtb leg); code: tools/ gate and path toolchain (check_purity.py, check_docs.py, winpath.py); human: full env exercised at every live checkpoint (01-06, 03-08, 04-09, 05-16, 06-12, 07-10; 2026-09-06..2026-09-26) |
 | INFRA-02 | Phase 1 | Complete | mech: tools/check_purity.py AST gate + tests/test_purity_gates.py; code: tools/check_purity.py GUI/BRIDGE allowlists (everything else pure, zero pymol/Qt/numpy); human: purity gate green at every phase close since 01-06 (2026-09-06) |
 | INFRA-03 | Phase 1 | Complete | mech: tests/test_skeleton.py (anchor + single-instance pins); code: serpentrum/__init__.py anchor pmg_tk.startup._serpentrum (never module globals); human: 01-06 reload survival verified APPROVED 2026-09-06 |
 | INFRA-04 | Phase 3 | Complete | mech: smoke/04_demo_e2e_smoke.py cleanup + user-object sentinel leg; code: serpentrum/pymol_bridge.py cleanup_srp (srp_* namespace only); human: 03-08 .pse fresh-process survival APPROVED 2026-09-12 |
 | INFRA-05 | Phase 1 | Complete | mech: tools/check_purity.py exec-token ban + tests/test_xtb_run.py (async runner contract); code: serpentrum/xtb_runner.py QProcess async + modeless dialog (show() only); human: 01-06 modelessness APPROVED 2026-09-06 + 06-12 responsive live-log verdict 2026-09-26 |
 | INFRA-06 | Phase 1 | Complete | mech: tests/run_gates.py gate 1 py_compile walk; code: py3.6 discipline across serpentrum/ (stdlib-compatible, no newer syntax); human: gates green at every phase close through 07-10 (2026-09-26) |
-| DOCS-01 | Phase 8 | Pending | mech: tools/check_docs.py README-claims families + tests/test_docs_audit.py; code: README.md (08-07 rewrite; vibe block pinned byte-exact); human: GATE V (08-11) approval |
-| DOCS-02 | Phase 8 | Pending | mech: tools/check_docs.py DATA_SOURCES citation checks + tests/test_docs_audit.py; code: serpentrum/data/DATA_SOURCES.md (08-02 CID/DOI edits); human: GATE V (08-11) data approval |
-| DOCS-03 | Phase 8 | Pending | mech: tests/test_help_text.py; code: serpentrum/help_text.py + gui wiring (08-09 game/spectra/before-apply/after-apply hints rendered); human: GATE V (08-11) approval |
-| DOCS-04 | Phase 8 | Pending | mech: tools/check_docs.py (7 check families) + tests/test_docs_audit.py (23 tests); code: tools/check_docs.py (doc-vs-code harness, gate-3 discovered); human: GATE V (08-11) reproduce steps (Section C) |
-| DOCS-05 | Phase 8 | Pending | mech: smoke/14_release_e2e_smoke.py SMOKE-OK RELEASE-E2E + tools/audit_requirements.py; code: tools/audit_requirements.py (4 checks + --release) + tests/test_audit_requirements.py; human: GATE V (08-11) closing checkpoint |
+| DOCS-01 | Phase 8 | Complete | mech: tools/check_docs.py README-claims families + tests/test_docs_audit.py; code: README.md (08-07 rewrite; vibe block pinned byte-exact); human: GATE V (08-11) checkpoint verdict "approved" 2026-10-10 (Section C6 README Install reproduce spot-check) |
+| DOCS-02 | Phase 8 | Complete | mech: tools/check_docs.py DATA_SOURCES citation checks + tests/test_docs_audit.py; code: serpentrum/data/DATA_SOURCES.md (08-02 CID/DOI edits); human: GATE V (08-11) data approval 2026-10-10 (Section A whole-document sign-off; APPROVED-headed, UNVERIFIED quarantine intact) |
+| DOCS-03 | Phase 8 | Complete | mech: tests/test_help_text.py; code: serpentrum/help_text.py + gui wiring (08-09 game/spectra/before-apply/after-apply hints rendered); human: GATE V (08-11) checkpoint verdict "approved" 2026-10-10 (Section C6 in-game hints incl. controls recap, focus hint, negative-frequency guidance; 08-13 tooltips) |
+| DOCS-04 | Phase 8 | Complete | mech: tools/check_docs.py (7 check families) + tests/test_docs_audit.py (23 tests); code: tools/check_docs.py (doc-vs-code harness, gate-3 discovered); human: GATE V (08-11) checkpoint verdict "approved" 2026-10-10 (Section C6 reproduce steps: README Install verbatim in a fresh plugin-manager pass; usage flow matches reality) |
+| DOCS-05 | Phase 8 | Complete | mech: smoke/14_release_e2e_smoke.py SMOKE-OK RELEASE-E2E + tools/audit_requirements.py --release (46/46); code: tools/audit_requirements.py (4 checks + --release) + tests/test_audit_requirements.py; human: GATE V (08-11) checkpoint verdict "approved" 2026-10-10 (Section C full release flow incl. real xtb; Section C8 46-row evidence ledger accepted) |
 
 *Reconciled 2026-09-28 (UTC) — Phase 8 plan 08-10: checkbox list aligned with table statuses; Evidence column added; Phase-8 rows flip at the GATE V (08-11) closing checkpoint.*
+*Flipped 2026-10-10 (UTC) — GATE V (08-11) v1 release sign-off: owner verdict "approved" (Section A data sign-off / Section B 6-button + educator round-trip / Section C release close incl. real xtb); the 10 Phase-8 rows (SETUP-07/08, DATA-01/02/04, DOCS-01..05) flipped to Complete — 46/46 v1 requirements Complete.*
 
 **Coverage:**
 - v1 requirements: 46 total (44 original + GAME-11 with Phase 5.1 + STACK-06 promoted from v2 with Phase 5.2, 2026-09-20)
@@ -186,3 +187,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 *2026-09-20 — GAME-11 added (Phase 5.1 inserted): Setup-selectable game speed/difficulty, constant per run (GAME-08 intact), persisted, default = baseline 3.0 Å/s. Coverage 44 → 45. GAME-10 behavior note: 05-16 checkpoint owner overrides amended the in-run turn model (turn pre-check refuses 180° only; REFUSE_WALL placement gate removed; chain may extend outside the box — only the head is box-bound) — statuses to be finalized at Phase 5 completion.*
 *2026-09-20b — **Phase 5 COMPLETE** (05-VERIFICATION: passed — 48/48 plan must-have truths, 3 verified-as-owner-amended; 5/5 success criteria; 7-round human checkpoint 2026-09-18..20): GAME-04, GAME-05, GAME-06, GAME-09, GAME-10, STACK-01, STACK-03, STACK-04, STACK-05 → Complete. GAME-10 shipped contract = owner-amended: rigid chain sweep with train-follow tail (immutable 3.60 Å spacing), turn pre-check refuses 180° only, REFUSE_WALL removed (chain may extend outside box; only head box-bound), REFUSE_ATOM clash gate intact (STACK-05).*
 *2026-09-20c — STACK-06 PROMOTED v2 → v1 (Phase 5.2 inserted, owner request): generic π-stack for canonical-planar-6-ring uploads, Setup-consented (OFF default), labeled "illustrative — user-approved"; plan before Phase 5.1, execute sequentially. Coverage 45 → 46.*
+*2026-10-10 — **Phase 8 COMPLETE — v1 RELEASE SIGNED OFF**: GATE V (08-11) owner verdict "approved" 2026-10-10 (UTC; git commit dates authoritative) across all three sections; DATA_SOURCES.md flipped DRAFT → APPROVED (commit 3fd30cf) with the UNVERIFIED quarantine intact; 46/46 v1 requirements Complete with human-certified evidence; `audit_requirements.py --release` green.*
