@@ -1041,6 +1041,21 @@ class GameTab(QtWidgets.QWidget):
                 # same inputs resolve consumes below; resolve returns the
                 # PLACEMENT geometry, never the tail, so the trace pairs
                 # the placed ring against its own recomputed tail).
+                # debug_tail: SRP_DEBUG=1 trace-only payload (the
+                # PRE-RESOLUTION tail frame below) -- but its CONSUMERS
+                # (the debug_tail-is-not-None checks on the placed AND
+                # refused branches) run in non-debug sessions too, so
+                # the binding must be UNCONDITIONAL. Regression fix
+                # (debug session second-mol-spawn-requires-debug,
+                # 2026-10-11): previously bound only under the debug
+                # gate, every non-debug placed/refused capture raised
+                # UnboundLocalError -- after the pickup block logged but
+                # BEFORE _respawn_pickup -- so no second pickup ever
+                # spawned without SRP_DEBUG=1 (all historical
+                # verification ran with the tracer on and masked it;
+                # pinned live by tests/test_hud_content.py
+                # TestDebugTailBinding).
+                debug_tail = None
                 if session.get('debug'):
                     debug_tail = placement.tail_frame(
                         engine.segments, records_by_id, head_atoms,

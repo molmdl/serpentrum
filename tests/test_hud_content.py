@@ -892,5 +892,72 @@ class TestGuiSpawnCallSites(unittest.TestCase):
         self.assertIn('_heading_name(engine.heading)', source)
 
 
+class TestDebugTailBinding(unittest.TestCase):
+    """Regression pins (debug session second-mol-spawn-requires-debug,
+    2026-10-11): _handle_stack_event's debug_tail local MUST be bound
+    unconditionally before its consumers.
+
+    Live-reproduced bug: the pre-fix code bound debug_tail ONLY on the
+    skip path (`debug_tail = None`) or under the SRP_DEBUG=1 trace gate
+    (`debug_tail = placement.tail_frame(...)`), while consuming it
+    UNCONDITIONALLY on both the placed and refused branches
+    (`if debug_tail is not None:`). In a non-debug run every NON-skip
+    capture (placed OR refused) therefore raised UnboundLocalError AFTER
+    the pickup block logged (the player saw the capture succeed) but
+    BEFORE `self._respawn_pickup(...)` -- the function-level except
+    printed 'placement error: ...' and the second pickup NEVER spawned.
+    Debug runs bound the variable and spawned fine, which is why every
+    historical human verification (all run with SRP_DEBUG=1) masked the
+    bug. Restored live in GUI-mode PyMOL: without the binding a straight
+    seeded run captures pick_0001 and stops (spawner.issued=1); with it
+    pick_0002 spawns (issued=2).
+    """
+
+    def _capture_seam_body(self):
+        source_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'serpentrum', 'gui_game.py')
+        with open(source_path) as handle:
+            source = handle.read()
+        start = source.index('def _handle_stack_event')
+        end = source.index('def _dbg_capture_line')
+        return source[start:end]
+
+    def test_debug_tail_bound_unconditionally(self):
+        # TWO binding sites in the capture seam: the skip branch's
+        # explicit None AND the unconditional pre-gate init before the
+        # SRP_DEBUG tail-frame computation. Pre-fix there was exactly
+        # one (the skip branch) -- the RED driver for this pin.
+        body = self._capture_seam_body()
+        self.assertEqual(body.count('debug_tail = None'), 2,
+                         'debug_tail must be bound on BOTH non-trace '
+                         'paths: the skip branch AND unconditionally '
+                         'before the session.get(\'debug\') trace gate '
+                         '(the placed/refused consumers run in '
+                         'non-debug sessions too)')
+
+    def test_consumers_require_the_binding(self):
+        # The contract that MAKES the unconditional binding necessary:
+        # exactly one consumer on the placed branch + one on the refused
+        # branch, both reached in NON-debug sessions.
+        body = self._capture_seam_body()
+        self.assertEqual(body.count('if debug_tail is not None:'), 2,
+                         'both capture-outcome branches consume '
+                         'debug_tail unconditionally')
+
+    def test_binding_precedes_trace_gate(self):
+        # The unconditional init must precede the SRP_DEBUG trace
+        # computation (assignment-order pin; the first None binding
+        # must also precede the first consumer).
+        body = self._capture_seam_body()
+        init_idx = body.index('debug_tail = None')
+        gate_idx = body.index('if session.get(\'debug\'):')
+        consumer_idx = body.index('if debug_tail is not None:')
+        self.assertLess(init_idx, gate_idx,
+                        'unconditional init precedes the trace gate')
+        self.assertLess(init_idx, consumer_idx,
+                        'unconditional init precedes the first consumer')
+
+
 if __name__ == '__main__':
     unittest.main()
