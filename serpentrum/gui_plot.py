@@ -8,7 +8,10 @@ paint, not compute). ONE module-level painter seam,
 onto ANY paint device: ``IrPlotWidget.paintEvent`` uses it on-screen
 and ``render_image`` uses it into a 2x QImage for the save route
 (route A — the SAME scene and the SAME look on screen and on disk;
-probe stage2/stage4 SMOKE-OK in 07-RESEARCH-qt-plot.md).
+probe stage2/stage4 SMOKE-OK in 07-RESEARCH-qt-plot.md). quick-002
+(2026-10-10): the seam serves curve AND discrete-lines scenes — a
+segments-carrying scene draws one vertical stick per mode instead of
+the polyline (route-A parity holds for both representations).
 
 The Spectra tab (plan 07-08) embeds ``SpectraPlotPanel``: an
 appearance row (y-unit / curve-color / x-direction combos + 'Invert y
@@ -106,6 +109,12 @@ def paint_scene(painter, rect, scene, show_labels=True,
     line_color, an (r, g, b) float tuple in [0, 1], re-colors the curve
     — None keeps the pinned default blue (#1f4fff) so the approved
     look is exactly preserved.
+
+    A lines scene (scene.segments not None — quick-002 2026-10-10)
+    draws one vertical segment per mode through the same pen/clip
+    path; ticks, margins, and labels are representation-independent
+    (they read the scene's tick/label fields only). An empty segments
+    tuple paints axes only.
     """
     painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
     dark = QtGui.QColor('#444444')
@@ -210,17 +219,16 @@ def paint_scene(painter, rect, scene, show_labels=True,
             int(QtCore.Qt.AlignCenter), scene.y_label)
         painter.restore()
 
-    # --- Curve: ONE float QPolygonF (probe stage2: 701-point QPolygonF
-    #     paints+saves fine) clipped to the plot rect (volume.py:269-272)
-    #     so nothing draws over the margins. ---
-    polygon = QtGui.QPolygonF()
-    for i in range(len(scene.xs)):
-        polygon.append(QtCore.QPointF(
-            _map_x(scene.xs[i], scene, plot_left, plot_w, invert_x),
-            _map_y(scene.ys[i], scene, plot_top, plot_h, invert_y)))
-    # Curve pen: the pinned default blue stays EXACTLY #1f4fff when
-    # line_color is None (the approved look); an (r, g, b) tuple re-
-    # colors via fromRgbF (owner amendment: blue / red / black).
+    # --- Representation (quick-002, 2026-10-10): a curve scene draws
+    #     ONE float QPolygonF polyline (probe stage2: 701-point
+    #     QPolygonF paints+saves fine); a discrete-lines scene carries
+    #     segments instead — one vertical line per mode, drawn with
+    #     the SAME pen (color + width 2) and clip rect so route-A
+    #     parity and the color/invert options apply unchanged. An
+    #     EMPTY segments tuple draws nothing (empty modes -> no
+    #     sticks, never fabricated). Clipped to the plot rect
+    #     (volume.py:269-272) either way so nothing draws over the
+    #     margins. ---
     if line_color is not None:
         curve_color = QtGui.QColor.fromRgbF(
             float(line_color[0]), float(line_color[1]),
@@ -230,7 +238,22 @@ def paint_scene(painter, rect, scene, show_labels=True,
     painter.save()
     painter.setClipRect(plot)
     painter.setPen(QtGui.QPen(curve_color, 2))
-    painter.drawPolyline(polygon)
+    if scene.segments is not None:
+        for (x0, y0), (x1, y1) in scene.segments:
+            painter.drawLine(
+                QtCore.QPointF(
+                    _map_x(x0, scene, plot_left, plot_w, invert_x),
+                    _map_y(y0, scene, plot_top, plot_h, invert_y)),
+                QtCore.QPointF(
+                    _map_x(x1, scene, plot_left, plot_w, invert_x),
+                    _map_y(y1, scene, plot_top, plot_h, invert_y)))
+    else:
+        polygon = QtGui.QPolygonF()
+        for i in range(len(scene.xs)):
+            polygon.append(QtCore.QPointF(
+                _map_x(scene.xs[i], scene, plot_left, plot_w, invert_x),
+                _map_y(scene.ys[i], scene, plot_top, plot_h, invert_y)))
+        painter.drawPolyline(polygon)
     painter.restore()
 
 

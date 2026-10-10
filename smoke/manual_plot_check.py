@@ -111,12 +111,24 @@ print('        (labels, curve, white background) and is a real PNG',
       flush=True)
 print('     g. resize the PyMOL window/panel - no crashes, no label '
       'garbage at small sizes', flush=True)
-print('     h. y-unit combo (round-2 amendments): absorbance - the '
-      'curve normalizes (peak touches the top of', flush=True)
+print('     h. y-unit combo (quick-002): the DEFAULT is now '
+      "'epsilon (Multiwfn curve)' - the approved curve", flush=True)
+print("        look, y label 'epsilon (L mol-1 cm-1)'; "
+      'absorbance - the curve normalizes (peak touches the top '
+      'of', flush=True)
 print("        the axis), y label becomes 'absorbance (arb.)'; "
-      "transmittance - the curve flips (peaks point", flush=True)
-print("        DOWN), y label 'transmittance (arb.)', T <= 1 on the "
-      'scale', flush=True)
+      'transmittance - the curve flips (peaks point', flush=True)
+print("        DOWN), y label 'transmittance (arb.)', T <= 1 on "
+      'the scale', flush=True)
+print("     h2. y-unit combo 'lines (km/mol)' (quick-002): "
+      'DISCRETE vertical sticks - one per table row, at the',
+      flush=True)
+print("        table's (frequency, IR intensity) values; y label "
+      "'IR intensity (km/mol)'; sharp lines (NO", flush=True)
+print('        broadening, unlike the epsilon curve); stick count '
+      'matches the table rows; switching back to', flush=True)
+print("        'epsilon (Multiwfn curve)' restores the smooth "
+      'curve', flush=True)
 print('     i. color combo blue/red/black - the curve color switches '
       'on screen', flush=True)
 print("     j. x-direction combo 'descending' - the axis reads "

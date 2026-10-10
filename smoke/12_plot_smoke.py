@@ -13,6 +13,8 @@ verdicts are flushed sentinels grepped by tests/run_gates.py --smoke:
     STAGE4 PNG-EMPTY              None scene paints the hint, never crashes
     STAGE5 OPTIONS <bytes>        unit/color/invert render parity leg
                                   (owner amendment 2026-09-26)
+    STAGE6 LINES <bytes>          discrete-lines scene renders to a valid
+                                  PNG (quick-002)
     SMOKE-OK PLOT-RENDER          all stages passed
     SMOKE-FAIL <stage>: ...       a stage failed (one line per failure)
 
@@ -189,6 +191,26 @@ def s_stage5_render_options(scene):
     print('STAGE5 OPTIONS %d bytes' % size, flush=True)
 
 
+def s_stage6_render_lines(scene):
+    # Stage 6 (quick-002 lines leg, 2026-10-10): the discrete-lines
+    # scene derives PURELY and renders through the SAME paint_scene
+    # seam to a valid PNG (route-A parity for the segment
+    # representation — the painter branch's only automated coverage).
+    from serpentrum import gui_plot, plot_logic
+    l_scene = plot_logic.scene_with_unit(scene, 'lines')
+    assert l_scene.segments is not None, 'lines scene carries no segments'
+    assert len(l_scene.segments) == 72, \
+        'segments %r != 72 modes' % (len(l_scene.segments),)
+    assert l_scene.y_label == 'IR intensity (km/mol)', \
+        'y_label %r' % (l_scene.y_label,)
+    assert all(y0 == 0.0
+               for (_x0, y0), (_x1, _y1) in l_scene.segments), \
+        'segments must be baseline-rooted'
+    img = gui_plot.render_image(l_scene, (640, 400), scale=2)
+    size, _tmp = _save_and_assert_png(img, 'lines')
+    print('STAGE6 LINES %d bytes' % size, flush=True)
+
+
 def s_cleanup():
     for path in TMP_PNGS:
         try:
@@ -208,6 +230,7 @@ if _APP is not None:
               lambda: s_stage3_render_nolabels(_scene[0]))
         check('stage4_render_empty', s_stage4_render_empty)
         check('stage5_render_options', lambda: s_stage5_render_options(_scene[0]))
+        check('stage6_render_lines', lambda: s_stage6_render_lines(_scene[0]))
         check('cleanup', s_cleanup)
 
 if FAILURES:
