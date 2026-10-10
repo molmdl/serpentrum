@@ -260,7 +260,11 @@ class TestUnitModes(unittest.TestCase):
     '(arb.)'); transmittance = 10**(-A) of that normalized absorbance
     (peaks point down, T in (0, 1]). Unknown modes raise ValueError
     (loud, never a silent passthrough). All non-y Scene fields pass
-    through UNCHANGED in every derived scene.
+    through UNCHANGED in every derived scene. quick-002 (owner
+    directive 2026-10-10) renamed the default combo entry to 'epsilon
+    (Multiwfn curve)' (label ONLY - the mode key stays 'intensity',
+    the approved curve look and axis label unchanged) and added the
+    'lines' discrete-sticks mode (own coverage: TestLinesMode below).
     """
 
     @classmethod
@@ -277,14 +281,18 @@ class TestUnitModes(unittest.TestCase):
                             'non-ASCII unit label %r' % label)
             self.assertTrue(_is_ascii(mode))
         self.assertEqual([label for label, _mode in table],
-                         ['IR intensity (km/mol)',
+                         ['epsilon (Multiwfn curve)',
+                          'lines (km/mol)',
                           'absorbance (arb.)',
                           'transmittance (arb.)'])
         self.assertEqual([mode for _label, mode in table],
-                         ['intensity', 'absorbance', 'transmittance'])
-        # The intensity entry is the pinned v1 default (first).
+                         ['intensity', 'lines', 'absorbance',
+                          'transmittance'])
+        # The approved look; quick-002 renamed the LABEL only (the
+        # internal mode key stays 'intensity' - passthrough
+        # semantics, the existing pins hold).
         self.assertEqual(table[0],
-                         ('IR intensity (km/mol)', 'intensity'))
+                         ('epsilon (Multiwfn curve)', 'intensity'))
 
     def test_intensity_passthrough(self):
         derived = plot_logic.scene_with_unit(self.scene, 'intensity')
@@ -352,6 +360,114 @@ class TestUnitModes(unittest.TestCase):
             self.assertEqual(derived.n_imaginary,
                              self.scene.n_imaginary)
             self.assertEqual(derived.fwhm, self.scene.fwhm)
+            # quick-002: the raw sticks ride along unchanged (data,
+            # like n_modes); a curve unit never carries segments.
+            self.assertEqual(derived.sticks, self.scene.sticks)
+            self.assertIsNone(derived.segments)
+
+
+class TestLinesMode(unittest.TestCase):
+    """quick-002 (owner directive 2026-10-10): the DISCRETE STICKS unit
+    mode ('lines (km/mol)'), added next to the renamed default. One
+    baseline-rooted vertical stick per mode at the actual table /
+    spectrum_line.txt (frequency, IR intensity) values; NO broadening
+    (fwhm is irrelevant - discrete by definition); empty modes -> NO
+    sticks (never fabricated); negative-frequency sticks render at
+    NEGATIVE x - the x window widens LEFT (07-01 freq_label governs
+    TABLE text, not plot x); a lines scene never re-derives (lines do
+    not feed the curve-based absorbance/transmittance).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.spectrum = spectra.parse_g98(G98_PATH)
+        cls.scene = plot_logic.build_scene(cls.spectrum.modes)
+        cls.lines = plot_logic.scene_with_unit(cls.scene, 'lines')
+
+    def test_sticks_echo_raw_mode_data(self):
+        # build_scene echoes the RAW (freq, intensity) mode data -
+        # the table values, not the broadened curve.
+        self.assertEqual(
+            self.scene.sticks,
+            tuple((m.freq, m.intensity) for m in self.spectrum.modes))
+        self.assertEqual(len(self.scene.sticks), 72)
+        self.assertIsNone(self.scene.segments)
+        self.assertEqual(plot_logic.build_scene([]).sticks, ())
+
+    def test_segments_one_baseline_rooted_stick_per_mode(self):
+        # One vertical stick per mode: ((freq, 0.0), (freq, inten))
+        # IN sticks order; the lines scene carries NO curve data (xs/ys
+        # emptied - nothing stale to draw, the painter reads segments
+        # instead).
+        self.assertEqual(len(self.lines.segments), 72)
+        for segment, (freq, inten) in zip(self.lines.segments,
+                                          self.scene.sticks):
+            self.assertEqual(segment, ((freq, 0.0), (freq, inten)))
+        self.assertEqual(self.lines.xs, ())
+        self.assertEqual(self.lines.ys, ())
+
+    def test_axis_labels(self):
+        # The lines AXIS label states the REAL unit - the frequency
+        # table header's literal; distinct from the combo label
+        # 'lines (km/mol)'.
+        self.assertEqual(self.lines.y_label, 'IR intensity (km/mol)')
+        self.assertEqual(self.lines.x_label, 'wavenumber (cm-1)')
+        self.assertTrue(_is_ascii(self.lines.y_label))
+
+    def test_y_max_headroom_over_peak_intensity(self):
+        # The stick peak IS the raw max table intensity (257.1018,
+        # PEAK_INTEN); the build_scene headroom policy applies
+        # (10%, floored) so the tallest stick never clips.
+        self.assertAlmostEqual(self.lines.y_max, PEAK_INTEN * 1.1,
+                               delta=1e-9)
+        for value, _label in self.lines.y_ticks:
+            self.assertGreaterEqual(value, 0.0)
+            self.assertLessEqual(value, self.lines.y_max)
+
+    def test_negative_frequencies_widens_x_min_left(self):
+        # Fixture modes 1-3 are imaginary (-31.9175 / -23.0766 /
+        # -18.1086): the lines x window widens LEFT of the curve's
+        # 0.0 so the imaginary sticks render at negative x; the RIGHT
+        # bound stays the curve window (mode switching never jumps
+        # the axis).
+        self.assertAlmostEqual(self.lines.x_min, -31.9175, delta=1e-9)
+        self.assertEqual(self.lines.x_max, self.scene.x_max)
+        self.assertEqual(self.lines.x_max, 3600.0)
+        x_values = [value for value, _label in self.lines.x_ticks]
+        for prev, cur in zip(x_values, x_values[1:]):
+            self.assertLess(prev, cur, 'x ticks not strictly ascending')
+
+    def test_empty_modes_no_sticks(self):
+        # Empty modes -> a sane axis with ZERO sticks - never
+        # fabricated data points.
+        derived = plot_logic.scene_with_unit(
+            plot_logic.build_scene([]), 'lines')
+        self.assertEqual(derived.segments, ())
+        self.assertEqual(derived.y_max, plot_logic.Y_MAX_FLOOR)
+        self.assertEqual(derived.x_min, 0.0)
+
+    def test_fwhm_irrelevant(self):
+        # Discrete by definition - the fwhm=32 curve differs from the
+        # default fwhm=8 curve, but the sticks (and so the segments)
+        # are broadening-independent.
+        lines32 = plot_logic.scene_with_unit(
+            plot_logic.build_scene(self.spectrum.modes, fwhm=32.0),
+            'lines')
+        self.assertEqual(lines32.segments, self.lines.segments)
+
+    def test_counts_and_fwhm_passthrough(self):
+        self.assertEqual(self.lines.n_modes, 72)
+        self.assertEqual(self.lines.n_imaginary, 3)
+        self.assertEqual(self.lines.fwhm, self.scene.fwhm)
+        self.assertEqual(self.lines.sticks, self.scene.sticks)
+
+    def test_lines_scene_never_rederives(self):
+        # A lines scene feeds NO further derivation - not even back
+        # into 'lines': derivation always starts from the BASE curve
+        # scene (lines must never feed the curve-based units).
+        for mode in ('lines', 'absorbance', 'transmittance'):
+            with self.assertRaises(ValueError):
+                plot_logic.scene_with_unit(self.lines, mode)
 
 
 class TestModeCaption(unittest.TestCase):

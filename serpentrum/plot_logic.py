@@ -4,11 +4,14 @@ This module builds paint-ready Scenes over the committed
 ``spectra.broaden`` (the Multiwfn-parity Lorentzian curve — unit-area
 per-mode weighting x spectra.CURVE_SCALE; GATE V amendment 2026-10-04):
 the broadening, the y_max headroom + floor, nice-tick selection, axis
-labels, size-preset data, and the imaginary-mode caption. The GUI
-renderer (plan 07-05, ``gui_plot.paint_scene``) maps a Scene to pixels
-and NEVER recomputes (07-RESEARCH-qt-plot.md pitfall 2: paintEvent must
-paint, not compute — paint stays O(points) and every numeric decision
-is unit-testable here).
+labels, size-preset data, and the imaginary-mode caption. quick-002
+(2026-10-10) adds the discrete-lines representation: the scene echoes
+the raw mode sticks and scene_with_unit's 'lines' mode synthesizes
+paint segments (Multiwfn discrete-lines style) — the curve transforms
+stay untouched. The GUI renderer (plan 07-05, ``gui_plot.paint_scene``)
+maps a Scene to pixels and NEVER recomputes (07-RESEARCH-qt-plot.md
+pitfall 2: paintEvent must paint, not compute — paint stays O(points)
+and every numeric decision is unit-testable here).
 
 Pure stdlib module (``math`` + the intra-package ``from . import
 spectra``, which the purity gate exempts): no pymol/pmg_tk/PyQt5/numpy
@@ -29,13 +32,23 @@ from . import spectra
 Scene = namedtuple(
     'Scene',
     'xs ys x_min x_max y_max x_ticks y_ticks x_label y_label '
-    'n_modes n_imaginary fwhm')
+    'n_modes n_imaginary fwhm sticks segments')
 # xs/ys: the broadened curve on an ascending grid (spectra.broaden).
 # x_ticks/y_ticks: precomputed (value, label_str) pairs — the GUI maps
 #   values to pixels, never recomputes tick math.
 # x_label/y_label: ASCII axis titles.
 # n_modes/n_imaginary: mode counts for the caption/status framing.
 # fwhm: the broadening actually used (echoed for display/debug).
+# sticks: the RAW discrete mode data — a tuple of (freq, intensity)
+#   float pairs (the table / spectrum_line.txt values), echoed by
+#   build_scene; carried UNCHANGED through every derived scene
+#   (data, like n_modes). quick-002 2026-10-10.
+# segments: the PAINT representation for the discrete-lines unit
+#   mode — None for every curve scene (the painter draws the xs/ys
+#   polyline); a tuple of ((x0, y0), (x1, y1)) float pairs when the
+#   scene is a lines scene (the painter draws these INSTEAD; the
+#   lines scene also empties xs/ys so no stale curve data rides
+#   along). quick-002 2026-10-10.
 
 # y-axis floor in Multiwfn-scaled curve units (GATE V amendment
 # 2026-10-04: the curve is unit-area Lorentzian x100, not raw km/mol).
@@ -95,7 +108,11 @@ def nice_ticks(lo, hi, target=8):
 def build_scene(modes, fwhm=8.0, x_min=0.0, x_max=None, n_points=800):
     """Build the paint-ready Scene over spectra.broaden ->
     Scene(xs, ys, x_min, x_max, y_max, x_ticks, y_ticks, x_label,
-    y_label, n_modes, n_imaginary, fwhm).
+    y_label, n_modes, n_imaginary, fwhm, sticks, segments).
+
+    quick-002 (2026-10-10): the scene now also echoes the raw mode
+    sticks (``sticks``) for the discrete-lines derivation; the curve
+    representation itself is unchanged.
 
     Thin orchestration ONLY: broaden does the convolutions (its
     ValueError on fwhm <= 0 / n_points < 2 propagates — the caller's
@@ -134,18 +151,31 @@ def build_scene(modes, fwhm=8.0, x_min=0.0, x_max=None, n_points=800):
         y_label='epsilon (L mol-1 cm-1)',
         n_modes=n_modes,
         n_imaginary=n_imaginary,
-        fwhm=fwhm)
+        fwhm=fwhm,
+        sticks=tuple((float(m.freq), float(m.intensity))
+                     for m in modes),
+        segments=None)
 
 
-# Owner amendment (07-06 checkpoint round 1, 2026-09-26): the y-axis
-# DISPLAY unit is selectable in the panel. (label, mode) combo data for
-# the house addItem(label, data) pattern; the FIRST entry is the
-# default. The combo labels name the UNIT MODE; the intensity-mode
-# AXIS label itself is set by build_scene to the Multiwfn-scaled
-# convention (GATE V amendment 2026-10-04). The absorbance/transmittance
-# transforms below normalize by the curve peak, so the x100 curve scale
-# cancels — they are convention-invariant and were NOT retouched.
-UNIT_MODES = (('IR intensity (km/mol)', 'intensity'),
+# Owner amendments: the y-axis DISPLAY is selectable in the panel.
+# (07-06 checkpoint round 1, 2026-09-26) created the 3-entry combo;
+# (GATE V amendment 2026-10-04) made the curve the Multiwfn-parity
+# epsilon curve, so the original 'IR intensity (km/mol)' combo label
+# no longer named what it plots; (quick-002, owner directive
+# 2026-10-10) RENAMES the default entry to what it is and ADDS a
+# discrete-lines mode. (label, mode) combo data for the house
+# addItem(label, data) pattern; the FIRST entry is the default. The
+# combo labels name the UNIT MODE; the epsilon-mode AXIS label itself
+# is set by build_scene to the Multiwfn-scaled convention
+# ('epsilon (L mol-1 cm-1)', GATE V amendment 2026-10-04); the
+# lines-mode AXIS label states the real unit ('IR intensity (km/mol)'
+# -- the table header's literal). Combo label wording is PROVISIONAL
+# pending the owner's live blessing at the gate (quick-002). The
+# absorbance/transmittance transforms below normalize by the curve
+# peak, so the x100 curve scale cancels -- they are
+# convention-invariant and remain UNTOUCHED.
+UNIT_MODES = (('epsilon (Multiwfn curve)', 'intensity'),
+              ('lines (km/mol)', 'lines'),
               ('absorbance (arb.)', 'absorbance'),
               ('transmittance (arb.)', 'transmittance'))
 
@@ -160,6 +190,18 @@ def scene_with_unit(scene, mode):
         (the y_label it passes through is build_scene's Multiwfn-
         scaled convention, GATE V amendment 2026-10-04; the pinned
         default).
+      - 'lines': quick-002 (owner directive 2026-10-10): the DISCRETE
+        STICKS representation — one baseline-rooted vertical segment
+        per mode at the actual table / spectrum_line.txt (freq,
+        intensity) values (Multiwfn 'discrete lines' style). NO
+        broadening applies (discrete by definition; fwhm is echoed
+        unchanged). The x window keeps the curve's right bound and
+        widens LEFT when negative-frequency modes exist so they
+        render at negative x; the returned scene empties xs/ys (no
+        stale curve data rides along), carries the segments payload,
+        and states the real-unit AXIS label 'IR intensity (km/mol)'
+        (distinct from the combo label 'lines (km/mol)'). Empty
+        modes -> NO segments (never fabricated).
       - 'absorbance': intensity normalized to peak = 1. Rationale:
         xtb IR intensities (km/mol) are proportional to absorbance via
         Beer-Lambert linearity, so the relative absorbance curve is
@@ -174,12 +216,20 @@ def scene_with_unit(scene, mode):
         look if wanted.
 
     Unknown modes raise ValueError — loud, never a silent passthrough.
+    A lines scene never re-derives either (quick-002): calling this on
+    a segments-carrying scene raises ValueError for every non-default
+    mode — lines do NOT feed absorbance/transmittance (those are
+    curve-based) and derivation always starts from the BASE curve
+    scene.
     A zero curve (the pinned empty-modes scene) stays zeros in every
     unit (no division-by-zero; the GUI shows the hint path for an
-    empty spectrum anyway). Everything except ys/y_max/y_ticks/y_label
-    passes through UNCHANGED. y_max/y_ticks recompute under the
-    build_scene policy (10% headroom over the new peak, floored at
-    Y_MAX_FLOOR; nice_ticks(0, y_max, 5)).
+    empty spectrum anyway). In the curve modes everything except
+    ys/y_max/y_ticks/y_label passes through UNCHANGED ('lines'
+    additionally synthesizes segments, empties xs/ys, and widens
+    x_min/x_ticks left when negative modes exist); sticks pass
+    through UNCHANGED everywhere (data, like n_modes). y_max/y_ticks
+    recompute under the build_scene policy (10% headroom over the
+    new peak, floored at Y_MAX_FLOOR; nice_ticks(0, y_max, 5)).
     """
     if mode not in _UNIT_MODE_KEYS:
         raise ValueError(
@@ -187,6 +237,49 @@ def scene_with_unit(scene, mode):
             % (mode, ', '.join(_UNIT_MODE_KEYS)))
     if mode == 'intensity':
         return scene
+    if scene.segments is not None:
+        # quick-002 (2026-10-10): derivation always starts from the
+        # BASE curve scene. A lines scene re-derives into nothing:
+        # lines do NOT feed absorbance/transmittance (those are
+        # curve-based), and a lines scene is never re-derived.
+        raise ValueError(
+            'cannot re-express a discrete-lines scene (mode %r)'
+            % (mode,))
+    if mode == 'lines':
+        # quick-002 (2026-10-10, owner directive): the DISCRETE STICKS
+        # mode — one vertical line per mode at the actual table /
+        # spectrum_line.txt values (Multiwfn 'discrete lines' style).
+        # fwhm/broadening does NOT apply (discrete by definition). The
+        # x window keeps the curve's right bound (mode switching never
+        # jumps the axis) and widens LEFT when negative-frequency
+        # sticks exist so they render at negative x. Empty modes ->
+        # zero sticks (never fabricated). The AXIS label states the
+        # real unit — distinct from the combo label 'lines (km/mol)'.
+        segments = tuple(((float(freq), 0.0),
+                          (float(freq), float(inten)))
+                         for freq, inten in scene.sticks)
+        x_lo = scene.x_min
+        if scene.sticks:
+            x_lo = min(x_lo, min(float(freq)
+                                 for freq, _inten in scene.sticks))
+        y_peak = max((float(inten) for _freq, inten in scene.sticks),
+                     default=0.0)
+        y_max = max(y_peak * 1.1, Y_MAX_FLOOR)
+        return Scene(
+            xs=(),
+            ys=(),
+            x_min=x_lo,
+            x_max=scene.x_max,
+            y_max=y_max,
+            x_ticks=nice_ticks(x_lo, scene.x_max, 8),
+            y_ticks=nice_ticks(0.0, y_max, 5),
+            x_label=scene.x_label,
+            y_label='IR intensity (km/mol)',
+            n_modes=scene.n_modes,
+            n_imaginary=scene.n_imaginary,
+            fwhm=scene.fwhm,
+            sticks=scene.sticks,
+            segments=segments)
     y_label = dict((m, label) for label, m in UNIT_MODES)[mode]
     peak = max(scene.ys) if scene.ys else 0.0
     if peak <= 0.0:
@@ -212,7 +305,9 @@ def scene_with_unit(scene, mode):
         y_label=y_label,
         n_modes=scene.n_modes,
         n_imaginary=scene.n_imaginary,
-        fwhm=scene.fwhm)
+        fwhm=scene.fwhm,
+        sticks=scene.sticks,
+        segments=None)
 
 
 def size_presets():
