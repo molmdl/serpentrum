@@ -1,4 +1,4 @@
-# DATA_SOURCES.md — serpentrum demo data sources & licenses (DRAFT — NOT APPROVED)
+# DATA_SOURCES.md — serpentrum demo data sources & licenses (APPROVED — 2026-10-10)
 
 All external data sources for the serpentrum Demo Set A (aromatic π-stack).
 Every PubChem CID, DOI, and COD entry is listed here with its license and
@@ -8,6 +8,7 @@ human before this file's status changes from DRAFT (repo hard rule; DATA-02).
 STATUS LEGEND: VERIFIED = checked against a live source on 2026-09-07 with the
 location recorded in .planning/phases/02-*/02-RESEARCH-demo-data.md.
 UNVERIFIED = no accessible source; do not ship.
+APPROVED = human sign-off recorded (Phase 8, GATE V 08-11).
 
 ## 1. Molecule geometry files (PubChem 3D SDF) — public domain (US Gov / NCBI)
 
@@ -180,4 +181,4 @@ uncertainty is recorded here for traceability (research §8 item 6).
 
 *Every value in this file is either quoted with an exact verifiable location
 or explicitly marked UNVERIFIED. Nothing ships without human approval
-(DATA-02). DRAFT — NOT APPROVED.*
+(DATA-02). APPROVED 2026-10-10 (DATA-02 sign-off).*

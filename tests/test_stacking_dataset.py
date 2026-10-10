@@ -198,7 +198,7 @@ class TestDataSourcesAttribution(unittest.TestCase):
     def test_sources_contains_required_markers(self):
         with open(SOURCES_PATH, 'r') as handle:
             text = handle.read()
-        required = ['DRAFT', 'UNVERIFIED', '4003564', '2100607',
+        required = ['APPROVED', 'UNVERIFIED', '4003564', '2100607',
                     '3.555', 'herringbone']
         for marker in required:
             self.assertIn(marker, text,
