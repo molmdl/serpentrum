@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-09-06)
 
 ## Current Position
 
-Phase: 8 of 8 (Demo Data, Docs & Release Audit) — IN PROGRESS: 12/13 plans complete; GATE V (08-11) blocking checkpoint RESUMED after owner insertions 08-12/08-13
-Plan: 08-01..08-10, 08-12, 08-13 COMPLETE; 08-11 (GATE V) live walk-through in progress — Tasks 2/3 (approval flip + ledger close) conditional on owner "approved"
-Status: GATE V Sections A (data sign-off incl. D3-humanized dataset text) / B (6-button + educator round-trip + new Performance controls + tooltips) / C (release close incl. real xtb) — owner verdict pending
-Last activity: 2026-10-10 - Completed quick task 002: epsilon plot mode rename + km/mol lines mode (combo: 'epsilon (Multiwfn curve)' default / 'intensity (km/mol)' discrete sticks / absorbance / transmittance; 995 unittests + all required smokes incl. STAGE6 LINES green; owner label amendment 898030d)
+Phase: 8 of 8 (Demo Data, Docs & Release Audit) — COMPLETE + GATE V APPROVED (v1 release sign-off "approved" 2026-10-10 UTC) + VERIFIED (162/162 must-haves, 5/5 SCs — 08-VERIFICATION.md)
+Plan: 13 of 13 COMPLETE (08-11 GATE V: flip 3fd30cf + ledger close 7e0ddc9 + final SUMMARY 3d0874b; battery: 995 unittests + 11/11 required smokes incl. RELEASE-E2E + xtb normal termination + audit 46/46)
+Status: v1 SHIPPABLE — APPROVED-headed DATA_SOURCES.md (UNVERIFIED quarantine intact, all DOIs verified); REQUIREMENTS 46/46 Complete; ROADMAP Phase 8 [x] 13/13; all gate amendments recorded in 08-11-SUMMARY (quick-001/002, insertions 08-12/08-13, Multiwfn parity + epsilon/intensity plot modes, debug-06 RESOLVED)
+Last activity: 2026-10-10 - Phase 8 COMPLETE + VERIFIED — GATE V owner "approved" (v1 release sign-off); verifier passed 162/162 zero gaps; phase-completion commit lands next
 
-Progress: [██████████] 100% (95 of 95 planned plans fully closed — Phases 1-5 + 5.1 + 5.2 + 5.3 + 6 + 7 COMPLETE; Phase 8 unplanned/TBD)
+Progress: [██████████] 100% (108 of 108 planned plans fully closed — Phases 1-8 + 5.1/5.2/5.3 COMPLETE; v1 milestone verified 2026-10-10)
 
 ## Performance Metrics
 
@@ -137,8 +137,8 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-09-27 (gsd-executor — 07-10 post-approval follow-up: show_srp_sticks() occlusion fix; gates re-green; docs stamped)
-Stopped at: Phase 7 COMPLETE + CHECKPOINT-APPROVED (07-10 round 2 "approved, well done" 2026-09-26) + post-approval occlusion fix committed — pending orchestrator verifier
+Last session: 2026-10-10 (orchestrator — GATE V close-out: owner "approved" → flip + ledger + final battery; verifier 162/162 passed)
+Stopped at: Phase 8 COMPLETE + VERIFIED; v1 milestone reached (all 8 phases + 3 insertions verified; 46/46 requirements Complete)
 Resume file: None needed
-Next action: GATE V (08-11) resumed — owner finishes the live walk-through (Sections A/B/C, incl. the new Performance controls + tooltips); "approved" → continuation runs Task 2 (DATA_SOURCES DRAFT->APPROVED flip + coupled marker pin) + Task 3 (10-row ledger flip + final battery incl. --smoke/--xtb + ROADMAP close). Do NOT start plan work outside its own plan.
+Next action: /gsd-audit-milestone (recommended — audit the v1 milestone), or /gsd-complete-milestone to archive directly; /gsd-quick for small ad-hoc work. Do NOT start plan work outside its own plan.
 Date convention: planning-doc dates are UTC (git commit dates authoritative) — the dev shell is HKT (UTC+8); never stamp from the local date.
