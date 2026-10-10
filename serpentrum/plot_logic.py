@@ -175,7 +175,7 @@ def build_scene(modes, fwhm=8.0, x_min=0.0, x_max=None, n_points=800):
 # peak, so the x100 curve scale cancels -- they are
 # convention-invariant and remain UNTOUCHED.
 UNIT_MODES = (('epsilon (Multiwfn curve)', 'intensity'),
-              ('lines (km/mol)', 'lines'),
+              ('intensity (km/mol)', 'lines'),
               ('absorbance (arb.)', 'absorbance'),
               ('transmittance (arb.)', 'transmittance'))
 
@@ -200,7 +200,7 @@ def scene_with_unit(scene, mode):
         render at negative x; the returned scene empties xs/ys (no
         stale curve data rides along), carries the segments payload,
         and states the real-unit AXIS label 'IR intensity (km/mol)'
-        (distinct from the combo label 'lines (km/mol)'). Empty
+        (distinct from the combo label 'intensity (km/mol)'). Empty
         modes -> NO segments (never fabricated).
       - 'absorbance': intensity normalized to peak = 1. Rationale:
         xtb IR intensities (km/mol) are proportional to absorbance via
@@ -254,7 +254,7 @@ def scene_with_unit(scene, mode):
         # jumps the axis) and widens LEFT when negative-frequency
         # sticks exist so they render at negative x. Empty modes ->
         # zero sticks (never fabricated). The AXIS label states the
-        # real unit — distinct from the combo label 'lines (km/mol)'.
+        # real unit — distinct from the combo label 'intensity (km/mol)'.
         segments = tuple(((float(freq), 0.0),
                           (float(freq), float(inten)))
                          for freq, inten in scene.sticks)

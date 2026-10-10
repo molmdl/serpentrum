@@ -77,3 +77,7 @@ No bugs, blockers, authentication gates, or architectural decisions encountered;
 
 - **GATE V amendment round:** the owner blesses the final combo + lines axis wording live (steps h/h2 of `manual_plot_check.py`); any post-blessing re-wording is a label-only edit with coupled pins (see Provisional wording above).
 - README intentionally untouched (line 43's "y unit / color / x direction / invert / size presets" generic wording still holds) — documents follow the owner-blessed wording at the gate, per the plan.
+
+---
+
+**Amendment 2026-10-10 (owner label correction, GATE V wording round):** the lines-mode combo option literal is renamed `'lines (km/mol)'` -> `'intensity (km/mol)'` (label only; the internal mode key `'lines'` and all math/painter logic unchanged). Coupled pins updated in the same single commit: the `UNIT_MODES` literal + two comments in `plot_logic.py`, the table pin + `TestLinesMode` docstring + comment in `tests/test_plot_logic.py`, and step h2 in `smoke/manual_plot_check.py`; `smoke/12_plot_smoke.py` verified key-based/structural (axis label `'IR intensity (km/mol)'` untouched) — no edit. Gates green.

@@ -282,7 +282,7 @@ class TestUnitModes(unittest.TestCase):
             self.assertTrue(_is_ascii(mode))
         self.assertEqual([label for label, _mode in table],
                          ['epsilon (Multiwfn curve)',
-                          'lines (km/mol)',
+                          'intensity (km/mol)',
                           'absorbance (arb.)',
                           'transmittance (arb.)'])
         self.assertEqual([mode for _label, mode in table],
@@ -368,7 +368,7 @@ class TestUnitModes(unittest.TestCase):
 
 class TestLinesMode(unittest.TestCase):
     """quick-002 (owner directive 2026-10-10): the DISCRETE STICKS unit
-    mode ('lines (km/mol)'), added next to the renamed default. One
+    mode ('intensity (km/mol)'), added next to the renamed default. One
     baseline-rooted vertical stick per mode at the actual table /
     spectrum_line.txt (frequency, IR intensity) values; NO broadening
     (fwhm is irrelevant - discrete by definition); empty modes -> NO
@@ -409,7 +409,7 @@ class TestLinesMode(unittest.TestCase):
     def test_axis_labels(self):
         # The lines AXIS label states the REAL unit - the frequency
         # table header's literal; distinct from the combo label
-        # 'lines (km/mol)'.
+        # 'intensity (km/mol)'.
         self.assertEqual(self.lines.y_label, 'IR intensity (km/mol)')
         self.assertEqual(self.lines.x_label, 'wavenumber (cm-1)')
         self.assertTrue(_is_ascii(self.lines.y_label))

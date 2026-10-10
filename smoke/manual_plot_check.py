@@ -120,7 +120,7 @@ print("        the axis), y label becomes 'absorbance (arb.)'; "
       'transmittance - the curve flips (peaks point', flush=True)
 print("        DOWN), y label 'transmittance (arb.)', T <= 1 on "
       'the scale', flush=True)
-print("     h2. y-unit combo 'lines (km/mol)' (quick-002): "
+print("     h2. y-unit combo 'intensity (km/mol)' (quick-002): "
       'DISCRETE vertical sticks - one per table row, at the',
       flush=True)
 print("        table's (frequency, IR intensity) values; y label "
