@@ -20,20 +20,23 @@ screen. Round 3 placement policy:
 
 Arithmetic on the owner's 200%-scaling machine (measured identities
 in the debug file: 926 = 450*2+26, 1613 = 771*2+71, 1693 = 811*2+71;
-available height 882 logical px at cap basis max(560, int(*0.92))
-== 811; real frame margins left/right 6.5, top 29, bottom 6.5
-LOGICAL px -- Windows sizes title bars in logical px, so the logical
-margins are scale-invariant):
+real frame margins left/right 6.5, top 29, bottom 6.5 LOGICAL px --
+Windows sizes title bars in logical px, so the logical margins are
+scale-invariant). Round-5 status (owner decision 2026-10-10, option
+D): the dialog now freezes at ~643-668 logical (height cap basis
+max(560, int(avail*0.73)) = 643 on this machine; the old figure was
+811 under the 0.92 basis -- the identities above stay as the
+measured history):
 
-* cap regime (dialog 811 of 882): centered widget top = (882-811)//2
-  = 35 >= the 29-logical top frame margin, so the frame top lands
-  6 px INSIDE the screen; the clamp interval [32, 63] contains 35,
-  so centering survives the clamp unchanged;
+* cap regime (dialog ~643-668 of 882): centered widget top =
+  (882-668)//2 = 107 at the tall end, >= the 29-logical top frame
+  margin with ~75 px to spare, so the frame top lands deep inside
+  the screen; the clamp keeps centering unchanged;
 * 560-floor regime (avail < 609 and sizeHint taller than the cap):
-  the 8%-of-avail headroom no longer guarantees 35 px per side --
-  e.g. avail 608, dialog 560 centers at top 24, which would put the
-  frame top 5 px ABOVE the avail top; the margin-aware clamp moves
-  the widget down to 32 so the frame top sits 3 px inside;
+  the headroom no longer guarantees 35 px per side -- e.g. avail
+  608, dialog 560 centers at top 24, which would put the frame top
+  5 px ABOVE the avail top; the margin-aware clamp moves the widget
+  down to 32 so the frame top sits 3 px inside;
 * degenerate regime (avail shorter than size + margins, e.g. avail
   < 578 for a 560-tall dialog): NO fitting position exists at all;
   the clamp pins the frame TOP edge to the avail top (the title bar

@@ -219,12 +219,19 @@ def size_presets():
     """The v1 plot-size adjustment data -> [(label, (w, h))].
 
     Pure data for the house addItem(label, data) combo pattern
-    (gui_setup.py:106-108 precedent) — no widget code here. 'medium
-    (640x400)' is the default (first entry). NO FWHM control, NO
-    zoom/pan in v1 (SPECTRA-03 'minimal adjustments' = size presets +
-    axis-label toggle only).
+    (gui_setup.py combo precedent) — no widget code here. 'compact
+    (640x320)' is the pinned default (first entry) since the round-5
+    owner decision (2026-10-10, height-reduction option D, debug
+    session .planning/debug/06-window-move-resize-quirk.md): the
+    construction-time pin freezes the dialog ~80 logical px shorter.
+    'medium (640x400)' — the pre-round-5 default — STAYS as a
+    one-click choice (large/wide untouched): the 07-06 exact-preset
+    + grow/shrink semantics are unchanged, only the default moved.
+    NO FWHM control, NO zoom/pan in v1 (SPECTRA-03 'minimal
+    adjustments' = size presets + axis-label toggle only).
     """
-    return [('medium (640x400)', (640, 400)),
+    return [('compact (640x320)', (640, 320)),
+            ('medium (640x400)', (640, 400)),
             ('large (800x500)', (800, 500)),
             ('wide (960x500)', (960, 500))]
 

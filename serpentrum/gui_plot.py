@@ -401,7 +401,10 @@ class SpectraPlotPanel(QtWidgets.QWidget):
 
         # Pin the plot to the DEFAULT preset at construction (same
         # exact-size pin as _on_size_changed) so the first show is
-        # already exactly 'medium (640x400)'.
+        # already exactly 'compact (640x320)' -- the round-5 default
+        # (2026-10-10, debug session 06 height reduction, option D);
+        # 'medium (640x400)' (the pre-round-5 default) stays a
+        # one-click choice.
         self._on_size_changed(self.size_combo.currentIndex())
 
     # --- public seam for the tab -----------------------------------

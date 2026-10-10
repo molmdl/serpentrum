@@ -11,8 +11,14 @@ The "owner machine" cases below encode the measured environment from
 the decoded round-2 SRP_DEBUG=1 capture (see the debug file:
 identities 926=450*2+26 / 1613=771*2+71 / 1693=811*2+71 pin the 200%
 scale and the frame margins native 13/58/13 = LOGICAL 6.5/29/6.5;
-available height ~881.5 -> 882 logical px; the dialog freezes at 811
-logical tall under the 07-10 cap basis max(560, int(avail*0.92))).
+available height ~881.5 -> 882 logical px). The 811-tall dialog
+figures were the round-2..4 frozen size (07-10 cap basis
+max(560, int(avail*0.92))); since round 5 (owner decision 2026-10-10,
+option D) the dialog freezes ~643-668 logical tall under
+max(560, int(avail*0.73)) -- the (700, 811) test inputs below remain
+valid SYNTHETIC sizes: the placement math is size-agnostic, and the
+811 cases double as the tall-regression band edge (a dialog that
+tall must still clamp on-screen where one exists).
 Every expected value is derived by hand in the comments.
 """
 import os
@@ -98,9 +104,11 @@ class TestClampedPositionOwnerMachine(unittest.TestCase):
 
 
 class TestClampedPositionFloorRegime(unittest.TestCase):
-    """The 560-floor regime (avail < 609 logical): the 0.92 headroom
-    is gone, so CENTERING ALONE WOULD CLIP THE TITLE BAR -- the
-    margin-aware clamp must shift the widget down instead."""
+    """The 560-floor regime (since round 5: avail < 767 logical, i.e.
+    int(avail*0.73) < 560; pre-round 5 it was avail < 609 under the
+    0.92 basis): the proportional headroom is gone, so CENTERING
+    ALONE WOULD CLIP THE TITLE BAR -- the margin-aware clamp must
+    shift the widget down instead."""
 
     def test_floor_case_shifts_down_to_keep_frame_top_inside(self):
         # avail 608, dialog 560: centered top = (608-560)//2 = 24;

@@ -31,8 +31,11 @@ source-pin pattern and the 07-07 raw-source grep audits:
   .planning/debug/06-window-move-resize-quirk.md)
     - the dialog is FIXED-SIZE: freeze_dialog_size applies
       setFixedSize at construction (the 07-10 envelope -- min-width
-      450 + max-height cap -- is subsumed with the same 0.92 basis
-      and floors)
+      450 + max-height cap -- is subsumed with the same floors).
+      Since round 5 (owner decision 2026-10-10, option D "Two-column
+      form"): the HEIGHT cap basis is 0.73 (width keeps the 07-10
+      0.92) and the freeze carries the clip-proof rail
+      max(minimumSizeHint, min(hint, cap)) on the height term
     - NO resizeEvent/moveEvent handlers in gui.py (a containment
       handler re-enters the broken WM negotiation; any future
       deliberate exception must update these pins)
@@ -268,9 +271,12 @@ class TestFixedDialogSize(unittest.TestCase):
 
     gui.py: freeze_dialog_size applies setFixedSize ONCE at
     construction (and again on plot-preset changes) at the natural
-    sizeHint capped to the available screen with the SAME 07-10
-    basis (avail * 0.92 headroom, 560 floor, 450 min-width promise)
-    -- no resizeEvent/moveEvent handlers, no construction-time
+    sizeHint capped to the available screen -- width on the 07-10
+    basis (avail * 0.92 headroom, 450 min-width promise) and, since
+    round 5 (owner decision 2026-10-10, height-reduction option D
+    "Two-column form"), height on max(560, int(avail * 0.73)) with
+    the clip-proof rail max(minimumSizeHint, min(hint, cap_h)) --
+    no resizeEvent/moveEvent handlers, no construction-time
     setMinimumWidth/setMaximumHeight envelope creep-back.
 
     gui_plot.py: the 07-06 exact-preset surface survives via the
@@ -293,11 +299,21 @@ class TestFixedDialogSize(unittest.TestCase):
         source = _read(os.path.join('serpentrum', 'gui.py'))
         body = self._method_body(source, '    def freeze_dialog_size(')
         self.assertIn('self.setFixedSize(', body)
-        # 07-10 cap basis survives inside the freeze, extended to the
-        # full RECT: 0.92 headroom + 560 floor + 450 min-width promise.
-        self.assertIn('max(560, int(avail.height() * 0.92))', body)
+        # Width: the 07-10 cap basis survives inside the freeze
+        # (0.92 headroom + 450 min-width promise; unchanged by the
+        # round-5 decision -- no width growth).
+        self.assertIn('int(avail.width() * 0.92)', body)
         self.assertIn('max(450, min(desired.width(), cap_w))', body)
+        # Height: round-5 basis 0.73 (owner decision 2026-10-10,
+        # option D) with the 560 floor kept.
+        self.assertIn('max(560, int(avail.height() * 0.73))', body)
         self.assertIn('min(desired.height(), cap_h)', body)
+        # Clip-proof rail (round 5): the freeze can never fall below
+        # the LIVE layout minimum -- a cap below content would clip
+        # children inside the fixed window, and a preset-grown
+        # refreeze must land at the (larger) minimum, never the cap.
+        self.assertIn('max(self.minimumSizeHint().height(), hinted_h)',
+                      body)
         # freeze runs once at construction end.
         self.assertIn('self.freeze_dialog_size()', source)
 
@@ -353,10 +369,12 @@ class TestFixedDialogPositionChrome(unittest.TestCase):
         the dialog and its frame opened bottom-out on the owner's
         screen. Now freeze_dialog_size owns size AND placement via
         PURE serpentrum/dialog_fit math: pre-show the base is the
-        available-geometry center (0.92 headroom absorbs the ~29
-        logical-px title-bar margin; the clamp also covers the
-        560-floor regime), post-show (preset refreeze) the base is
-        the CURRENT position clamped under the new size.
+        available-geometry center (the round-5 height leaves the
+        centered widget top ~107+ logical px down, absorbing the
+        ~29-logical title-bar margin with room to spare; the clamp
+        covers the 560-floor regime where centering alone would
+        not), post-show (preset refreeze) the base is the CURRENT
+        position clamped under the new size.
     (2) TOP-BORDER TRANSLATE: with min==max the native WS_THICKFRAME
         sizing hit-test + clamp turns an edge grab into a window
         MOVE. MSWindowsFixedSizeDialogHint (fixed-dialog chrome, no

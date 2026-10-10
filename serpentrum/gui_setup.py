@@ -70,9 +70,12 @@ _UPLOAD_SENTINEL = '__upload__'
 class SetupTab(QtWidgets.QWidget):
     """The Setup configuration form.
 
-    Eight QGroupBox sections (Molecule set, Box, Head molecule, xtb,
-    Win cap, Performance, Speed, Generic stacking) + a persistent
-    status QLabel. collect_state()/apply_state()
+    Eight QGroupBox sections (Molecule set, Head molecule, Box, Speed,
+    xtb, Performance, Win cap, Generic stacking) + a persistent
+    status QLabel, arranged in a TWO-COLUMN grid since the round-5
+    owner decision (2026-10-10; the Molecule set | Head molecule
+    chooser pair leads row 0; Generic stacking spans the full width
+    -- see _build_layout). collect_state()/apply_state()
     round-trip is the established pattern: collect_state reads widgets
     into the setup dict; apply_state populates widgets from the dict. A
     _loading flag guards apply_state against cascading signal recompute.
@@ -217,9 +220,46 @@ class SetupTab(QtWidgets.QWidget):
         # _on_load_setup/_on_cleanup/_on_start).
 
     def _build_layout(self):
-        """Arrange widgets into 8 QGroupBox sections + status (no buttons
-        since plan 08-08 -- the action row is dialog-owned)."""
+        """Arrange the 8 QGroupBox sections + status into a
+        TWO-COLUMN grid (owner decision 2026-10-10, round-5 height
+        reduction option D 'Two-column form', debug session
+        .planning/debug/06-window-move-resize-quirk.md).
+
+        Geometry only -- every group title, row label, tooltip and
+        control is byte-identical to the pre-round-5 stack (no scroll
+        wrap, no widget moved between groups, no dialog widening).
+        Grid contract (width-guard arithmetic in the debug file's
+        round-5 Evidence):
+
+        * Rows 0-2 PAIR the groups so logical neighbors sit side by
+          side. Row 0 is the "choose your molecules" pair --
+          Molecule set | Head molecule -- leading the page: the
+          demo-set selection populates the head options (owner GATE D
+          round-2 directive), so the two vib-relevant choosers read
+          as ONE step at full ~300-px column width (every molecule
+          name fits; the popup lists all <= 6 entries, no popup
+          scrolling). This is the round-5 vib-chooser treatment:
+          before round 5 the head picker sat THREE groups down a
+          ~694-px single-column stack.
+        * Win cap (row 3) keeps the left column; its right cell stays
+          EMPTY -- 7 groups pair into 3 rows and the width guard
+          (below) turns the 8th into a full-span row, so one pair
+          cell has no partner (revivable at the round-5 eyeball).
+        * Generic stacking (row 4) SPANS both columns: its consent
+          checkbox text is one NON-wrapping ~460-logical-px line
+          (QCheckBox text never word-wraps) -- wider than one ~300-px
+          column, so a column placement would force the fixed-size
+          dialog WIDER (round-5 decision: no width growth).
+        * The status label stays a full-width strip below the grid;
+          the trailing stretch closes the page. Reveals stay safe
+          inside the shorter fixed dialog: the upload row (+~28) and
+          the hessian label (word-wrap, worst ~150 in the narrow
+          column) grow into the stretch/leftover slack -- the
+          two-column Setup page minimum (~390-490) sits far below the
+          Spectra-led dialog floor.
+        """
         layout = QtWidgets.QVBoxLayout(self)
+        grid = QtWidgets.QGridLayout()
 
         # --- Molecule set group (QVBoxLayout: upload row needs
         #     show/hide as a unit) ---
@@ -237,19 +277,27 @@ class SetupTab(QtWidgets.QWidget):
         upload_lay.addWidget(self.browse_upload_btn)
         mol_lay.addWidget(self._upload_container)
         self._upload_container.setVisible(False)
-        layout.addWidget(mol_group)
+        grid.addWidget(mol_group, 0, 0)
+
+        # --- Head molecule group (row 0's RIGHT half -- the chooser
+        #     pair: which set you play, which molecule you start as,
+        #     i.e. whose vibrations the run features) ---
+        head_group = QtWidgets.QGroupBox('Head molecule', self)
+        head_form = QtWidgets.QFormLayout(head_group)
+        head_form.addRow('Head:', self.head_combo)
+        grid.addWidget(head_group, 0, 1)
 
         # --- Box group ---
         box_group = QtWidgets.QGroupBox('Box', self)
         box_form = QtWidgets.QFormLayout(box_group)
         box_form.addRow('Preset:', self.box_combo)
-        layout.addWidget(box_group)
+        grid.addWidget(box_group, 1, 0)
 
-        # --- Head molecule group ---
-        head_group = QtWidgets.QGroupBox('Head molecule', self)
-        head_form = QtWidgets.QFormLayout(head_group)
-        head_form.addRow('Head:', self.head_combo)
-        layout.addWidget(head_group)
+        # --- Speed group (Phase 5.1, plan 5.1-04) ---
+        speed_group = QtWidgets.QGroupBox('Speed', self)
+        speed_form = QtWidgets.QFormLayout(speed_group)
+        speed_form.addRow('Tier:', self.speed_combo)
+        grid.addWidget(speed_group, 1, 1)
 
         # --- xtb group ---
         xtb_group = QtWidgets.QGroupBox('xtb', self)
@@ -261,41 +309,35 @@ class SetupTab(QtWidgets.QWidget):
         xtb_path_lay.addWidget(self.xtb_path_field, 1)
         xtb_path_lay.addWidget(self.browse_xtb_btn)
         xtb_form.addRow('Path:', xtb_path_widget)
-        layout.addWidget(xtb_group)
-
-        # --- Win cap group ---
-        cap_group = QtWidgets.QGroupBox('Win cap', self)
-        cap_form = QtWidgets.QFormLayout(cap_group)
-        cap_form.addRow('Molecules:', self.win_cap_spin)
-        cap_form.addRow('', self.hessian_label)
-        layout.addWidget(cap_group)
+        grid.addWidget(xtb_group, 2, 0)
 
         # --- Performance group (owner insertion Q2, 2026-10-01, plan
-        #     08-12; appended AFTER the Win cap group, BEFORE the
-        #     Speed group - the 5.1-04 sibling-section pattern) ---
+        #     08-12): atom budget + xtb threads, in-game settable ---
         perf_group = QtWidgets.QGroupBox('Performance', self)
         perf_form = QtWidgets.QFormLayout(perf_group)
         perf_form.addRow('Atom budget (atoms):', self.atom_budget_spin)
         perf_form.addRow('xtb threads:', self.threads_spin)
-        layout.addWidget(perf_group)
+        grid.addWidget(perf_group, 2, 1)
 
-        # --- Speed group (Phase 5.1, plan 5.1-04; a new sibling section
-        #     after Win cap - Performance (08-12) now sits between) ---
-        speed_group = QtWidgets.QGroupBox('Speed', self)
-        speed_form = QtWidgets.QFormLayout(speed_group)
-        speed_form.addRow('Tier:', self.speed_combo)
-        layout.addWidget(speed_group)
+        # --- Win cap group (row 3 LEFT; the right pair cell stays
+        #     EMPTY -- docstring rationale above) ---
+        cap_group = QtWidgets.QGroupBox('Win cap', self)
+        cap_form = QtWidgets.QFormLayout(cap_group)
+        cap_form.addRow('Molecules:', self.win_cap_spin)
+        cap_form.addRow('', self.hessian_label)
+        grid.addWidget(cap_group, 3, 0)
 
-        # --- Generic stacking group (Phase 5.2, plan 5.2-05; appended
-        #     AFTER the Speed group as a new sibling section, before
-        #     the status label -- 5.1-04 sibling-section precedent) ---
+        # --- Generic stacking group (Phase 5.2, plan 5.2-05; row 4
+        #     SPANS both columns -- the width guard, see docstring) ---
         generic_group = QtWidgets.QGroupBox('Generic stacking', self)
         generic_form = QtWidgets.QFormLayout(generic_group)
         generic_form.addRow('', self.generic_stack_check)
         generic_form.addRow('', self.generic_stack_note_label)
-        layout.addWidget(generic_group)
+        grid.addWidget(generic_group, 4, 0, 1, 2)
 
-        # --- Status label ---
+        layout.addLayout(grid)
+
+        # --- Status label (full-width strip, unchanged) ---
         layout.addWidget(self.status_label)
 
         # --- Stretch ---

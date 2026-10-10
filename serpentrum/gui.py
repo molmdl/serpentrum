@@ -100,16 +100,17 @@ class PluginDialog(QtWidgets.QDialog):
         # The thin chrome changes the FRAME margins slightly (the
         # sizing borders go away; the title bar stays), which is
         # fine in contract terms: freeze + position work from the
-        # 0.92-headroom basis and the (scale-invariant) title-bar
-        # margin, not from exact frame metrics.
+        # cap bases and the (scale-invariant) title-bar margin, not
+        # from exact frame metrics.
         self.setWindowFlags(
             self.windowFlags() | QtCore.Qt.MSWindowsFixedSizeDialogHint)
         # Dialog sizing: FIXED SIZE, applied once at the END of
         # __init__ (see freeze_dialog_size below). The old
         # construction-time envelope (min width 450 + the 07-10
         # height cap, max(560, 0.92*avail)) is fully SUBSUMED by the
-        # freeze: the 450 min-width promise and the 560 floor /
-        # 0.92-headroom cap basis survive inside it.
+        # freeze: the 450 min-width promise survives inside it; the
+        # height basis is 0.73 since round 5 (width stays 0.92 --
+        # see freeze_dialog_size).
         # Live-state anchor (pmg_tk.startup._serpentrum): carries setup,
         # last_run and the Phase-6 spectra_runner; survives Plugin-
         # Manager reload; stripped-down constructions may pass None --
@@ -223,6 +224,11 @@ class PluginDialog(QtWidgets.QDialog):
         # Windows move behavior stays (the window may be dragged
         # partially off-screen and back, like every other window):
         # the 07-10 directive bounds SIZE, not position.
+        # ROUND 5 AMENDMENT (owner decision 2026-10-10, option D
+        # "Two-column form", same debug session): the height cap
+        # basis drops 0.92 -> 0.73 (width term untouched) and the
+        # freeze gains the clip-proof rail max(minimumSizeHint.h,
+        # min(hint, cap)) -- see freeze_dialog_size for the numbers.
         self.spectra_tab.plot_panel.dialog_size_refreeze = \
             self.freeze_dialog_size
         self.freeze_dialog_size()
@@ -234,13 +240,35 @@ class PluginDialog(QtWidgets.QDialog):
 
         desired = sizeHint(): called after the top-level layout is
         complete, this is the same quantity Qt uses to open the
-        dialog, so the frozen size reproduces today's approved
-        on-screen size exactly (including the 640x400 default plot
-        preset pin -- the Spectra tab is part of the layout). Caps
-        use the SAME 07-10 basis (avail * 0.92 headroom, 560 floor)
-        extended to the full RECT, with the 450 min-width promise
-        kept as a floor -- so the frozen size equals today's size on
-        this machine and shrinks on smaller screens.
+        dialog, so the frozen size reproduces the laid-out look
+        exactly (including the 640x320 compact default plot
+        preset pin -- the Spectra tab is part of the layout).
+
+        Caps: the WIDTH keeps the 07-10 basis byte-identical
+        (avail * 0.92 headroom, 450 min-width promise); the HEIGHT
+        basis is 0.73 since the round-5 owner decision (2026-10-10,
+        height-reduction option D "Two-column form", debug session
+        .planning/debug/06-window-move-resize-quirk.md): with the
+        two-column Setup page + the compact default plot, the
+        content floor drops to ~640-668 logical px, so the cap
+        max(560, int(avail.height() * 0.73)) (= 643 on the owner
+        machine, avail 882) freezes a dialog ~170 logical px shorter
+        than the old 811 -- casual title-bar drags no longer ride the
+        bottom edge past the taskbar (~35 logical px of slack at
+        811-of-882 vs ~240 at 643-of-882).
+
+        Clip-proof rail (round 5, part of every menu option):
+        height = max(minimumSizeHint().height(),
+        min(desired.height(), cap_h)). minimumSizeHint is the LIVE
+        layout minimum (totalMinimumSize), so the freeze can never
+        fall below the content -- worst case it lands a few px TALLER
+        than the cap, never clipping. The rail also rescues the
+        PRESET-GROWN refreeze: a larger preset (e.g. large 800x500)
+        raises the layout minimum above the cap, and the dialog
+        re-freezes at the minimum (grows to fit, then the position
+        clamp keeps the frame on-screen) instead of clipping at the
+        cap. The width term needs no rail: max(450, ...) is its
+        floor, and a layout hint can never undercut its own minimum.
 
         Position (round 3): a fixed SIZE was never paired with a
         POSITION -- Qt's default centers a fresh dialog on its parent
@@ -248,21 +276,21 @@ class PluginDialog(QtWidgets.QDialog):
         the frame's bottom edge below the screen. One-shot placement
         from PURE dialog_fit math on the same available rect:
         PRE-SHOW (construction) the base is the avail center + frame
-        -- on this screen the 0.92 headroom centers the widget top
-        at ~35 logical px, absorbing the ~29-logical title-bar
-        margin with ~6 px to spare, and the clamp also covers the
-        560-floor regime where centering alone would not (see
-        dialog_fit's docstring arithmetic). POST-SHOW (the
-        plot-preset refreeze) the base is the CURRENT position,
-        clamped under the NEW size with minimal shift so a grown
-        dialog never bottoms out. move() pre-show only records the
-        placement (Qt then opens exactly there -- no parent
-        re-centering, no WM traffic on a hidden window); the
-        refreeze move is one deliberate programmatic move per
-        preset click. NO move/resize event handlers exist anywhere
-        in serpentrum/ (that regression class is closed, test-pinned
-        in tests/test_gui_pins.py) -- pre-show placement plus this
-        hook are the only position code there is.
+        -- with the round-5 height the centered widget top lands ~107
+        logical px down (avail 882, dialog ~643-668), so the ~29-
+        logical title-bar margin is absorbed with room to spare, and
+        the clamp still covers the 560-floor + degenerate regimes
+        where centering alone would not (see dialog_fit's docstring
+        arithmetic). POST-SHOW (the plot-preset refreeze) the base is
+        the CURRENT position, clamped under the NEW size with
+        minimal shift so a grown dialog never bottoms out. move()
+        pre-show only records the placement (Qt then opens exactly
+        there -- no parent re-centering, no WM traffic on a hidden
+        window); the refreeze move is one deliberate programmatic
+        move per preset click. NO move/resize event handlers exist
+        anywhere in serpentrum/ (that regression class is closed,
+        test-pinned in tests/test_gui_pins.py) -- pre-show placement
+        plus this hook are the only position code there is.
 
         Re-frozen on plot-preset changes via the injected hook
         plot_panel.dialog_size_refreeze (the 07-06 owner-approved
@@ -272,11 +300,17 @@ class PluginDialog(QtWidgets.QDialog):
         the layout's minimums)."""
         avail = QtWidgets.QApplication.desktop().availableGeometry(self)
         desired = self.sizeHint()
+        # Width: the 07-10 0.92 basis, byte-identical (no width growth
+        # in the round-5 decision). Height: 0.73 since round 5 (see
+        # docstring), 560 floor kept.
         cap_w = int(avail.width() * 0.92)
-        cap_h = max(560, int(avail.height() * 0.92))
+        cap_h = max(560, int(avail.height() * 0.73))
+        # Clip-proof rail: never freeze below the live layout minimum.
+        hinted_h = min(desired.height(), cap_h)
+        height = max(self.minimumSizeHint().height(), hinted_h)
         self.setFixedSize(
             max(450, min(desired.width(), cap_w)),
-            min(desired.height(), cap_h))
+            height)
         # One-shot frame-fit position on the SAME available rect
         # (round 3): margins from the live native window when it
         # exists (refreeze, post-show), else the measured fallback

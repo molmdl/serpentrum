@@ -216,13 +216,17 @@ class TestBuildScene(unittest.TestCase):
 
 
 class TestSizePresets(unittest.TestCase):
-    """Pure (label, (w, h)) data for the house addItem(label, data) combo
-    pattern; 'medium (640x400)' is the pinned default (first entry)."""
+    """Pure (label, (w, h)) data for the house addItem(label, data)
+    combo pattern; 'compact (640x320)' is the pinned default (first
+    entry) since round 5 (owner decision 2026-10-10, debug session 06
+    height reduction, option D); 'medium (640x400)' -- the pre-round-5
+    default -- must STAY a one-click choice together with large/wide
+    (the 07-06 exact-preset + grow/shrink surface is unchanged)."""
 
     def test_shape(self):
         presets = plot_logic.size_presets()
         self.assertGreaterEqual(len(presets), 2)
-        self.assertEqual(presets[0], ('medium (640x400)', (640, 400)))
+        self.assertEqual(presets[0], ('compact (640x320)', (640, 320)))
         for label, dims in presets:
             self.assertIsInstance(label, str)
             self.assertIsInstance(dims, tuple)
@@ -231,9 +235,19 @@ class TestSizePresets(unittest.TestCase):
             self.assertIsInstance(width, int)
             self.assertIsInstance(height, int)
             self.assertGreaterEqual(width, 640)
-            self.assertGreaterEqual(height, 400)
+            self.assertGreaterEqual(height, 320)
             self.assertTrue(_is_ascii(label),
                             'non-ASCII preset label %r' % label)
+
+    def test_pre_round_5_presets_retained(self):
+        # Round-5 pin (option D): ONLY the default moved to compact;
+        # every pre-round-5 preset stays a one-click choice.
+        presets = plot_logic.size_presets()
+        self.assertIn(('medium (640x400)', (640, 400)), presets,
+                      'medium must remain one click back to the '
+                      'pre-round-5 default look')
+        self.assertIn(('large (800x500)', (800, 500)), presets)
+        self.assertIn(('wide (960x500)', (960, 500)), presets)
 
 
 class TestUnitModes(unittest.TestCase):
