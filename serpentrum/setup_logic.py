@@ -65,8 +65,12 @@ DEFAULTS = {
                                    # is Multiwfn-parity (Lorentzian,
                                    # unit-area x100; spectra.CURVE_SCALE).
                                    # The pre-parity value was 16.0.
-    'speed': 6.0,                  # A/s = the 'normal' tier (owner-final
-                                   # 2026-09-25 feel-check; game_engine's
+    'speed': 9.0,                  # A/s = the 'normal' tier (quick-003
+                                   # owner retune 2026-10-11, option C:
+                                   # 'increase the speed of difficulty
+                                   # tiers - current expert should be
+                                   # normal'; supersedes the 5.1-06
+                                   # value 6.0; game_engine's
                                    # SPEED_A_PER_S stays 3.0 as the v1
                                    # baseline + kwarg fallback only)
     'generic_stack_consent': False,  # STACK-06 (Phase 5.2): generic upload
@@ -119,25 +123,32 @@ BOX_PRESETS = {
 }
 
 # Speed tiers: named difficulty levels as (name, A/s) pairs (plan 5.1-02,
-# SC1). OWNER-FINALIZED at the 5.1-06 feel-check (2026-09-25): the drafts
+# SC1). History: at the 5.1-06 feel-check (2026-09-25) the drafts
 # (2.0/3.0/4.5/6.0) all played too slow — "only expert feel like playing"
 # — so the scale shifted up: relaxed 3.0 (= the old v1 baseline) and
-# normal 6.0 (= the old expert, the owner's playable anchor) are FINAL;
-# fast 7.5 / expert 9.0 are the owner's "try" values pending a feel round
-# at the new speeds. Value tweaks remain edits to THIS table only, and
-# the exact tuple pin in tests/test_setup_logic.py is the visible
+# normal 6.0 (= the old expert, the owner's playable anchor) were the
+# final values of that round; fast 7.5 / expert 9.0 were the owner's
+# "try" values pending a feel round at the new speeds. quick-003
+# (2026-10-11, owner-approved option C): the ladder shifted up once more
+# per the owner directive — relaxed 6.0 (= the old 'normal') / normal
+# 9.0 (= the old 'expert'; DEFAULTS['speed'] follows) / fast 11.0 /
+# expert 13.0 (the old top-gap ratios x1.25/x1.2 scaled to the new
+# normal, rounded to whole A/s). Tier count, names, and order are
+# UNCHANGED. Value tweaks remain edits to THIS table only, and the
+# exact tuple pin in tests/test_setup_logic.py is the visible
 # reviewable diff for those tweaks. A tuple-of-tuples (insertion-ordered,
 # py3.6-safe — NEVER a dict for ordering) because insertion order drives
 # the GUI combo order. SINGLE source for the setup-tab combo (5.1-04),
 # the HUD speed note (5.1-03/05), and speed_tier_for() tier-name
 # resolution. The schema key 'speed' STAYS numeric (DEFAULTS['speed'] =
-# 6.0 = 'normal'): backcompat is free (every setup file ever written
-# already carries it) and no SCHEMA_VERSION bump is needed.
+# 9.0 = 'normal'): backcompat is free (every setup file ever written
+# already carries it; pre-retune values load as-is — 6.0 resolves to
+# 'relaxed', 3.0/7.5 to 'custom') and no SCHEMA_VERSION bump is needed.
 SPEED_TIERS = (
-    ('relaxed', 3.0),
-    ('normal', 6.0),
-    ('fast', 7.5),
-    ('expert', 9.0),
+    ('relaxed', 6.0),
+    ('normal', 9.0),
+    ('fast', 11.0),
+    ('expert', 13.0),
 )
 
 # Exact N-cubed hessian-cost warning (SETUP-06 / SPECTRA-06 pure half).

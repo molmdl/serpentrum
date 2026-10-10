@@ -76,7 +76,7 @@ SETUP_HINTS = {
 # controls, keyed by the widget-ATTRIBUTE name the gui_setup wiring
 # uses. Facts come ONLY from the setup_logic constants and shipped
 # behavior (demo combo items, box half-widths 35/55/85, speed tiers
-# 3.0/6.0/7.5/9.0, win cap 1-20 default 10, atom budget default 100,
+# 6.0/9.0/11.0/13.0, win cap 1-20 default 10, atom budget default 100,
 # threads default 4, the <=-3-ring upload acceptance rule, the
 # consent-gated generic overlay). The owner blesses the final wording
 # at the resumed GATE V Section A (same review round as the dataset D3
@@ -114,8 +114,8 @@ SETUP_TOOLTIPS = {
         'Higher caps mean longer games and bigger snakes (and slower '
         'spectra runs).'),
     'speed_combo': (
-        'Head speed in A/s: relaxed 3.0, normal 6.0 (default), fast '
-        '7.5, expert 9.0. The speed stays constant within a run.'),
+        'Head speed in A/s: relaxed 6.0, normal 9.0 (default), fast '
+        '11.0, expert 13.0. The speed stays constant within a run.'),
     'generic_stack_check': (
         'OFF by default. Turn ON to let uploads carrying a planar '
         'aromatic 6-ring stack at the illustrative geometry, clearly '

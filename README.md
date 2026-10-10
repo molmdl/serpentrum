@@ -36,7 +36,7 @@ Release alternative (no checkout needed): zip -r serpentrum.zip serpentrum/, the
 ## Usage
 
 1. **Setup tab** - choose the demo set (head options fill in; Random picks from the set), box preset, head molecule, xtb path (or auto-detect), win cap, speed tier, and the performance settings (atom budget, xtb threads).
-   Canonical values: speed tiers 3.0 / 6.0 (default) / 7.5 / 9.0 A/s; box presets 35 / 55 / 85 A half-widths (medium default); win cap default 10 (range 1-20); atom budget 100 atoms; broadening 8.0 cm-1 FWHM; xtb threads default 4. How long a spectra run takes: a ~100-atom snake takes about 1-2 min on a typical 4-core/8-thread laptop (measured 84-101 s; thread-capped runs slower, up to ~5 min single-threaded). On a modest PC, set xtb threads to 1 or 2 in the Performance settings - runs take longer but PyMOL stays responsive.
+   Canonical values: speed tiers 6.0 / 9.0 (default) / 11.0 / 13.0 A/s; box presets 35 / 55 / 85 A half-widths (medium default); win cap default 10 (range 1-20); atom budget 100 atoms; broadening 8.0 cm-1 FWHM; xtb threads default 4. How long a spectra run takes: a ~100-atom snake takes about 1-2 min on a typical 4-core/8-thread laptop (measured 84-101 s; thread-capped runs slower, up to ~5 min single-threaded). On a modest PC, set xtb threads to 1 or 2 in the Performance settings - runs take longer but PyMOL stays responsive.
 2. **Start** - Start applies the setup and materializes the box and head first, then a 3-2-1 countdown runs and the dialog switches to the Game tab.
 3. Steer with the 4 arrow keys. If the keys seem dead, click the 3D viewer first; when the dialog takes focus the game auto-pauses.
 4. Completion (win or crash) enables **Get Spectra**.

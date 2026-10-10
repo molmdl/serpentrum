@@ -75,8 +75,9 @@ import math
 # acceleration). v1 default tier + test pin; the per-run tier is injected
 # via the speed_a_per_s kwarg (Phase 5.1 GAME-11) — this module constant
 # is the kwarg DEFAULT and is NEVER mutated at runtime (the setup-side
-# default tier is 'normal' = 6.0 A/s in setup_logic.SPEED_TIERS since
-# the 5.1-06 owner retune; production always injects it via the kwarg).
+# default tier is 'normal' = 9.0 A/s in setup_logic.SPEED_TIERS since
+# the quick-003 owner retune (2026-10-11); production always injects it
+# via the kwarg).
 SPEED_A_PER_S = 3.0
 
 # --- Rigid-pivot sweep constants (plan 02-13, GAME-10). This plan owns

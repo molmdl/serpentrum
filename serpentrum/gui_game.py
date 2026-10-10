@@ -93,10 +93,11 @@ from . import input as game_input
 # S2). The per-tick DISTANCE is a separate knob: speed_a_per_s * dt,
 # where speed_a_per_s comes from the setup-selected tier injected at
 # _build_engine (Phase 5.1 GAME-11); at the default 'normal' tier
-# (6.0 A/s after the 5.1-06 owner retune) that is 0.6 A/tick, while the
-# engine's kwarg fallback (SPEED_A_PER_S = 3.0) would give 0.3. Tuning
-# lives in SPEED_TIERS in setup_logic (data-only edits) - the cadence
-# constants themselves are not a speed knob.
+# (9.0 A/s after the quick-003 owner retune, 2026-10-11) that is
+# 0.9 A/tick, while the engine's kwarg fallback (SPEED_A_PER_S = 3.0)
+# would give 0.3. Tuning lives in SPEED_TIERS in setup_logic
+# (data-only edits) - the cadence constants themselves are not a
+# speed knob.
 TICK_DT = 0.1
 TICK_INTERVAL_MS = 100
 

@@ -125,7 +125,7 @@ class TestNumericClaims(unittest.TestCase):
         self.assertFalse(ok)
 
     def test_tampered_speed_tier_fails(self):
-        fixture = self.readme.replace('6.0 (default)', '5.0 (default)')
+        fixture = self.readme.replace('9.0 (default)', '5.0 (default)')
         self.assertNotEqual(fixture, self.readme)
         ok, _msg = check_docs.check_numeric(fixture, self.context)
         self.assertFalse(ok)

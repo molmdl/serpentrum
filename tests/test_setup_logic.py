@@ -12,8 +12,8 @@ randomize_head is seed-deterministic via private random.Random instances
 tuple pin, the merge_defaults absent-key backcompat matrix, speed_tier_for
 exact-match resolution, the custom-speed accept-as-is pin, and a
 non-default-speed save/load round-trip. EXPECTED_DEFAULTS tracks the
-owner-finalized default (5.1-06 feel-check 2026-09-25: speed 6.0 = the
-'normal' tier; the drafts all played too slow).
+owner-approved default (quick-003 retune 2026-10-11: speed 9.0 = the
+'normal' tier; supersedes the 5.1-06 feel-check value 6.0).
 
 Discovery command (verified on python3.6.9 — NOTE: `-t .` FAILS on
 python3.6 with a non-package start dir; do not add it):
@@ -56,7 +56,8 @@ EXPECTED_DEFAULTS = {
     # Multiwfn-parity FWHM (owner directive 2026-10-04, GATE V
     # amendment): the pre-parity value was 16.0.
     'broadening_fwhm': 8.0,
-    'speed': 6.0,
+    # Owner-approved quick-003 retune (2026-10-11): 'normal' tier; was 6.0
+    'speed': 9.0,
     # STACK-06 consent (Phase 5.2): OFF by default; absent key = OFF via
     # merge_defaults.
     'generic_stack_consent': False,
@@ -365,20 +366,20 @@ class TestLoadSetupErrors(unittest.TestCase):
 
 class TestSpeedTierTable(unittest.TestCase):
     """SPEED_TIERS is the ONE ordered name -> A/s table (plan 5.1-02).
-    Owner-finalized at the 5.1-06 feel-check (2026-09-25): relaxed 3.0 /
-    normal 6.0 FINAL, fast 7.5 / expert 9.0 owner "try" values pending a
-    feel round at the new speeds. This EXACT tuple pin is the visible
-    reviewable diff for any further value tweaks. Insertion order is
-    pinned because it drives the GUI combo order."""
+    Owner-approved option-C ladder (quick-003 retune, 2026-10-11):
+    relaxed 6.0 / normal 9.0 / fast 11.0 / expert 13.0; supersedes the
+    5.1-06 feel-check values (3.0/6.0/7.5/9.0). This EXACT tuple pin is
+    the visible reviewable diff for any further value tweaks.
+    Insertion order is pinned because it drives the GUI combo order."""
 
     def test_speed_tiers_exact_ordered_table(self):
         self.assertEqual(
             SPEED_TIERS,
-            (('relaxed', 3.0), ('normal', 6.0), ('fast', 7.5),
-             ('expert', 9.0)))
+            (('relaxed', 6.0), ('normal', 9.0), ('fast', 11.0),
+             ('expert', 13.0)))
 
     def test_default_speed_is_a_tier_value(self):
-        # The numeric default (6.0) IS one of the tier values, so a
+        # The numeric default (9.0) IS one of the tier values, so a
         # fresh setup resolves to a named tier ('normal'), not 'custom'.
         tier_values = [aps for _name, aps in SPEED_TIERS]
         self.assertIn(DEFAULTS['speed'], tier_values)
@@ -403,10 +404,10 @@ class TestMergeDefaults(unittest.TestCase):
 
     def test_absent_speed_merges_to_default_and_validates_clean(self):
         # The backcompat scenario: a dict missing 'speed' merges to the
-        # default tier (6.0 = 'normal' since the 5.1-06 retune) instead
-        # of failing validation.
+        # default tier (9.0 = 'normal' since the quick-003 retune)
+        # instead of failing validation.
         merged = merge_defaults({'schema_version': 1})
-        self.assertEqual(merged['speed'], 6.0)
+        self.assertEqual(merged['speed'], 9.0)
         self.assertEqual(validate(merged), ([], []))
 
     def test_input_dict_not_mutated(self):
@@ -430,18 +431,23 @@ class TestSpeedTierFor(unittest.TestCase):
     used to tighten validate() — no nearest-match guessing."""
 
     def test_exact_tier_values_resolve_to_names(self):
-        # Exact-match only (owner-finalized table, 5.1-06 feel-check).
-        self.assertEqual(speed_tier_for(3.0), 'relaxed')
-        self.assertEqual(speed_tier_for(6.0), 'normal')
-        self.assertEqual(speed_tier_for(7.5), 'fast')
-        self.assertEqual(speed_tier_for(9.0), 'expert')
+        # Exact-match only (owner-approved table, quick-003 option C).
+        self.assertEqual(speed_tier_for(6.0), 'relaxed')
+        self.assertEqual(speed_tier_for(9.0), 'normal')
+        self.assertEqual(speed_tier_for(11.0), 'fast')
+        self.assertEqual(speed_tier_for(13.0), 'expert')
 
     def test_off_tier_speed_is_custom(self):
-        # 3.1 sits between relaxed (3.0) and normal (6.0) — off-tier.
+        # 3.1 sits below relaxed (6.0) — off-tier.
         self.assertEqual(speed_tier_for(3.1), 'custom')
-        # The pre-retune draft values are now off-tier too.
+        # The pre-5.1 draft values are now off-tier too.
         self.assertEqual(speed_tier_for(2.0), 'custom')
         self.assertEqual(speed_tier_for(4.5), 'custom')
+        # quick-003: the 5.1-06 final values are off-tier after the
+        # retune - an old saved file at these speeds shows 'custom'
+        # (accept-as-is; the numeric value still loads and runs).
+        self.assertEqual(speed_tier_for(3.0), 'custom')
+        self.assertEqual(speed_tier_for(7.5), 'custom')
 
     def test_non_number_inputs_are_custom(self):
         self.assertEqual(speed_tier_for(None), 'custom')
