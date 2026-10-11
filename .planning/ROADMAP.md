@@ -1,7 +1,7 @@
 # Roadmap: serpentrum
 
 **Created:** 2026-09-06
-**Depth:** comprehensive (8 phases)
+**Depth:** comprehensive (9 phases)
 **Coverage:** 46/46 v1 requirements mapped — 0 unmapped, 0 duplicated (44 original after the 41→44 count correction + GAME-11 with Phase 5.1 + STACK-06 promoted from v2 with Phase 5.2, 2026-09-20)
 
 ## Overview
@@ -27,6 +27,7 @@ A PyMOL plugin game: steer a molecular head around a bounded box, stack real sma
 - [x] **Phase 6: xtb Pipeline** - Async cancellable `xtb --ohess` with verified success contract and calibrated atom-budget guard *(research F — parallel track)*
 - [x] **Phase 7: Spectra UI** - Broadened IR plot, clickable frequency table → static mode vectors, streaming log, saveable plot *(research G)* — COMPLETE 2026-09-26 (verified 38/38 must-haves, 3/3 SCs; owner checkpoints: 07-06 plot APPROVED round 2 with amendments, 07-10 live flow APPROVED round 2 with optimized-frame + [TRAIN] sign-offs)
 - [x] **Phase 8: Demo Data, Docs & Release Audit** - Human-approved Set A + attribution, 6-button setup persistence, help/docs, end-to-end audit *(research H)*
+- [ ] **Phase 9: Random Line-Wall Spawning (ADDED 2026-10-11)** - After picking up a mol, a random line-wall spawns within the box at the same time as the next mol's spawn — never overlapping the newly spawned mol *(owner request — post-v1 gameplay improvement)*
 
 ## Phase Details
 
@@ -319,6 +320,34 @@ Plans:
 
 Notes: Data ships only after citation pinning + human approval (repo hard rule — no fabrication; GATE V Section A is the data approval act; 08-02 only prepares the DRAFT doc). EXACTLY TWO gates: GATE D (08-01, checkpoint:decision) and GATE V (08-11, checkpoint:human-verify) — no other plan carries a checkpoint. Decision-dependent plans (08-05/08-06/08-07) use the read-decision pattern: their first task step reads the verdict from 08-01-SUMMARY.md and implements the chosen option's contract. Real xtb stays OUT of required smokes (06-12 EQ-smoke-1 disposition; smoke 14 is fixture-tailed). Parallel waves run under the worktree protocol with disjoint files_modified: Wave 1 (08-01/08-02/08-04), Wave 2 (08-05/08-06/08-07). 08-09 follows 08-08 to avoid the shared gui_setup.py race (the wave-3 parallelism that the prior structure omitted is now explicit: only one plan touches gui_setup.py per wave). Avoids Pitfalls 8 (.pse desync), 4 (leak check), UX table; honors the test_stacking_dataset.py 'DRAFT' marker-pin trap (same-commit coupling in GATE V Task 2).
 
+### Phase 9: Random Line-Wall Spawning *(added 2026-10-11 — owner request, post-v1 gameplay improvement; planned 2026-10-12)*
+
+**Goal**: Picking up a molecule spawns the NEXT molecule and exactly ONE seeded-random pure-red line-wall inside the box together (same event, both respawn paths) — the wall never overlaps the newly spawned mol (per-atom 3.0 Å clearance, the owner mandate, live-auditable via SRP_DEBUG), stays fair (ends inset from the box faces, 12.0 Å launch clearance from the head, off other live mols), and steering the head into it crashes the run through the existing completion path ('crashed into wall', snake still complete → Get Spectra); pickup spawning, the v1 release record, and GAME-07 replay determinism all stay byte-identical.
+**Depends on**: Phase 8 (COMPLETE — Phase 9 is post-release refinement; the GATE V release record is unaffected)
+**Requirements**: (none new — **D-MAP verdict route (b)**: dated amendment on GAME-05 mirroring the 5.3 "refines an existing rule" + quick-003 dated-amendment precedents — walls extend the GAME-05 lethal-collision class; the spawn pairing refines the 5.3 spawn cadence; coverage stays 46/46 with ZERO audit-tool churn; the amendment lands in plan 09-09 after the owner feel-check. Alternative route (a) GAME-12 mint was rejected: the v1 ledger is the closed, human-certified GATE V release record.)
+**Success Criteria** (what must be TRUE):
+  1. Every successful next-mol spawn swaps in exactly one red wall (srp_wall) on the same event at BOTH respawn call sites (capture tail + exhaust-cooldown resume); no mol spawn ⇒ no wall swap; never at run start; never on the win tick (engine.finished guard). [owner request verbatim]
+  2. The wall never overlaps the newly spawned mol — every translated atom keeps ≥ 3.0 Å from the wall segment; live-auditable via the SRP_DEBUG 'DBG wall spawn ... gap=...' line. [owner request verbatim]
+  3. Head contact emits ('crashed', 'wall') in the referee slot after boundary / before body; the run ends 'crashed' with the snake complete → the normal completion path; the GUI renders 'crashed into wall' with ZERO new crash-handler code. [GAME-05 class]
+  4. Fairness: endpoints ≥ 6.0 Å inset from every face, head launch clearance 12.0 Å, live-mol clearance 3.0 Å, length 0.45 × minor-axis span, arbitrary angle [0, π); the collision halo is WALL_COLLISION_RADIUS_A 2.0 — all constants owner-retunable in the single wall.py table at the feel-check.
+  5. GAME-07 holds for BOTH streams: same setup + same call sequence ⇒ identical pickup AND wall sequences (separate derived rng crc32(pickup_seed|'wall-v1')); spawn.py + test_spawn.py stay byte-identical/UNMODIFIED. [GAME-07]
+  6. Wall hygiene: gone from the completion view (delete_walls in _teardown_round — D-WALL-TEARDOWN (b), GAME-09 "the viewer clears"), gone after Restart (cleanup_srp), swept by Cleanup model in a fresh .pse process; help 'playing' hint names red walls as lethal. [GAME-09, DOCS-03]
+  7. A live owner feel-check APPROVES the wall experience + feel numbers (the ONE consolidated blocking checkpoint). [closure gate]
+**Plans**: 9 plans (4 waves; planned 2026-10-12 from the three 09-RESEARCH-* files; owner directive: fine-grained focused plans)
+
+Plans:
+- [ ] 09-01-PLAN.md — TDD serpentrum/wall.py: wall_seed_from_setup + WallSpawner policy (constants table, 3-draw contract, 4 clearance legs, None semantics) + tests/test_wall.py (Wave 1, parallel)
+- [ ] 09-02-PLAN.md — TDD engine wall state + collision: WALL_COLLISION_RADIUS_A, set_wall/clear_wall/reset, ('crashed','wall') leg after boundary before body + tests/test_engine_wall.py (Wave 1, parallel)
+- [ ] 09-03-PLAN.md — TDD cgo_build.wall_cgo: 42-float 4-edge vertical LINES fence + TestWallCgo (Wave 1, parallel)
+- [ ] 09-04-PLAN.md — TDD pure text surfaces: hud_logic.debug_wall_trace DBG builder (SRP_DEBUG no-overlap audit line) + help 'playing' wall clause with coupled pins (Wave 1, parallel)
+- [ ] 09-05-PLAN.md — pymol_bridge wall channel: WALL_NAME/DEFAULT_WALL_* + load_line_wall + delete_walls ('srp_wall*' pattern) (Wave 2, parallel)
+- [ ] 09-06-PLAN.md — s10 integration scenario: capture → synchronized next-mol + wall spawn → wall crash → completion counters → byte-identical GAME-07 re-run (+ docstring line; s10 NOT s9) (Wave 2, parallel)
+- [ ] 09-07-PLAN.md — gui_game wiring: _build_engine WallSpawner + session 'wall_spawner' + _respawn_pickup success-tail wall seam (finished guard) + _teardown_round delete_walls + TestWallWiring source-scan pins (Wave 3, parallel)
+- [ ] 09-08-PLAN.md — REQUIRED smoke/15_line_wall_smoke.py (6 stages: load/replace/spawn-pairing/crash/delete/scene-clear) + REQUIRED_SMOKES registration + full battery (Wave 3, parallel)
+- [ ] 09-09-PLAN.md — Phase-close: battery recorded → BLOCKING owner feel-check (feel numbers + decision-table confirm-or-amend) → conditional constant retunes + REQUIREMENTS.md GAME-05 dated amendment (route b) (Wave 4, blocking)
+
+Notes: Owner request verbatim (2026-10-11): "improve gameplay experience by random spawn line as wall-within-box after picking up a mol, at the same time as the spawn of the next mol. the line-wall should not overlap with the newly spawn mol." Planning verdicts (2026-10-12, owner blesses/retunes at the ONE closing checkpoint 09-09): **D-MAP = route (b)** dated GAME-05 amendment (coverage stays 46/46; the closed GATE V ledger keeps its meaning; zero audit-tool churn); **D-WALL-TEARDOWN = (b) delete at _teardown_round** beside delete_pickups (GAME-09 requirement compliance — the box is static user-chosen arena, the wall is per-run spawned content kin to pickups; crash cause stays in the log) — ONE consistent contract across engine reset (09-02), the bridge delete seat (09-05), teardown wiring (09-07), smoke STAGE5/6 (09-08), and feel steps 5-6 (09-09). Other researched defaults encoded: head-only wall binding; ('crashed','wall') rides the generic crash→completion path with zero GUI crash-handler edits; one live wall replaced per spawn; separate derived rng stream (pre/post-Phase-9 pickup replays byte-identical — no feel-check confound); s10 scenario name avoids the existing test_phase5_integration s9 (5.3's chain pin); NO new Setup knob (5.3 precedent — constants are the tuning surface); docs stay hidden (README/check_docs families wall-neutral — verified; the ONLY user-visible text is the mandated DOCS-03 playing-hint clause). Prior suites stay green UNMODIFIED: test_spawn.py untouched (spawn.py byte-identical, checked per plan), engine suites untouched (wall pins live in the new test_engine_wall.py), s1-s9 untouched (s10 additive). Wave-1 runs FOUR parallel TDD plans (worktree protocol, Phase-5 batch-cap precedent).
+
 ## Execution Waves (parallelization: true)
 
 Dependency-driven waves:
@@ -372,3 +401,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 6. xtb Pipeline | 12/12 | Complete (verified 5/5 SCs; owner live checkpoint APPROVED 12/12 with SRP_SPECTRA_DIR amendment; 796 unittests, 8/8 required smokes; DEFAULT_THREAD_ARG ('-P','4') ships; HESSIAN_WARNING measurement-derived) | 2026-09-26 |
 | 7. Spectra UI | 10/10 | Complete (verified 38/38 must-haves, 3/3 SCs; owner-approved plot options expanded at 07-06; 07-10 live checkpoint APPROVED round 2 — optimized frame signed off; 840 unittests, 10/10 required smokes, --xtb green) | 2026-09-26 |
 | 8. Demo Data, Docs & Release Audit | 13/13 | Complete (verified 5/5 SCs; 11 planned plans + owner insertions 08-12/08-13 mid-GATE V; GATE D verdicts + GATE V sign-off all approved): SC1 data approval flipped live (DATA_SOURCES.md APPROVED-headed 2026-10-10, commit 3fd30cf, UNVERIFIED quarantine intact); SC2 persistence checkpoint (GATE V Section B — 6-button row + educator round-trip PASS); SC3 README reproduce + doc-vs-code audit (GATE V Section C6 PASS); SC4 help surfaces incl. 08-13 tooltips + D3 dataset explanation (B/C PASS); SC5 release checkpoint + 46/46 requirement ledger Complete (owner "approved" 2026-10-10 UTC) | 2026-10-10 |
+| 9. Random Line-Wall Spawning (ADDED 2026-10-11) | 0/9 | Planned 2026-10-12 (9 plans, 4 waves; TDD waves 1-2 via worktree protocol) | — |

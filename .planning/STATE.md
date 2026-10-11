@@ -5,14 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-09-06)
 
 **Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
-**Current focus:** Phase 7 spectra UI COMPLETE 2026-09-26 (07-10 phase-close: gates green first try → consolidated human-verify round-1 defect (dialog too tall) fixed e91c7ad → round-2 APPROVED "approved, well done" with BOTH sign-offs — optimized-frame vectors + all [TRAIN] discharges) — next: phase verification, then Phase 8 (Demo Data, Docs & Release Audit — TBD planning)
+**Current focus:** v1 milestone COMPLETE + VERIFIED 2026-10-10 (GATE V owner sign-off "approved"; 08-VERIFICATION 162/162 must-haves, 5/5 SCs); post-release quick tasks 001-003 landed; 2026-10-11 — Phase 9 (Random Line-Wall Spawning) APPENDED to the v1 milestone per owner request, UNPLANNED → run /gsd-plan-phase 9 before any other plan work
 
 ## Current Position
 
-Phase: 8 of 8 (Demo Data, Docs & Release Audit) — COMPLETE + GATE V APPROVED (v1 release sign-off "approved" 2026-10-10 UTC) + VERIFIED (162/162 must-haves, 5/5 SCs — 08-VERIFICATION.md)
+Phase: 8 of 9 (Demo Data, Docs & Release Audit) — COMPLETE + GATE V APPROVED (v1 release sign-off "approved" 2026-10-10 UTC) + VERIFIED (162/162 must-haves, 5/5 SCs — 08-VERIFICATION.md)
 Plan: 13 of 13 COMPLETE (08-11 GATE V: flip 3fd30cf + ledger close 7e0ddc9 + final SUMMARY 3d0874b; battery: 995 unittests + 11/11 required smokes incl. RELEASE-E2E + xtb normal termination + audit 46/46)
 Status: v1 SHIPPABLE — APPROVED-headed DATA_SOURCES.md (UNVERIFIED quarantine intact, all DOIs verified); REQUIREMENTS 46/46 Complete; ROADMAP Phase 8 [x] 13/13; all gate amendments recorded in 08-11-SUMMARY (quick-001/002, insertions 08-12/08-13, Multiwfn parity + epsilon/intensity plot modes, debug-06 RESOLVED)
 Last activity: 2026-10-11 - Completed quick task 003: increase the speed of difficulty tiers (owner-approved Option C — 6.0/9.0 (default)/11.0/13.0 A/s; feat 913fbd5, gates 995 + 11/11 smokes green); previous: 2026-10-10 Phase 8 COMPLETE + VERIFIED — GATE V owner "approved" (v1 release sign-off); verifier passed 162/162 zero gaps
+Next Phase: 9 — Random Line-Wall Spawning (APPENDED 2026-10-11, owner request; NOT PLANNED — run /gsd-plan-phase 9 first; the v1 GATE V release sign-off above remains the completed-release record)
 
 Progress: [██████████] 100% (108 of 108 planned plans fully closed — Phases 1-8 + 5.1/5.2/5.3 COMPLETE; v1 milestone verified 2026-10-10)
 
@@ -104,6 +105,7 @@ Recent decisions affecting current work:
 - 2026-09-20: **Phase 5.1 (Game Speed / Difficulty, GAME-11) inserted after Phase 5** (URGENT — owner playtesting feedback "current speed is easy, kinda slow even with small box"); directory .planning/phases/5.1-game-speed-difficulty/; coverage 44 -> 45; draft tiers relaxed ~2.0 / normal 3.0 (default) / fast ~4.5 / expert ~6.0 A/s — owner feel-check finalizes. Distinct from v2 GAME-10-v2 (speed-vs-length, still deferred).
 - 2026-09-20: **Phase 5.2 (Generic Upload Stacking Consent, STACK-06 promoted v2->v1) inserted after 5.1** (owner request 2026-09-20, planning choice = plan-first before 5.1); directory .planning/phases/5.2-generic-upload-stacking-consent/; coverage 45 -> 46; consent via inline Setup control (modal popup purity-banned — .exec_() gate), OFF default, persisted; generic entry = already-approved idealized 3.60 A @ 20 geometry for canonical-planar-6-ring uploads, labeled "generic (illustrative — user-approved)" everywhere; ring-less uploads still skip; absorbs debug C2 seam; execute 5.2 -> 5.1 sequentially (shared gui_setup/hud_logic files).
 - 2026-09-26: **Phase 5.3 (Randomized Pickup Spawning) inserted after Phase 5.2** (URGENT — owner playtesting feedback: "the new mol to be eaten spawn too close to the current position, so its likely too simple. make it more random in the box"); directory .planning/phases/5.3-randomized-pickup-spawning/; no new requirement ID (refines the Phase 5 pickup spawn policy — 05-03 spawn.py + 2026-09-19c cooldown family) — coverage stays 46/46; executes after 5.2, before Phase 6.
+- 2026-10-11: **Phase 9 (Random Line-Wall Spawning) APPENDED after Phase 8** — first integer phase added to the v1 milestone post-GATE V (owner request verbatim: "improve gameplay experience by random spawn line as wall-within-box after picking up a mol, at the same time as the spawn of the next mol. the line-wall should not overlap with the newly spawn mol."); directory .planning/phases/09-random-line-wall-spawning/; UNPLANNED — run /gsd-plan-phase 9; requirement mapping decided at planning (5.3 precedent — refine an existing GAME rule vs. mint a new GAME-12); v1 release record (GATE V sign-off + 08-VERIFICATION, 2026-10-10) unaffected; milestone audit/archive deferred until Phase 9 lands.
 
 ### Pending Todos
 
@@ -140,7 +142,7 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-10-11 (quick task 003 — speed-tier retune Option C owner-approved; 2026-10-10 before that: GATE V close-out, owner "approved" → flip + ledger + final battery; verifier 162/162 passed)
-Stopped at: v1 milestone intact — all 8 phases + 3 insertions verified, 46/46 requirements Complete; quick-003 retune landed post-release (6.0/9.0/11.0/13.0 A/s, default normal 9.0); no open work
+Stopped at: v1 release state intact — all 8 phases + 3 insertions verified, 46/46 requirements Complete; quick-003 retune landed post-release (6.0/9.0/11.0/13.0 A/s, default normal 9.0); Phase 9 (Random Line-Wall Spawning) APPENDED 2026-10-11 — UNPLANNED, the only open work
 Resume file: None needed
-Next action: /gsd-audit-milestone (recommended — audit the v1 milestone), or /gsd-complete-milestone to archive directly; /gsd-quick for small ad-hoc work. Do NOT start plan work outside its own plan.
+Next action: /gsd-plan-phase 9 (plan Random Line-Wall Spawning; `/new` first — fresh context window); /gsd-audit-milestone and /gsd-complete-milestone deferred until Phase 9 lands; /gsd-quick for small ad-hoc work. Do NOT start plan work outside its own plan.
 Date convention: planning-doc dates are UTC (git commit dates authoritative) — the dev shell is HKT (UTC+8); never stamp from the local date.
