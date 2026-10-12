@@ -38,9 +38,12 @@ interpretation per value (e.g. we use END, never LINE_STRIP; VERTEX,
 never TRIANGLES), and the test interpreter maps each value to the single
 operand-count we use.
 
-Three public builders:
+Four public builders:
   box_cgo      -- displayed boundary box (STACK.md sec.3) as 12 LINES
-                  edges built purely from two corners.
+                   edges built purely from two corners.
+  wall_cgo     -- random line-wall (Phase 9) as a floor-to-ceiling
+                   4-edge vertical LINES fence between two opposite
+                   corners (the visual twin of the engine's 2D wall).
   mode_arrows  -- vibrational mode displacement arrows (SPECTRA-05) as a
                   CYLINDER shaft + CONE head per nonzero displacement
                   vector.
@@ -121,6 +124,79 @@ def box_cgo(min_corner, max_corner, color=(1.0, 0.4, 0.1), linewidth=2.0):
         (c001, c101), (c101, c111), (c111, c011), (c011, c001),
         # Four verticals
         (c000, c001), (c100, c101), (c110, c111), (c010, c011),
+    ]
+
+    out = [LINEWIDTH, lw, BEGIN, LINES, COLOR, cr, cg, cb]
+    for p_a, p_b in edges:
+        out.extend([VERTEX, p_a[0], p_a[1], p_a[2],
+                    VERTEX, p_b[0], p_b[1], p_b[2]])
+    out.extend([END, STOP])
+    return out
+
+
+def wall_cgo(p1, p2, color=(1.0, 0.4, 0.1), linewidth=2.0):
+    """Build a vertical line-wall CGO stream as a 4-edge LINES fence.
+
+    PURE: stdlib only, returns a plain list of floats.
+
+    Phase 9 random line-wall: the vertical fence whose on-screen
+    projection under the locked camera (looking down -z at the xy
+    plane) equals exactly the engine's 2D collision segment -- visual
+    truth == collision truth at the play plane.  The full z band (not
+    a flat z=0 line) keeps the wall reading as a wall from any
+    post-unlock oblique angle.
+
+    p1 / p2: two OPPOSITE 3D corners of the fence.  p1 = (x1, y1, z1)
+        is one wall endpoint's BOTTOM corner and p2 = (x2, y2, z2) is
+        the OTHER endpoint's TOP corner; the four fence corners derive
+        as (x1, y1, z1) / (x1, y1, z2) and (x2, y2, z1) / (x2, y2, z2)
+        -- the 2D truth is the ENGINE's xy endpoints.  z spans the two
+        corner args -- the BRIDGE owns the +-BOX_DISPLAY_Z call
+        exactly like load_box does, so a wall spans floor-to-ceiling
+        like the box itself.
+    color: (r, g, b) float triplet for the fence color.  Builder
+        default mirrors box_cgo's kwargs; the bridge passes its own
+        DEFAULT_WALL_* constants (pure red -- decided in the bridge
+        plan, NOT here).
+    linewidth: float line width for the LINES block.
+
+    LINES only -- no fill, no TRIANGLE_STRIP: the test interpreter's
+    operand table has no TRIANGLE_STRIP and needs none, so the stream
+    parses with ZERO harness changes.
+
+    Returns a float list structured as:
+      [LINEWIDTH, w, BEGIN, LINES, COLOR, r, g, b]      -- 8 floats
+      + 4 edges, each [VERTEX, x,y,z, VERTEX, x,y,z]     -- 32 floats
+      + [END, STOP]                                      -- 2 floats
+    Total: 42 floats (parseable by the mini CGO interpreter in tests).
+    Edge order is PINNED (parallelogram): bottom edge, vertical at p2,
+    top edge, closing vertical at p1 -- the box_cgo header/edge/
+    trailer float protocol exactly, with 4 edges instead of 12.
+    """
+    x1 = float(p1[0])
+    y1 = float(p1[1])
+    z1 = float(p1[2])
+    x2 = float(p2[0])
+    y2 = float(p2[1])
+    z2 = float(p2[2])
+    cr = float(color[0])
+    cg = float(color[1])
+    cb = float(color[2])
+    lw = float(linewidth)
+
+    # Four fence corners from the two OPPOSITE corners: p1 anchors the
+    # bottom z (z1), p2 anchors the top z (z2); each xy endpoint gets
+    # both z heights.
+    p1_bot = (x1, y1, z1)
+    p1_top = (x1, y1, z2)
+    p2_bot = (x2, y2, z1)
+    p2_top = (x2, y2, z2)
+
+    # 4 edges in PINNED order (bridge research sec.2.1): bottom edge,
+    # vertical at p2, top edge, closing vertical back down to p1_bot.
+    edges = [
+        (p1_bot, p2_bot), (p2_bot, p2_top),
+        (p2_top, p1_top), (p1_top, p1_bot),
     ]
 
     out = [LINEWIDTH, lw, BEGIN, LINES, COLOR, cr, cg, cb]
