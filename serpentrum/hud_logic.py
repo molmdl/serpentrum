@@ -440,6 +440,27 @@ def debug_spawn_cooldown_over():
     return 'DBG spawn pool cooldown over - spawning resumed'
 
 
+def debug_wall_trace(wall_id, p1, p2, new_mol_id, new_centroid, gap,
+                     tick=None):
+    """SRP_DEBUG-only wall-spawn trace (Phase 9; the 33c13e7 family).
+
+    Pure %-format builder — the CALLER computes all inputs
+    unconditionally and gates only the log call. `gap` is the wall's
+    min per-atom clearance to the newly spawned mol (the pure spawner
+    math via wall.min_atom_clearance, never a viewer read) — the
+    live human audit of the owner's 'never overlap the new mol'
+    mandate. `len` is the wall segment length (span sanity).
+    """
+    line = ('DBG wall spawn %s p1=(%.2f,%.2f) p2=(%.2f,%.2f) '
+            'len=%.4f new_mol=%s@(%.2f,%.2f) gap=%.4f'
+            % (wall_id, p1[0], p1[1], p2[0], p2[1],
+               math.hypot(p2[0] - p1[0], p2[1] - p1[1]),
+               new_mol_id, new_centroid[0], new_centroid[1], gap))
+    if tick is not None:
+        line += ' tick=%d' % tick
+    return line
+
+
 def debug_event_trace(kind, tick=None, heading=None, head_xy=None,
                       sweep_delta=None, result=None,
                       molecules_stacked=None, pickups_remaining=None):
