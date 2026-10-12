@@ -402,5 +402,127 @@ class TestSpheresCgo(unittest.TestCase):
         self.assertAlmostEqual(stream[8], 1.5, delta=1e-9)
 
 
+class TestWallCgo(unittest.TestCase):
+    """Line-wall builder: parseable 4-edge vertical LINES fence stream.
+
+    Phase 9 contract (bridge research sec.2.1): ``wall_cgo(p1, p2)``
+    takes two OPPOSITE 3D corners -- p1 = (x1, y1, z1) is one wall
+    endpoint's BOTTOM corner and p2 = (x2, y2, z2) is the OTHER
+    endpoint's TOP corner -- and derives the four fence corners from
+    them: (x1, y1, z1) / (x1, y1, z2) and (x2, y2, z1) / (x2, y2, z2).
+    The 2D collision truth (engine-owned) is the xy endpoints; the z
+    band comes from the corner args (the bridge passes
+    +-BOX_DISPLAY_Z).  LINES only, so the stream parses through the
+    SAME _OPERANDS mini interpreter with ZERO harness changes.
+    """
+
+    def test_structure_42_floats(self):
+        stream = cgo_build.wall_cgo((1.0, 2.0, -5.0), (4.0, 6.0, 5.0))
+        # Interpreter must parse the whole stream cleanly (no exceptions).
+        records = _interpret_cgo(stream)
+        # Total: 8 (header) + 32 (4 edges x 8 floats) + 2 (END+STOP) = 42.
+        self.assertEqual(len(stream), 42)
+        # Single header: [LINEWIDTH, w, BEGIN, LINES, COLOR, r, g, b].
+        self.assertEqual(stream[0], cgo_build.LINEWIDTH)
+        self.assertEqual(stream[1], 2.0)
+        self.assertEqual(stream[2], cgo_build.BEGIN)
+        self.assertEqual(stream[3], cgo_build.LINES)
+        self.assertEqual(stream[4], cgo_build.COLOR)
+        self.assertEqual(stream[5:8], [1.0, 0.4, 0.1])
+        # Single trailer: [END, STOP].
+        self.assertEqual(stream[-2:], [cgo_build.END, cgo_build.STOP])
+        # 4 edge blocks of [VERTEX, ax, ay, az, VERTEX, bx, by, bz].
+        for edge in range(4):
+            base = 8 + edge * 8
+            self.assertEqual(stream[base], cgo_build.VERTEX,
+                             'edge %d first record is not VERTEX' % edge)
+            self.assertEqual(stream[base + 4], cgo_build.VERTEX,
+                             'edge %d second record is not VERTEX' % edge)
+        # Record counts: one header worth, exactly 8 VERTEX records.
+        opcodes = [r[0] for r in records]
+        self.assertEqual(opcodes.count(cgo_build.LINEWIDTH), 1)
+        self.assertEqual(opcodes.count(cgo_build.BEGIN), 1)
+        self.assertEqual(opcodes.count(cgo_build.LINES), 1)
+        self.assertEqual(opcodes.count(cgo_build.COLOR), 1)
+        self.assertEqual(opcodes.count(cgo_build.VERTEX), 8)
+        self.assertEqual(opcodes.count(cgo_build.END), 1)
+        self.assertEqual(opcodes.count(cgo_build.STOP), 1)
+
+    def test_all_elements_floats(self):
+        stream = cgo_build.wall_cgo((1.0, 2.0, -5.0), (4.0, 6.0, 5.0))
+        for i, v in enumerate(stream):
+            self.assertIsInstance(
+                v, float,
+                'stream[%d] = %r is %s, not float'
+                % (i, v, type(v).__name__))
+
+    def test_vertices_recovered_by_interpreter(self):
+        # ZERO harness edits: the existing _OPERANDS interpreter parses
+        # the LINES stream and recovers the 8 vertices in PINNED order.
+        stream = cgo_build.wall_cgo((1.0, 2.0, -5.0), (4.0, 6.0, 5.0))
+        records = _interpret_cgo(stream)
+        verts = _vertex_triples(records)
+        self.assertEqual(len(verts), 8)
+        p1_bot = (1.0, 2.0, -5.0)
+        p2_bot = (4.0, 6.0, -5.0)
+        p2_top = (4.0, 6.0, 5.0)
+        p1_top = (1.0, 2.0, 5.0)
+        # Pinned edge order: bottom edge, vertical at p2, top edge, then
+        # the closing vertical back down to p1_bot.
+        self.assertEqual(verts, [
+            p1_bot, p2_bot,
+            p2_bot, p2_top,
+            p2_top, p1_top,
+            p1_top, p1_bot,
+        ])
+        # The fence spans exactly the given corners' z band [-5, 5].
+        zs = [v[2] for v in verts]
+        self.assertEqual(min(zs), -5.0)
+        self.assertEqual(max(zs), 5.0)
+
+    def test_color_linewidth_propagation(self):
+        stream = cgo_build.wall_cgo(
+            (1.0, 2.0, -5.0), (4.0, 6.0, 5.0),
+            color=(1.0, 0.0, 0.0), linewidth=3.0)
+        _interpret_cgo(stream)
+        # Width rides in the single LINEWIDTH header (position 1).
+        self.assertEqual(stream[0], cgo_build.LINEWIDTH)
+        self.assertEqual(stream[1], 3.0)
+        # Color rides in the single COLOR header (positions 5..7).
+        self.assertEqual(stream[4], cgo_build.COLOR)
+        self.assertEqual(stream[5:8], [1.0, 0.0, 0.0])
+
+    def test_builder_defaults(self):
+        # Defaults mirror box_cgo's kwargs exactly: default color
+        # (1.0, 0.4, 0.1), default linewidth 2.0 (cgo_build.py:75).
+        stream = cgo_build.wall_cgo((0.0, 0.0, -5.0), (3.0, 3.0, 5.0))
+        _interpret_cgo(stream)
+        self.assertEqual(stream[1], 2.0)
+        self.assertEqual(stream[5:8], [1.0, 0.4, 0.1])
+
+    def test_generic_z_and_horizontal(self):
+        # Asymmetric z band [-3, 7]: z derives from the corner args,
+        # NOT from a hardcoded +-5.
+        stream = cgo_build.wall_cgo((0.0, 0.0, -3.0), (5.0, 0.0, 7.0))
+        records = _interpret_cgo(stream)
+        verts = _vertex_triples(records)
+        zs = [v[2] for v in verts]
+        self.assertEqual(min(zs), -3.0)
+        self.assertEqual(max(zs), 7.0)
+        # Horizontal segment (dy=0): every element is still a finite
+        # float (NaN is the only float unequal to itself; none of the
+        # outputs may be +-inf either).
+        for i, v in enumerate(stream):
+            self.assertTrue(
+                v == v and v != float('inf') and v != float('-inf'),
+                'stream[%d] = %r is not finite' % (i, v))
+        # Degenerate zero-length wall (x/y collapsed): STILL a valid
+        # 42-float 4-edge stream -- a point wall renders as one
+        # vertical line.
+        deg = cgo_build.wall_cgo((2.0, 3.0, -5.0), (2.0, 3.0, 5.0))
+        self.assertEqual(len(deg), 42)
+        _interpret_cgo(deg)
+
+
 if __name__ == '__main__':
     unittest.main()
