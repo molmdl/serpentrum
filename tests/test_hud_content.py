@@ -959,5 +959,76 @@ class TestDebugTailBinding(unittest.TestCase):
                         'unconditional init precedes the first consumer')
 
 
+class TestWallDebugTrace(unittest.TestCase):
+    """Phase 9 (plan 09-04): debug_wall_trace -- the SRP_DEBUG-only
+    wall-spawn line, joining the debug_spawn_cooldown / debug_event_trace
+    pure DBG family (the 33c13e7 discipline: the CALLER computes all
+    inputs unconditionally and gates only the log call on
+    session.get('debug')).
+
+    `gap` is the wall's min per-atom clearance to the newly spawned mol
+    (pure spawner math via wall.min_atom_clearance, never a viewer
+    read) -- the live human audit of the owner's 'should not overlap
+    the newly spawn mol' mandate. `len` is the wall segment length
+    (span sanity). Pure builder, exact-string pinned (bridge research
+    09 ss5.2). NO gui call sites yet -- the 09-07 controller wall seam
+    is the only future consumer (call-site pins belong there, not
+    here).
+    """
+
+    def test_exact_line_no_tick(self):
+        # Exact-format pin: id via %s, p1/p2 via %.2f, len = hypot(3, 4)
+        # = 5.0000 via %.4f, new_mol id + centroid via (%s, %.2f,%.2f),
+        # gap via %.4f. tick omitted -> NO tick field in the line.
+        self.assertEqual(
+            hud_logic.debug_wall_trace(
+                2, (0.0, 0.0), (3.0, 4.0), 'benzene_2', (10.5, -2.0),
+                4.1251),
+            'DBG wall spawn 2 p1=(0.00,0.00) p2=(3.00,4.00) '
+            'len=5.0000 new_mol=benzene_2@(10.50,-2.00) gap=4.1251')
+
+    def test_exact_line_with_tick(self):
+        # Same call + tick=137 -> the same pinned line with ' tick=137'
+        # appended LAST (the optional-field order pinned).
+        line = hud_logic.debug_wall_trace(
+            2, (0.0, 0.0), (3.0, 4.0), 'benzene_2', (10.5, -2.0), 4.1251,
+            tick=137)
+        self.assertEqual(
+            line,
+            'DBG wall spawn 2 p1=(0.00,0.00) p2=(3.00,4.00) '
+            'len=5.0000 new_mol=benzene_2@(10.50,-2.00) gap=4.1251 '
+            'tick=137')
+
+    def test_wall_id_rendering(self):
+        # %s rendering: an int id (2) and a string id ('w7') both land
+        # in the same pinned slot, byte-for-byte, after the prefix.
+        line_int = hud_logic.debug_wall_trace(
+            2, (0.0, 0.0), (3.0, 4.0), 'benzene_2', (10.5, -2.0), 4.1251)
+        self.assertTrue(line_int.startswith('DBG wall spawn 2 '),
+                        line_int)
+        line_str = hud_logic.debug_wall_trace(
+            'w7', (0.0, 0.0), (3.0, 4.0), 'benzene_2', (10.5, -2.0),
+            4.1251)
+        self.assertTrue(line_str.startswith('DBG wall spawn w7 '),
+                        line_str)
+
+    def test_pure_builder_no_gating_inside(self):
+        # The builder itself carries NO session/debug/enable flag --
+        # gating is the CALLER's session.get('debug') concern, so none
+        # of those kwargs may exist in the signature (TypeError).
+        with self.assertRaises(TypeError):
+            hud_logic.debug_wall_trace(
+                2, (0.0, 0.0), (3.0, 4.0), 'benzene_2', (10.5, -2.0),
+                4.1251, session=True)
+        with self.assertRaises(TypeError):
+            hud_logic.debug_wall_trace(
+                2, (0.0, 0.0), (3.0, 4.0), 'benzene_2', (10.5, -2.0),
+                4.1251, debug=True)
+        with self.assertRaises(TypeError):
+            hud_logic.debug_wall_trace(
+                2, (0.0, 0.0), (3.0, 4.0), 'benzene_2', (10.5, -2.0),
+                4.1251, enable=True)
+
+
 if __name__ == '__main__':
     unittest.main()

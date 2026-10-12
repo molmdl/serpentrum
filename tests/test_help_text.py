@@ -143,9 +143,13 @@ class TestGameHint(unittest.TestCase):
             'Get ready - steer with the arrow keys once GO! appears.')
 
     def test_playing(self):
+        # Phase 9 (plan 09-04, DOCS-03): the wall clause names the
+        # visible cue (red = hazard) and the honest consequence - one
+        # undiscoverable lethal rule, one clear clause.
         self.assertEqual(
             help_text.game_hint('playing'),
-            'Steer with the arrow keys. If keys seem dead, click the 3D '
+            'Steer with the arrow keys. Red wall lines are obstacles - '
+            'touching one ends the run. If keys seem dead, click the 3D '
             'viewer first.')
 
     def test_paused(self):
