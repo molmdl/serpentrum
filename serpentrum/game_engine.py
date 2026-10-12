@@ -67,6 +67,10 @@ two engines built with identical args produce identical state and event
 sequences over identical steps. python3.6 syntax only; stdlib-only PURE
 module (no pymol / pmg_tk / PyQt5 / numpy — enforced by
 tools/check_purity.py); zero sys.modules stubs.
+
+Phase 9: an optional static wall (engine.wall, set_wall/clear_wall)
+binds the HEAD ONLY; hitting it is a GAME-05 crash ('crashed', 'wall');
+referee order is moved -> boundary -> wall -> body -> stacked -> won.
 """
 
 import math
@@ -105,6 +109,11 @@ DIRS = {
 BODY_COLLISION_RADIUS_A = 2.0   # head-centroid vs chain-edge clearance.
 # MUST stay < 3.4 A (committed dimer2 stacking distance) minus margin,
 # else the head would collide with the segment just stacked behind it.
+WALL_COLLISION_RADIUS_A = 2.0    # Phase 9 wall: head-vs-wall-line
+# clearance (STRICT <). Same VALUE as BODY_COLLISION_RADIUS_A on
+# purpose, but an INDEPENDENT name — the owner retunes wall feel
+# without touching body feel (the BOUNDARY_MARGIN_A
+# one-name-per-margin discipline).
 SEGMENT_SKIP_RECENT = 2         # newest chain edges exempt from self-collision
 PICKUP_RADIUS_A = 3.0           # head-vs-pickup-CENTROID capture distance
 BOUNDARY_MARGIN_A = 1.0         # = BODY_COLLISION_RADIUS_A / 2 — the ONE
@@ -228,6 +237,17 @@ class GameEngine(object):
                 boundary checking (02-06's free-moving default).
       box_max:  (x1, y1) float tuple or None — axis-aligned box upper
                 corner. None disables boundary checking.
+      wall:     None or ((ax, ay), (bx, by)) float 2-tuples — an
+                optional STATIC line obstacle on the movement plane
+                (Phase 9). ENVIRONMENT, like the box: never translates
+                with the train, never rotates with sweeps. Written by
+                the controller via set_wall/clear_wall (state-only,
+                the attach_segment pattern) or seeded once via the
+                __init__/reset wall= test seam. Binds the HEAD ONLY: a
+                post-move head STRICTLY within WALL_COLLISION_RADIUS_A
+                of the wall segment emits ('crashed', 'wall') and ends
+                the run (GAME-05); the chain may swing/clip through
+                it freely.
       finished: bool — True once the run has ended (crash or win); every
                 later step() is a no-op returning []. Introduced by
                 plan 02-10 (02-06's trimmed scope has no end-of-run
@@ -254,7 +274,8 @@ class GameEngine(object):
     def __init__(self, head=(0.0, 0.0), heading='right', segments=None,
                  box_min=None, box_max=None,
                  pickups=None, cap=None, atom_budget=None,
-                 speed_a_per_s=SPEED_A_PER_S):
+                 speed_a_per_s=SPEED_A_PER_S,
+                 wall=None):
         """Seed the engine state (see reset for the parameter contract).
 
         Kept keyword-friendly: plan 02-10 extends this signature with
@@ -264,12 +285,14 @@ class GameEngine(object):
         self.reset(head=head, heading=heading, segments=segments,
                    box_min=box_min, box_max=box_max,
                    pickups=pickups, cap=cap, atom_budget=atom_budget,
-                   speed_a_per_s=speed_a_per_s)
+                   speed_a_per_s=speed_a_per_s,
+                   wall=wall)
 
     def reset(self, head=(0.0, 0.0), heading='right', segments=None,
               box_min=None, box_max=None,
               pickups=None, cap=None, atom_budget=None,
-              speed_a_per_s=SPEED_A_PER_S):
+              speed_a_per_s=SPEED_A_PER_S,
+              wall=None):
         """Rebuild ALL engine state from the given seeds.
 
         Same parameters as __init__ (GAME-07 deterministic restart):
@@ -283,7 +306,11 @@ class GameEngine(object):
         speed_a_per_s the per-instance forward speed in A/s (Phase 5.1
         GAME-11; default SPEED_A_PER_S = 3.0 preserves the v1 baseline;
         set once here and NEVER mutated mid-run — GAME-08 by
-        construction). Unknown heading names raise ValueError, the same
+        construction), wall = optional static line obstacle
+        ((ax, ay), (bx, by)) (Phase 9; None = no wall, the default) —
+        stored float-coerced as an engine-owned tuple pair,
+        head-only collision, GAME-05 crash class ('crashed', 'wall').
+        Unknown heading names raise ValueError, the same
         loud contract as request_direction; speed_a_per_s <= 0 raises
         ValueError (the single validation point).
         """
@@ -302,6 +329,14 @@ class GameEngine(object):
         self.paused = False
         self.box_min = tuple(box_min) if box_min is not None else None
         self.box_max = tuple(box_max) if box_max is not None else None
+        # Phase 9 wall: default absent; when given, an engine-owned
+        # float-coerced tuple pair (same shape discipline as set_wall —
+        # guarded, tuple-copied, picky about shape: float() raises on
+        # non-numeric endpoints).
+        self.wall = None
+        if wall is not None:
+            self.wall = ((float(wall[0][0]), float(wall[0][1])),
+                         (float(wall[1][0]), float(wall[1][1])))
         self.finished = False
         self.result = None
         self.pickups = self._copy_pickups(pickups)
@@ -594,6 +629,18 @@ class GameEngine(object):
         clear the pending queue, and STOP event processing for this
         tick. A crashed engine no-ops on every later step().
 
+        Wall crash (Phase 9, GAME-05): after the boundary check and
+        BEFORE the body check, if a wall is set and the post-move head
+        is STRICTLY within WALL_COLLISION_RADIUS_A of the wall segment
+        (squared compare via _point_segment_distance_sq — degenerate
+        walls are point obstacles), emit ('crashed', 'wall') and end
+        the run the same way as a boundary crash. The wall binds the
+        HEAD ONLY at straight-motion ticks: sweeps early-return above
+        and never move the head, so a moved-tick check cannot miss a
+        crossing; the chain may swing/clip through it freely (owner
+        2026-09-19b philosophy, head-only box binding precedent
+        2026-09-19d).
+
         Self-collision (plan 02-10, GAME-05 — AUTHORITATIVE polyline-edge
         model): after the boundary check, build the chain polyline from
         segment centroids c[0..n-1] (index 0 = oldest, n-1 = newest
@@ -678,6 +725,22 @@ class GameEngine(object):
                     ny <= y0 + BOUNDARY_MARGIN_A or
                     ny >= y1 - BOUNDARY_MARGIN_A):
                 events.append(('crashed', 'boundary'))
+                self.finished = True
+                self.result = 'crashed'
+                self.pending = []
+                return events
+        # Phase 9 wall (head-only, straight-motion ticks): the wall
+        # binds the HEAD ONLY — sweeps early-return above and never
+        # move the head, so a moved-tick check cannot miss a crossing;
+        # the chain may swing/clip through it freely (owner
+        # 2026-09-19b philosophy). STRICT < WALL_COLLISION_RADIUS_A**2
+        # via the same degenerate-safe helper as the body leg; end-state
+        # lines textually parallel to the boundary/body crash legs.
+        if self.wall is not None:
+            (ax, ay), (bx, by) = self.wall
+            if _point_segment_distance_sq(nx, ny, ax, ay, bx, by) \
+                    < WALL_COLLISION_RADIUS_A ** 2:
+                events.append(('crashed', 'wall'))
                 self.finished = True
                 self.result = 'crashed'
                 self.pending = []
@@ -822,3 +885,32 @@ class GameEngine(object):
             self.finished = False
             self.result = None
         return ('refused', pickup_id, reason)
+
+    def set_wall(self, endpoints):
+        """Store the static wall endpoints (Phase 9, state-only write).
+
+        endpoints: ((ax, ay), (bx, by)) — float-coerced into a fresh
+        engine-owned tuple pair, never sharing caller data (a second
+        set_wall REPLACES the first: one live wall at a time, the
+        spawn seam's replace-per-spawn contract). Returns None and
+        emits NO events: mirrored on attach_segment — the controller
+        writes, the engine never echoes its own state changes as
+        step() events. The wall is ENVIRONMENT, like the box: it
+        never translates with the train and never rotates with
+        sweeps.
+
+        Collision: the HEAD ONLY, straight-motion ticks, STRICT <
+        WALL_COLLISION_RADIUS_A via _point_segment_distance_sq (a
+        degenerate zero-length wall behaves as a point obstacle).
+        """
+        self.wall = ((float(endpoints[0][0]), float(endpoints[0][1])),
+                     (float(endpoints[1][0]), float(endpoints[1][1])))
+
+    def clear_wall(self):
+        """Remove the wall (Phase 9): engine.wall becomes None.
+
+        State-only like set_wall — returns None, emits no event; the
+        controller logs its own side. reset() also rebuilds
+        wall = None (no wall survives an epoch).
+        """
+        self.wall = None
