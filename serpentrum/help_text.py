@@ -166,8 +166,9 @@ _GAME_HINTS = {
     'idle': GAME_FOCUS_HINT + ' ' + CONTROLS_RECAP,
     'countdown': 'Get ready - steer with the arrow keys once GO! '
                  'appears.',
-    'playing': 'Steer with the arrow keys. If keys seem dead, click the '
-               '3D viewer first.',
+    'playing': 'Steer with the arrow keys. Red wall lines are obstacles '
+                '- touching one ends the run. If keys seem dead, click '
+                'the 3D viewer first.',
     'paused': 'Paused - press Resume to continue.',
     'over': 'Run over - press Get Spectra to compute the IR spectrum of '
             'your snake.',
