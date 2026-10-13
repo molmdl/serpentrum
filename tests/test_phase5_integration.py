@@ -45,7 +45,11 @@ scenario-1-shaped call sequence (the GAME-07 restart contract). Scenario 9
 box-sampling policy: a randomized nine-spawn capture chain (growing chain
 atoms, accumulating live centroids) returns no Nones, keeps every
 clearance leg at every step, spreads across the box, and re-runs
-byte-identically.
+byte-identically. Scenario 10 (Phase 9) re-proves the capture chain with
+the randomized line-wall live: every capture spawns the next mol and
+swaps the wall together (clearances derived-true at each step), steering
+into the wall crashes via ('crashed', 'wall') with the snake complete,
+and the whole drive re-runs byte-identically.
 
 python3.6 only (%-formatting, no f-strings). tests/ has NO __init__.py (the
 dev plugin path IS the repo root). Discovery:
@@ -74,6 +78,7 @@ from serpentrum import setloader  # noqa: E402
 from serpentrum import setup_logic  # noqa: E402
 from serpentrum import spawn  # noqa: E402
 from serpentrum import stacking  # noqa: E402
+from serpentrum import wall  # noqa: E402
 from serpentrum.game_engine import GameEngine  # noqa: E402
 
 DT = 0.1
@@ -812,6 +817,249 @@ class TestPhase5IntegrationChain(unittest.TestCase):
         # end-to-end): same record ids, pids, and centroid floats.
         run_b = run_once()
         self.assertEqual(run_a, run_b)
+
+    # ---- SCENARIO 10 (Phase 9) --------------------------------------------
+
+    def test_s10_wall_spawn_pairing_and_crash(self):
+        """GAME-07 end-to-end with the Phase-9 randomized line-wall live
+        (09-RESEARCH-engine-policy.md 4.3 canon): a REAL set_a capture
+        drive mirrors the controller's _respawn order exactly --
+        note_resolution -> next_after -> build_pickup_seed + engine
+        append -> next_wall -> engine.set_wall (the same order 09-07
+        wires into gui_game._respawn_pickup's success tail). At every one
+        of the three captures a fresh mol AND a fresh wall spawn
+        TOGETHER; the owner's no-overlap mandate is asserted at every
+        step on the RAW sym-first (sym, x, y, z) seed atoms fed
+        UNPROJECTED (09-01's x=[1]/y=[2] contract); the wall endpoints
+        keep the box inset; the head keeps the launch clearance; exactly
+        one wall is live (replaced per spawn); no wall exists at run
+        start (begin-no-wall); set_wall is state-only (no wall-induced
+        event). Steering the head into the live wall then emits exactly
+        ('crashed', 'wall') with the snake complete (molecules_stacked
+        intact) and no ('won',); the crash tick suppresses any capture
+        (the wall leg precedes the pickup scan). The ENTIRE drive
+        re-runs byte-identical from fresh same-seed spawners/engine.
+        Every bound is DERIVED from the module constants (WALL_MOL_
+        CLEARANCE_A, WALL_BOX_MARGIN_A, WALL_HEAD_CLEARANCE_A,
+        WALL_COLLISION_RADIUS_A) -- no hardcoded positions, so an owner
+        retune at 09-09 cannot silently break this scenario."""
+        state = self.state
+        tol = 1e-9
+
+        # Sanctioned working fixed seed (the s9 :733 / 4242-class
+        # precedent): the drive must yield captures that all PLACE and a
+        # wall stream that returns a legal wall at every capture. The
+        # seed_tag 1 draw is the first working one found; recorded here,
+        # never derived.
+        setup = {'phase': '9', 'scenario': 's10', 'seed_tag': 1}
+        pickup_seed_value = spawn.seed_from_setup(setup)
+        wall_seed_value = wall.wall_seed_from_setup(setup)
+
+        _opposite = {'left': 'right', 'right': 'left',
+                     'up': 'down', 'down': 'up'}
+
+        def heading_name(engine):
+            hx, hy = engine.heading
+            if hx > 0.5:
+                return 'right'
+            if hx < -0.5:
+                return 'left'
+            return 'up' if hy > 0.5 else 'down'
+
+        def choose_dir(engine, target):
+            """Greedy axis steering toward ``target``; never requests the
+            forbidden 180-degree reversal (the engine ignores it)."""
+            dx = target[0] - engine.head[0]
+            dy = target[1] - engine.head[1]
+            candidates = [(abs(dx), 'right' if dx > 0.0 else 'left'),
+                          (abs(dy), 'up' if dy > 0.0 else 'down')]
+            candidates.sort(key=lambda item: -item[0])
+            current = heading_name(engine)
+            for _distance, direction in candidates:
+                if direction != _opposite[current]:
+                    return direction
+            return candidates[0][1]
+
+        def run_drive():
+            """One full controller-mirrored drive -> (engine, log).
+
+            Seam order (gui_game._handle_stack_event -> _respawn_pickup;
+            09-07 seats the wall at the success-branch tail): capture()
+            resolution -> note_resolution -> next_after -> build_pickup_
+            seed + engine append (+ live-id bookkeeping) -> next_wall ->
+            engine.set_wall. Then steer into the live wall to crash.
+            """
+            spawner = spawn.PickupSpawner(
+                state['records'], state['box_min'], state['box_max'],
+                pickup_seed_value, state['atoms_by_id'])
+            wall_spawner = wall.WallSpawner(
+                state['box_min'], state['box_max'], wall_seed_value)
+            record0, pid0, centroid0 = spawner.first((0.0, 0.0), 'right')
+            first_seed = pickup_seed(state, record0['id'], pid0, centroid0)
+            engine = GameEngine(head=(0.0, 0.0), heading='right',
+                                box_min=state['box_min'],
+                                box_max=state['box_max'],
+                                pickups=[first_seed])
+            # Begin-no-wall invariant: the first wall appears WITH mol 2.
+            self.assertIsNone(engine.wall)
+            log = {'events': [], 'walls': [], 'crash_tick': None,
+                   'result': None, 'captures': 0}
+            previous_wall = None
+            captures = 0
+            steps = 0
+            max_steps = 8000
+            while (not engine.finished and captures < 3
+                   and steps < max_steps):
+                steps += 1
+                live = [p for p in engine.pickups
+                        if p['id'] in engine.live_pickup_ids]
+                if live:
+                    engine.request_direction(
+                        choose_dir(engine, live[-1]['centroid']))
+                events = engine.step(DT)
+                log['events'].append(tuple(events))
+                for event in events:
+                    if event[0] != 'stacked':
+                        continue
+                    captures += 1
+                    # The capture resolution (05-13 seam) precedes the
+                    # respawn seam; every pinned capture must PLACE so
+                    # the snake and the counter stay complete.
+                    outcome = capture(engine, event[1], state)
+                    self.assertEqual(outcome['status'], 'placed')
+                    # --- respawn seam (EXACT controller order) ----------
+                    spawner.note_resolution(event[1]['molecule_id'],
+                                            refused=False)
+                    chain_atoms = head_atom_fn(state, engine.head)
+                    for segment in engine.segments:
+                        chain_atoms.extend(segment['atoms'])
+                    live_centroids = [p['centroid'] for p in engine.pickups
+                                      if p['id'] in engine.live_pickup_ids]
+                    spawned = spawner.next_after(
+                        engine.head, heading_name(engine), chain_atoms,
+                        live_centroids)
+                    self.assertIsNotNone(spawned)
+                    record, pid, centroid = spawned
+                    seed = pickup_seed(state, record['id'], pid, centroid)
+                    engine.pickups.append(seed)
+                    engine.live_pickup_ids.add(pid)
+                    engine.pickups_remaining += 1
+                    # Other-live atoms: engine-live records EXCLUDING the
+                    # fresh seed (raw sym-first 4-tuples, x=[1]/y=[2]).
+                    other_live_atoms = []
+                    for pickup in engine.pickups:
+                        if (pickup['id'] in engine.live_pickup_ids
+                                and pickup['id'] != pid):
+                            other_live_atoms.extend(pickup['atoms'])
+                    wall_eps = wall_spawner.next_wall(
+                        engine.head, seed['atoms'], other_live_atoms)
+                    self.assertIsNotNone(wall_eps)
+                    self.assertIsNone(engine.set_wall(wall_eps))
+                    # (i) a wall is now live.
+                    self.assertIsNotNone(engine.wall)
+                    # (ii) exactly one live wall: replaced per spawn.
+                    if previous_wall is not None:
+                        self.assertNotEqual(engine.wall, previous_wall)
+                    previous_wall = engine.wall
+                    # (iii) owner no-overlap: every atom of the fresh
+                    # seed stays >= WALL_MOL_CLEARANCE_A from the wall
+                    # (RAW 4-tuples fed UNPROJECTED -- the integration
+                    # proof of 09-01's x=[1]/y=[2] shape contract).
+                    self.assertGreaterEqual(
+                        wall.min_atom_clearance(wall_eps, seed['atoms']),
+                        wall.WALL_MOL_CLEARANCE_A - tol)
+                    # (iv) both endpoints inset from all four faces.
+                    for endpoint in wall_eps:
+                        self.assertGreaterEqual(
+                            endpoint[0],
+                            state['box_min'][0] + wall.WALL_BOX_MARGIN_A
+                            - tol)
+                        self.assertLessEqual(
+                            endpoint[0],
+                            state['box_max'][0] - wall.WALL_BOX_MARGIN_A
+                            + tol)
+                        self.assertGreaterEqual(
+                            endpoint[1],
+                            state['box_min'][1] + wall.WALL_BOX_MARGIN_A
+                            - tol)
+                        self.assertLessEqual(
+                            endpoint[1],
+                            state['box_max'][1] - wall.WALL_BOX_MARGIN_A
+                            + tol)
+                    # (v) the head keeps the launch clearance.
+                    self.assertGreaterEqual(
+                        wall.min_atom_clearance(
+                            wall_eps,
+                            [(engine.head[0], engine.head[1])]),
+                        wall.WALL_HEAD_CLEARANCE_A - tol)
+                    # (vi) set_wall is state-only: the capture tick's
+                    # event list carries the capture and NO wall-induced
+                    # event (no crash).
+                    tick_names = [e[0] for e in events]
+                    self.assertIn('stacked', tick_names)
+                    self.assertNotIn('crashed', tick_names)
+                    log['walls'].append(wall_eps)
+            log['captures'] = captures
+            # --- wall-crash leg: steer into the CURRENT wall ------------
+            self.assertIsNotNone(engine.wall)
+            (ax, ay), (bx, by) = engine.wall
+            target = ((ax + bx) / 2.0, (ay + by) / 2.0)
+            while not engine.finished and steps < max_steps:
+                steps += 1
+                engine.request_direction(choose_dir(engine, target))
+                events = engine.step(DT)
+                log['events'].append(tuple(events))
+            log['crash_tick'] = steps
+            log['result'] = engine.result
+            return engine, log
+
+        engine_a, log_a = run_drive()
+        # Pairing drive: three captures, every one PLACED; the snake and
+        # the counter are complete (no wall crash during the drive).
+        self.assertEqual(log_a['captures'], 3)
+        self.assertEqual(engine_a.molecules_stacked, log_a['captures'])
+        self.assertEqual(len(engine_a.segments), log_a['captures'])
+        self.assertEqual(len(log_a['walls']), 3)
+        # (c) crash leg: the final event is EXACTLY ('crashed', 'wall').
+        self.assertTrue(engine_a.finished)
+        self.assertEqual(log_a['result'], 'crashed')
+        crash_events = log_a['events'][-1]
+        self.assertEqual(crash_events[-1], ('crashed', 'wall'))
+        self.assertNotIn('won', [e[0] for e in crash_events])
+        # (d) the crash tick suppresses capture (the wall leg precedes
+        # the pickup scan): no ('stacked', ...) after the crash.
+        self.assertNotIn('stacked', [e[0] for e in crash_events])
+        self.assertEqual(engine_a.pending, [])
+        all_names = [e[0] for frame in log_a['events'] for e in frame]
+        self.assertNotIn('won', all_names)
+        # A crashed engine no-ops on every later step.
+        self.assertEqual(engine_a.step(DT), [])
+        # (d) controlled suppression proof (non-vacuous): a fresh engine
+        # whose next step lands inside BOTH the pickup radius and the
+        # wall radius emits ONLY the wall crash -- head (0,0) -> (0.3,0);
+        # pickup centroid (1.0,0) is 0.7 A away (<= 3.0 PICKUP_RADIUS_A);
+        # the wall at x=1.2 is 0.9 A away (< 2.0 WALL_COLLISION_RADIUS_A).
+        proof_pickup = pickup_seed(state, 'benzene', 'pick_0001',
+                                   (1.0, 0.0))
+        proof = GameEngine(head=(0.0, 0.0), heading='right',
+                           box_min=state['box_min'],
+                           box_max=state['box_max'],
+                           pickups=[proof_pickup],
+                           wall=((1.2, -5.0), (1.2, 5.0)))
+        proof_events = proof.step(DT)
+        self.assertIn(('crashed', 'wall'), proof_events)
+        self.assertNotIn('stacked', [e[0] for e in proof_events])
+        self.assertTrue(proof.finished)
+        self.assertEqual(proof.molecules_stacked, 0)
+        # (e) GAME-07: the ENTIRE drive re-runs byte-identically from
+        # fresh same-seed spawners/engine -- every event equal, identical
+        # wall endpoint sequence, identical crash tick.
+        _engine_b, log_b = run_drive()
+        self.assertEqual(log_a['events'], log_b['events'])
+        self.assertEqual(log_a['walls'], log_b['walls'])
+        self.assertEqual(log_a['crash_tick'], log_b['crash_tick'])
+        self.assertEqual(log_a['result'], log_b['result'])
+        self.assertEqual(log_a['captures'], log_b['captures'])
 
 
 if __name__ == '__main__':
