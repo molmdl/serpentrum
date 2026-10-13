@@ -73,7 +73,11 @@ REQUIRED_SMOKES = ('smoke/01_skeleton_smoke.py',
                     # 14 = release e2e chain (Phase 8, plan 08-04) — scripted
                     # engine win -> xyz handoff -> fixture spectra -> PNG save
                     # -> setup round-trip, one headless run
-                    'smoke/14_release_e2e_smoke.py')
+                    'smoke/14_release_e2e_smoke.py',
+                    # 15 = random line-wall render + wall-crash + restart
+                    # hygiene (Phase 9, plan 09-08) — viewer channel,
+                    # replace-per-spawn, cleanup sweep on every end path
+                    'smoke/15_line_wall_smoke.py')
 
 SMOKE_BAT = 'C:\\src\\run-conda-pymol.bat'
 SMOKE_TIMEOUT = 90  # seconds, per research Q3
