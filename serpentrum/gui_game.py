@@ -73,6 +73,10 @@ from . import molfile
 from . import orientation
 from . import placement
 from . import spawn as spawn_mod
+# wall (plan 09-07): the PURE seeded random line-wall spawner --
+# constructed once per run in _build_engine (session-anchored), swapped
+# inside _respawn_pickup's success tail with each next-mol spawn.
+from . import wall as wall_mod
 # stacking is consumed ONLY on the SRP_DEBUG=1 trace path (ring normals
 # recomputed for the live capture trace; a PURE sibling import).
 from . import stacking
@@ -413,6 +417,10 @@ class GameTab(QtWidgets.QWidget):
             'head_stack_ring': extras['head_stack_ring'],
             'records_by_id': extras['records_by_id'],
             'spawner': extras['spawner'],
+            # Phase 9 (plan 09-07): session-anchored wall spawner (None on
+            # no-records runs -- box-only parity). Lives ONLY on the
+            # session dict, never a module global / widget state.
+            'wall_spawner': extras['wall_spawner'],
             'stacked_history': [],
             'live_pickup_names': [],
             'last_turn_delta': 0.0,
@@ -503,7 +511,8 @@ class GameTab(QtWidgets.QWidget):
         extras = {'head_atoms': None,
                   'head_stack_ring': None,
                   'records_by_id': {},
-                  'spawner': None}
+                  'spawner': None,
+                  'wall_spawner': None}
         pickups = None
         records = []
         if self._anchor is not None:
@@ -521,6 +530,17 @@ class GameTab(QtWidgets.QWidget):
                 records, (x0, y0), (x1, y1),
                 spawn_mod.seed_from_setup(setup), atoms_by_id)
             extras['spawner'] = spawner
+            # Phase 9 (plan 09-07): the wall spawner, beside the pickup
+            # spawner, receiving the SAME (box_min, box_max) tuple shape
+            # (a flattened WallSpawner(x0, y0, x1, y1, ...) call would
+            # silently misbind box_max<-y0, seed<-x1 and die degenerate).
+            # Seeded via the DISTINCT wall stream (wall_seed_from_setup
+            # salts the pickup seed; GAME-07 restart determinism intact).
+            # No-records runs leave extras['wall_spawner'] None (box-only
+            # parity -- walls are a records-run feature).
+            extras['wall_spawner'] = wall_mod.WallSpawner(
+                (x0, y0), (x1, y1),
+                wall_mod.wall_seed_from_setup(setup))
             # heading NAME: the spawner's contract is 'right' etc., not a
             # unit vector (spawn.py _DIRS keying).
             result = spawner.first((0.0, 0.0), 'right')
@@ -1255,6 +1275,38 @@ class GameTab(QtWidgets.QWidget):
         pymol_bridge.materialize_pickup(
             record['file'], name, self._pickup_m16(record, centroid))
         session['live_pickup_names'].append(name)
+        # --- Phase 9 wall seam: the wall swaps EXACTLY with each
+        # successful next-mol spawn (both _respawn_pickup call sites
+        # inherit this -- capture tail AND exhaust-cooldown resume; no
+        # mol spawn => no wall swap). Sits INSIDE the success branch so
+        # the can_spawn gate on a same-tick second invocation exits
+        # before it.
+        if engine.finished:
+            return  # win-tick guard: no wall on the completion board
+        wall_spawner = session.get('wall_spawner')
+        if wall_spawner is None:
+            return  # no-records run: box-only parity
+        other_live_atoms = []
+        for pickup in engine.pickups:
+            if (pickup['id'] in engine.live_pickup_ids
+                    and pickup['id'] != seed['id']):
+                other_live_atoms.extend(pickup['atoms'])
+        wall_endpoints = wall_spawner.next_wall(
+            engine.head, seed['atoms'], other_live_atoms)
+        if wall_endpoints is None:
+            return  # benign: keep the previous wall (32-draw miss)
+        engine.set_wall(wall_endpoints)
+        pymol_bridge.delete_walls()
+        pymol_bridge.load_line_wall(wall_endpoints[0], wall_endpoints[1])
+        # All trace inputs compute UNCONDITIONALLY (33c13e7 discipline);
+        # only the log call is SRP_DEBUG-gated. Raw sym-first 4-tuples
+        # feed both the gap math and next_wall (no (x, y) projection).
+        gap = wall_mod.min_atom_clearance(wall_endpoints, seed['atoms'])
+        trace = hud_logic.debug_wall_trace(
+            engine.molecules_stacked, wall_endpoints[0], wall_endpoints[1],
+            seed['id'], seed['centroid'], gap)
+        if session.get('debug') and trace is not None:
+            self._log(trace)
 
     def _on_elapsed_tick(self):
         """1 Hz elapsed refresh - delta-based, NEVER accumulated (Pitfall 5).
@@ -1522,6 +1574,10 @@ class GameTab(QtWidgets.QWidget):
         if session is not None:
             pymol_bridge.unlock_camera(session.pop('saved_cam', None))
         pymol_bridge.delete_pickups()  # (f) live pickups die here, chain stays
+        pymol_bridge.delete_walls()   # Phase 9: walls die on every end path
+                                      # (D-WALL-TEARDOWN (b); GAME-09 'the
+                                      # viewer clears'; crash cause stays in
+                                      # the log)
         self.pause_btn.blockSignals(True)
         self.pause_btn.setChecked(False)
         self.pause_btn.setText('Pause')
