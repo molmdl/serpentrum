@@ -515,6 +515,46 @@ def load_mode_arrows(cgo, name=MODE_VEC_NAME, zoom=0):
     return name
 
 
+# --- Phase 9: random line-wall (viewer half; the ENGINE owns the 2D
+# truth — endpoints arrive game-sampled, z is display-only here) --
+
+WALL_NAME = 'srp_wall'
+DEFAULT_WALL_COLOR = (1.0, 0.0, 0.0)    # pure red: hazard, vs the
+                                         # warm-orange BOX boundary
+DEFAULT_WALL_LINEWIDTH = 3.0             # the e8b3a9d human-verified
+                                         # visibility floor
+
+def load_line_wall(p1_xy, p2_xy, color=DEFAULT_WALL_COLOR,
+                   linewidth=DEFAULT_WALL_LINEWIDTH, name=WALL_NAME):
+    """Build + load ONE line-wall CGO as ``name``.
+
+    Replace semantics live in the CALLER -- delete_object(name)/this
+    delete-then-load first (the 07-09 load_mode_arrows contract).
+    Reads the ENGINE-owned 2D endpoints ((x, y) pairs); derives z
+    from BOX_DISPLAY_Z (display-only -- the load_box precedent at
+    the z-extension call): the wall spans floor-to-ceiling like the
+    box so it reads 'wall' from any post-unlock angle and projects
+    to EXACTLY the 2D collision segment under the locked camera.
+    Returns name (caller stores/ignores).
+    """
+    cmd.load_cgo(cgo_build.wall_cgo(
+        (p1_xy[0], p1_xy[1], -BOX_DISPLAY_Z),
+        (p2_xy[0], p2_xy[1], BOX_DISPLAY_Z),
+        color, linewidth), name, zoom=0)
+    return name
+
+def delete_walls():
+    """Delete every srp_wall* object.
+
+    Pattern delete mirroring delete_pickups ('srp_wall*' covers both
+    the singular WALL_NAME and any indexed srp_wall_<n> form);
+    idempotent by construction -- used by _teardown_round (every end
+    path) and safe on a fresh scene. cleanup_srp also sweeps the
+    prefix for restart/.pse recovery (INFRA-04).
+    """
+    cmd.delete('srp_wall*')
+
+
 def load_xtbopt(path, srp_name=XTBOPT_NAME, zoom=0):
     """Load the run's xtbopt.xyz (the OPTIMIZED frame) as STICKS.
 
