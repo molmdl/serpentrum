@@ -1030,5 +1030,114 @@ class TestWallDebugTrace(unittest.TestCase):
                 4.1251, enable=True)
 
 
+class TestWallWiring(unittest.TestCase):
+    """Phase 9 (plan 09-07): the gui wall-seam source-scan pins.
+
+    The wall swaps EXACTLY with each successful next-mol spawn: the
+    WallSpawner is constructed at ONE site (_build_engine, seeded via
+    wall_seed_from_setup), carried on the session dict as
+    'wall_spawner', and the wall seam lives INSIDE _respawn_pickup's
+    success-branch tail (both capture-tail and cooldown-resume call
+    sites inherit the same-time pairing by construction). Walls die at
+    _teardown_round beside delete_pickups.
+
+    House pattern 5.3-04 / test_gui_pins.py: open the module source and
+    count call forms + slice method bodies between ``def <name>``
+    markers -- any future drift in the wiring fails loudly here.
+    """
+
+    @staticmethod
+    def _method_body(source, needle):
+        start = source.find(needle)
+        assert start >= 0, '%r not found' % (needle,)
+        end = source.find('\n    def ', start + 1)
+        if end < 0:
+            end = len(source)
+        return source[start:end]
+
+    def _gui_game_source(self):
+        source_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'serpentrum', 'gui_game.py')
+        with open(source_path) as handle:
+            return handle.read()
+
+    def test_single_wall_spawner_construction_site(self):
+        # The wall spawner is built in EXACTLY ONE place (_build_engine,
+        # beside the PickupSpawner); a second construction site would
+        # mean duplicate wall state.
+        source = self._gui_game_source()
+        self.assertEqual(source.count('wall_mod.WallSpawner('), 1,
+                         'exactly one WallSpawner construction site '
+                         '(_build_engine)')
+
+    def test_single_wall_seed_wiring(self):
+        # The derived wall seed feeds the constructor at ONE site
+        # (GAME-07 restart determinism; wall_seed_from_setup salts the
+        # pickup seed so the streams stay isolated).
+        source = self._gui_game_source()
+        self.assertEqual(source.count('wall_mod.wall_seed_from_setup('), 1,
+                         'exactly one wall_mod.wall_seed_from_setup wiring '
+                         '(feeds the WallSpawner constructor)')
+
+    def test_single_next_wall_call(self):
+        # The _respawn_pickup success tail holds the ONLY next_wall call
+        # (the per-successful-spawn wall swap).
+        source = self._gui_game_source()
+        self.assertEqual(source.count('next_wall('), 1,
+                         'exactly one next_wall respawn call '
+                         '(_respawn_pickup success tail)')
+
+    def test_single_load_line_wall_call(self):
+        # ONE load_line_wall call site (the delete-then-load wall swap).
+        source = self._gui_game_source()
+        self.assertEqual(source.count('load_line_wall('), 1,
+                         'exactly one pymol_bridge.load_line_wall call '
+                         '(the wall swap)')
+
+    def test_single_debug_wall_trace_call(self):
+        # The 09-04 builder has EXACTLY ONE gui call site (the
+        # SRP_DEBUG-gated trace whose inputs compute unconditionally).
+        source = self._gui_game_source()
+        self.assertEqual(source.count('debug_wall_trace('), 1,
+                         'exactly one hud_logic.debug_wall_trace call site')
+
+    def test_respawn_pickup_has_finished_guard(self):
+        # The win-tick guard: the wall seam must start with
+        # `if engine.finished: return` so no wall flashes onto the
+        # completion board. The guard lives INSIDE the _respawn_pickup
+        # body slice (NOT retrofitted onto the pickup half).
+        source = self._gui_game_source()
+        body = self._method_body(source, '    def _respawn_pickup(')
+        self.assertIn('engine.finished', body,
+                      'the wall seam guard sits inside _respawn_pickup')
+
+    def test_teardown_round_deletes_walls(self):
+        # D-WALL-TEARDOWN (b): walls die on every end path beside
+        # pickups, so no red fence crosses the completion board.
+        source = self._gui_game_source()
+        body = self._method_body(source, '    def _teardown_round(')
+        self.assertIn('delete_walls(', body,
+                      '_teardown_round calls pymol_bridge.delete_walls')
+
+    def test_build_engine_constructs_wall_spawner(self):
+        # The construction seat: the WallSpawner is built in
+        # _build_engine (beside the PickupSpawner), receiving the SAME
+        # (box_min, box_max) tuple shape.
+        source = self._gui_game_source()
+        body = self._method_body(source, '    def _build_engine(')
+        self.assertIn('wall_mod.WallSpawner(', body,
+                      'WallSpawner constructed inside _build_engine')
+
+    def test_no_wall_kwarg_or_refuse_wall_literals(self):
+        # The gui uses the spawner's proportional/default wall kwargs;
+        # owner retunes via wall.py's tunable table, NEVER at the call
+        # site. Mirrors the existing min_head_dist_a blanket pin
+        # (:880-885); no REFUSE_WALL-shaped string may exist.
+        source = self._gui_game_source()
+        self.assertNotIn('min_head_dist_a', source)
+        self.assertNotIn('REFUSE_WALL', source)
+
+
 if __name__ == '__main__':
     unittest.main()
