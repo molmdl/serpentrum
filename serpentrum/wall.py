@@ -65,8 +65,8 @@ WALL_LENGTH_FRACTION = 0.45    # fraction of the minor-axis box span
 WALL_BOX_MARGIN_A = 6.0        # endpoint inset from every face (corridors:
                                # free width = margin - BOUNDARY 1.0 - halo
                                # 2.0 = 3.0 A at 6.0)
-WALL_HEAD_CLEARANCE_A = 12.0   # launch safety: ~0.63 s reaction at the
-                               # 9.0 A/s default, ~0.22 s at expert 13.0
+WALL_HEAD_CLEARANCE_A = 8.0    # launch safety: ~0.89 s reaction at the
+                               # 9.0 A/s default, ~0.62 s at expert 13.0
 WALL_MOL_CLEARANCE_A = 3.0     # per-atom vs the new mol (the chain-atom
                                # clearance value, spawn.py:118 precedent)
 WALL_LIVE_CLEARANCE_A = 3.0    # per-atom vs other live mols
