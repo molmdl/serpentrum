@@ -1029,6 +1029,49 @@ class TestWallDebugTrace(unittest.TestCase):
                 2, (0.0, 0.0), (3.0, 4.0), 'benzene_2', (10.5, -2.0),
                 4.1251, enable=True)
 
+    def test_exact_line_with_wwgap(self):
+        # wwgap appended LAST: the optional wall-vs-wall (L5) suffix
+        # field. The mandatory prefix + gap= stay byte-identical; the
+        # suffix is present exactly here (no tick field this call).
+        self.assertEqual(
+            hud_logic.debug_wall_trace(
+                2, (0.0, 0.0), (3.0, 4.0), 'benzene_2', (10.5, -2.0),
+                4.1251, wwgap=8.03),
+            'DBG wall spawn 2 p1=(0.00,0.00) p2=(3.00,4.00) '
+            'len=5.0000 new_mol=benzene_2@(10.50,-2.00) gap=4.1251 '
+            'wwgap=8.0300')
+
+    def test_wwgap_appends_last_after_tick(self):
+        # tick keeps its append position (after gap=); wwgap appends
+        # LAST (after the optional tick) — the append-order pin.
+        line = hud_logic.debug_wall_trace(
+            2, (0.0, 0.0), (3.0, 4.0), 'benzene_2', (10.5, -2.0), 4.1251,
+            tick=137, wwgap=8.03)
+        self.assertEqual(
+            line,
+            'DBG wall spawn 2 p1=(0.00,0.00) p2=(3.00,4.00) '
+            'len=5.0000 new_mol=benzene_2@(10.50,-2.00) gap=4.1251 '
+            'tick=137 wwgap=8.0300')
+
+    def test_wwgap_none_keeps_shipped_format(self):
+        # Default call (wwgap omitted) == the exact shipped pinned line:
+        # byte-stability of the mandatory prefix + gap= field.
+        self.assertEqual(
+            hud_logic.debug_wall_trace(
+                2, (0.0, 0.0), (3.0, 4.0), 'benzene_2', (10.5, -2.0),
+                4.1251),
+            'DBG wall spawn 2 p1=(0.00,0.00) p2=(3.00,4.00) '
+            'len=5.0000 new_mol=benzene_2@(10.50,-2.00) gap=4.1251')
+
+    def test_wwgap_zero_renders(self):
+        # A 0.0 clearance is a REAL value (a crossing/near-touch), not
+        # the None-absent case: it must render ' wwgap=0.0000'.
+        line = hud_logic.debug_wall_trace(
+            2, (0.0, 0.0), (3.0, 4.0), 'benzene_2', (10.5, -2.0), 4.1251,
+            wwgap=0.0)
+        self.assertTrue(line.endswith(' wwgap=0.0000'), line)
+        self.assertIn('gap=4.1251', line)
+
 
 class TestWallWiring(unittest.TestCase):
     """Phase 9 (plan 09-07): the gui wall-seam source-scan pins.
