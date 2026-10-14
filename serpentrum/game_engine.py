@@ -68,9 +68,10 @@ sequences over identical steps. python3.6 syntax only; stdlib-only PURE
 module (no pymol / pmg_tk / PyQt5 / numpy — enforced by
 tools/check_purity.py); zero sys.modules stubs.
 
-Phase 9: an optional static wall (engine.wall, set_wall/clear_wall)
-binds the HEAD ONLY; hitting it is a GAME-05 crash ('crashed', 'wall');
-referee order is moved -> boundary -> wall -> body -> stacked -> won.
+Phase 9 / 9.1: static line walls (engine.walls, add_wall/set_wall/
+clear_wall) bind the HEAD ONLY; hitting any of them is a GAME-05 crash
+('crashed', 'wall') — the FIRST hit in accumulated (spawn) order.
+Referee order is moved -> boundary -> wall -> body -> stacked -> won.
 """
 
 import math
@@ -237,17 +238,24 @@ class GameEngine(object):
                 boundary checking (02-06's free-moving default).
       box_max:  (x1, y1) float tuple or None — axis-aligned box upper
                 corner. None disables boundary checking.
-      wall:     None or ((ax, ay), (bx, by)) float 2-tuples — an
-                optional STATIC line obstacle on the movement plane
-                (Phase 9). ENVIRONMENT, like the box: never translates
-                with the train, never rotates with sweeps. Written by
-                the controller via set_wall/clear_wall (state-only,
-                the attach_segment pattern) or seeded once via the
-                __init__/reset wall= test seam. Binds the HEAD ONLY: a
-                post-move head STRICTLY within WALL_COLLISION_RADIUS_A
-                of the wall segment emits ('crashed', 'wall') and ends
-                the run (GAME-05); the chain may swing/clip through
-                it freely.
+      walls:    list of ((ax, ay), (bx, by)) float 2-tuples — the
+                ACCUMULATED set of STATIC line obstacles on the movement
+                plane (Phase 9.1; generalizes the Phase-9 single wall
+                slot). ENVIRONMENT, like the box: never translates with
+                the train, never rotates with sweeps. Written by the
+                controller via add_wall (append, the 9.1 accumulate
+                seam) / set_wall (clear-and-plant-one, the legacy
+                single-wall seam) / clear_wall (empty all); reset()
+                rebuilds walls = [] (no wall survives an epoch) or
+                plants a single-element list via the __init__/reset
+                wall= test seam. Binds the HEAD ONLY: the post-move head
+                is checked against every wall in list (spawn) order —
+                the FIRST wall STRICTLY within WALL_COLLISION_RADIUS_A
+                emits ('crashed', 'wall') and ends the run (GAME-05);
+                the chain may swing/clip through them freely.
+      wall:     read-only newest-wall accessor (walls[-1] if walls else
+                None) — kept for the Phase-9 consumers. There is NO
+                setter: add_wall/set_wall/reset are the write paths.
       finished: bool — True once the run has ended (crash or win); every
                 later step() is a no-op returning []. Introduced by
                 plan 02-10 (02-06's trimmed scope has no end-of-run
@@ -306,10 +314,14 @@ class GameEngine(object):
         speed_a_per_s the per-instance forward speed in A/s (Phase 5.1
         GAME-11; default SPEED_A_PER_S = 3.0 preserves the v1 baseline;
         set once here and NEVER mutated mid-run — GAME-08 by
-        construction), wall = optional static line obstacle
-        ((ax, ay), (bx, by)) (Phase 9; None = no wall, the default) —
-        stored float-coerced as an engine-owned tuple pair,
-        head-only collision, GAME-05 crash class ('crashed', 'wall').
+        construction), wall = optional SINGLE static line obstacle
+        ((ax, ay), (bx, by)) (Phase 9.1; None = no walls, the default) —
+        a SINGLE-wall TEST SEAM: when given it plants walls = [that
+        pair] (float-coerced, engine-owned); a bare reset() rebuilds
+        walls = [] (no wall survives an epoch). Production accumulate
+        writes go through add_wall (set_wall is the legacy replace
+        seam); head-only collision, GAME-05 crash class ('crashed',
+        'wall').
         Unknown heading names raise ValueError, the same
         loud contract as request_direction; speed_a_per_s <= 0 raises
         ValueError (the single validation point).
@@ -329,14 +341,15 @@ class GameEngine(object):
         self.paused = False
         self.box_min = tuple(box_min) if box_min is not None else None
         self.box_max = tuple(box_max) if box_max is not None else None
-        # Phase 9 wall: default absent; when given, an engine-owned
-        # float-coerced tuple pair (same shape discipline as set_wall —
-        # guarded, tuple-copied, picky about shape: float() raises on
-        # non-numeric endpoints).
-        self.wall = None
+        # Phase 9.1 walls: default EMPTY accumulated set; the wall= seam
+        # (a SINGLE-wall test seam, unchanged) plants a single-element
+        # list. Engine-owned float-coerced tuple pairs (same shape
+        # discipline as set_wall/add_wall — picky about shape: float()
+        # raises on non-numeric endpoints). No walls survive an epoch.
+        self.walls = []
         if wall is not None:
-            self.wall = ((float(wall[0][0]), float(wall[0][1])),
-                         (float(wall[1][0]), float(wall[1][1])))
+            self.walls = [((float(wall[0][0]), float(wall[0][1])),
+                           (float(wall[1][0]), float(wall[1][1])))]
         self.finished = False
         self.result = None
         self.pickups = self._copy_pickups(pickups)
@@ -361,6 +374,17 @@ class GameEngine(object):
         (reset rebuilds cap and zeroes the counter in one epoch).
         """
         return None if self.cap is None else self.cap - self.molecules_stacked
+
+    @property
+    def wall(self):
+        """Newest accumulated wall, or None (read-only accessor, 9.1).
+
+        ``self.walls[-1] if self.walls else None`` — kept for the
+        Phase-9 consumers that read a single wall. There is NO setter:
+        the write paths are add_wall (append), set_wall (replace) and
+        reset (seed/clear).
+        """
+        return self.walls[-1] if self.walls else None
 
     def _copy_segments(self, segments):
         """Copy the caller's segment list into fresh engine-owned dicts.
@@ -729,22 +753,26 @@ class GameEngine(object):
                 self.result = 'crashed'
                 self.pending = []
                 return events
-        # Phase 9 wall (head-only, straight-motion ticks): the wall
-        # binds the HEAD ONLY — sweeps early-return above and never
-        # move the head, so a moved-tick check cannot miss a crossing;
-        # the chain may swing/clip through it freely (owner
-        # 2026-09-19b philosophy). STRICT < WALL_COLLISION_RADIUS_A**2
-        # via the same degenerate-safe helper as the body leg; end-state
-        # lines textually parallel to the boundary/body crash legs.
-        if self.wall is not None:
-            (ax, ay), (bx, by) = self.wall
-            if _point_segment_distance_sq(nx, ny, ax, ay, bx, by) \
-                    < WALL_COLLISION_RADIUS_A ** 2:
-                events.append(('crashed', 'wall'))
-                self.finished = True
-                self.result = 'crashed'
-                self.pending = []
-                return events
+        # Phase 9.1 walls (head-only, straight-motion ticks): the
+        # accumulated set is checked as a FIRST-HIT loop in list (spawn)
+        # order — the first wall the post-move head is STRICTLY within
+        # WALL_COLLISION_RADIUS_A of crashes the run (payload and
+        # end-state identical to the Phase-9 single-wall leg). The walls
+        # bind the HEAD ONLY — sweeps early-return above and never move
+        # the head, so a moved-tick check cannot miss a crossing; the
+        # chain may swing/clip through them freely (owner 2026-09-19b
+        # philosophy). STRICT < WALL_COLLISION_RADIUS_A**2 via the same
+        # degenerate-safe helper as the body leg; end-state lines
+        # textually parallel to the boundary/body crash legs.
+        if self.walls:
+            for (ax, ay), (bx, by) in self.walls:
+                if _point_segment_distance_sq(nx, ny, ax, ay, bx, by) \
+                        < WALL_COLLISION_RADIUS_A ** 2:
+                    events.append(('crashed', 'wall'))
+                    self.finished = True
+                    self.result = 'crashed'
+                    self.pending = []
+                    return events
         # Self-collision: head-centroid vs chain POLYLINE EDGES built
         # from segment centroids. The SEGMENT_SKIP_RECENT edges nearest
         # the head (the neck) are exempt. STRICT < BODY_COLLISION_RADIUS_A**2.
@@ -887,30 +915,55 @@ class GameEngine(object):
         return ('refused', pickup_id, reason)
 
     def set_wall(self, endpoints):
-        """Store the static wall endpoints (Phase 9, state-only write).
+        """Plant a SINGLE static wall, replacing any accumulated set
+        (Phase 9, state-only write; the legacy single-wall seam).
 
         endpoints: ((ax, ay), (bx, by)) — float-coerced into a fresh
-        engine-owned tuple pair, never sharing caller data (a second
-        set_wall REPLACES the first: one live wall at a time, the
-        spawn seam's replace-per-spawn contract). Returns None and
-        emits NO events: mirrored on attach_segment — the controller
-        writes, the engine never echoes its own state changes as
-        step() events. The wall is ENVIRONMENT, like the box: it
-        never translates with the train and never rotates with
-        sweeps.
+        engine-owned tuple pair, never sharing caller data. A second
+        set_wall REPLACES the first (and REPLACES/clears any accumulated
+        set): one live wall at a time — the Phase-9 replace-per-spawn
+        contract, retained as the legacy single-wall seam. The 9.1
+        accumulate seam uses add_wall instead. Returns None and emits NO
+        events: mirrored on attach_segment — the controller writes, the
+        engine never echoes its own state changes as step() events. The
+        wall is ENVIRONMENT, like the box: it never translates with the
+        train and never rotates with sweeps.
 
         Collision: the HEAD ONLY, straight-motion ticks, STRICT <
         WALL_COLLISION_RADIUS_A via _point_segment_distance_sq (a
         degenerate zero-length wall behaves as a point obstacle).
         """
-        self.wall = ((float(endpoints[0][0]), float(endpoints[0][1])),
-                     (float(endpoints[1][0]), float(endpoints[1][1])))
+        self.walls = [((float(endpoints[0][0]), float(endpoints[0][1])),
+                       (float(endpoints[1][0]), float(endpoints[1][1])))]
+
+    def add_wall(self, endpoints):
+        """Append a static wall to the accumulated set (Phase 9.1,
+        state-only write — the controller accumulate seam).
+
+        endpoints: ((ax, ay), (bx, by)) — float-coerced into a fresh
+        engine-owned tuple pair, never sharing caller data. Appends to
+        self.walls: the accumulated set persists for the run (unlike
+        set_wall it never clears prior walls). Returns None and emits
+        NO events: mirrored on attach_segment/set_wall — the controller
+        writes, the engine never echoes its own state changes as step()
+        events. The wall is ENVIRONMENT, like the box: it never
+        translates with the train and never rotates with sweeps.
+
+        Collision: the HEAD ONLY, straight-motion ticks, STRICT <
+        WALL_COLLISION_RADIUS_A via _point_segment_distance_sq — checked
+        as a first-hit loop over the whole accumulated set (a degenerate
+        zero-length wall behaves as a point obstacle).
+        """
+        self.walls.append(
+            ((float(endpoints[0][0]), float(endpoints[0][1])),
+             (float(endpoints[1][0]), float(endpoints[1][1]))))
 
     def clear_wall(self):
-        """Remove the wall (Phase 9): engine.wall becomes None.
+        """Remove EVERY wall (Phase 9; generalized 9.1): the accumulated
+        set is emptied (engine.walls == [], engine.wall == None).
 
-        State-only like set_wall — returns None, emits no event; the
-        controller logs its own side. reset() also rebuilds
-        wall = None (no wall survives an epoch).
+        State-only like set_wall/add_wall — returns None, emits no event;
+        the controller logs its own side. reset() also rebuilds
+        walls = [] (no wall survives an epoch).
         """
-        self.wall = None
+        self.walls = []
