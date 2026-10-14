@@ -441,7 +441,7 @@ def debug_spawn_cooldown_over():
 
 
 def debug_wall_trace(wall_id, p1, p2, new_mol_id, new_centroid, gap,
-                     tick=None):
+                     tick=None, wwgap=None):
     """SRP_DEBUG-only wall-spawn trace (Phase 9; the 33c13e7 family).
 
     Pure %-format builder — the CALLER computes all inputs
@@ -449,7 +449,12 @@ def debug_wall_trace(wall_id, p1, p2, new_mol_id, new_centroid, gap,
     min per-atom clearance to the newly spawned mol (the pure spawner
     math via wall.min_atom_clearance, never a viewer read) — the
     live human audit of the owner's 'never overlap the new mol'
-    mandate. `len` is the wall segment length (span sanity).
+    mandate. `len` is the wall segment length (span sanity). `wwgap`
+    is the wall's min segment-segment clearance to the accumulated
+    wall set (pure spawner math via wall.min_wall_clearance, the 9.1
+    wall-vs-wall audit field; the L5 twin of gap) — the CALLER
+    computes it unconditionally and gates only the log (33c13e7
+    family); `wwgap` is optional and appends LAST, after `tick`.
     """
     line = ('DBG wall spawn %s p1=(%.2f,%.2f) p2=(%.2f,%.2f) '
             'len=%.4f new_mol=%s@(%.2f,%.2f) gap=%.4f'
@@ -458,6 +463,8 @@ def debug_wall_trace(wall_id, p1, p2, new_mol_id, new_centroid, gap,
                new_mol_id, new_centroid[0], new_centroid[1], gap))
     if tick is not None:
         line += ' tick=%d' % tick
+    if wwgap is not None:
+        line += ' wwgap=%.4f' % (wwgap,)
     return line
 
 
