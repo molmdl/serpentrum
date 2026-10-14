@@ -598,5 +598,230 @@ class TestLifecycleInvariants(unittest.TestCase):
         self.assertAlmostEqual(engine.head[1], 1.2, delta=DELTA)
 
 
+class TestMultipleWalls(unittest.TestCase):
+    """Phase 9.1 (plan 9.1-03): the engine wall slot becomes an
+    ACCUMULATING set under the COMPAT route.
+
+    The engine gains engine.walls (a list of endpoint pairs) with
+    add_wall (append, state-only, float-coerced, no events) and
+    clear_walls semantics; engine.wall becomes a READ-ONLY newest-wall
+    accessor (walls[-1] if walls else None). set_wall KEEPS its
+    Phase-9 clear-and-plant-one replace semantics (the legacy
+    single-wall seam), so every pin in the six classes above stays
+    TRUE and byte-unmodified.
+
+    The referee SLOT (moved -> boundary -> wall -> body -> stacked ->
+    won) and the ('crashed', 'wall') payload are IDENTICAL: the collision
+    leg becomes a first-hit loop over the accumulated set. Every
+    accumulated wall is lethal; an EARLY wall stays lethal while later
+    walls are present; boundary still precedes wall; wall still
+    precedes body; an empty set (walls == []) is byte-identical to the
+    shipped wall=None engine.
+    """
+
+    def test_add_wall_accumulates_and_accessor_returns_newest(self):
+        # add_wall appends a fresh float-coerced pair; returns None;
+        # emits NO events (state-only, the attach_segment pattern —
+        # mirroring TestWallState.test_set_wall_contract). The wall
+        # accessor returns the NEWEST wall (walls[-1]).
+        engine = GameEngine(head=(0.0, -10.0), heading='right')
+        self.assertIsNone(engine.add_wall(((0, 0), (3, 3))))
+        self.assertIsNone(engine.add_wall(((1, 1), (4, 4))))
+        self.assertIsNone(engine.add_wall(((2, 2), (5, 5))))
+        # Ints in, floats out — every stored pair is float-coerced.
+        self.assertEqual(engine.walls,
+                         [((0.0, 0.0), (3.0, 3.0)),
+                          ((1.0, 1.0), (4.0, 4.0)),
+                          ((2.0, 2.0), (5.0, 5.0))])
+        # The accessor is the NEWEST accumulated wall.
+        self.assertEqual(engine.wall, ((2.0, 2.0), (5.0, 5.0)))
+        # State-only: a normal step with the head away from every wall
+        # produces ONLY the usual ('moved', ...) — no echo events.
+        events = engine.step(DT)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0][0], 'moved')
+        self.assertAlmostEqual(events[0][1][0], 0.3, delta=DELTA)
+        self.assertAlmostEqual(events[0][1][1], -10.0, delta=DELTA)
+
+    def test_set_wall_still_clears_and_plants_one(self):
+        # set_wall KEEPS the Phase-9 clear-and-plant-one replace
+        # semantics: after accumulating two walls, set_wall(new) leaves
+        # EXACTLY ONE wall (the new one). This is the replacement pin
+        # restated for the list state.
+        engine = GameEngine()
+        engine.add_wall(((0, 0), (3, 3)))
+        engine.add_wall(((1, 1), (4, 4)))
+        self.assertEqual(len(engine.walls), 2)
+        engine.set_wall(((5, 5), (8, 8)))
+        self.assertEqual(len(engine.walls), 1)
+        self.assertEqual(engine.walls, [((5.0, 5.0), (8.0, 8.0))])
+        self.assertEqual(engine.wall, ((5.0, 5.0), (8.0, 8.0)))
+
+    def test_every_accumulated_wall_lethal(self):
+        # Every accumulated wall is lethal at the same referee slot:
+        # three engines each accumulate 3 walls (one crossing the y=0
+        # lane, two far bystanders) and drive the head into the crossing
+        # one. Each run ends with exactly ('crashed', 'wall') and the
+        # boundary/body end-state shape.
+        for target_x in (3.0, 5.0, 7.0):
+            engine = GameEngine(head=(0.0, 0.0), heading='right')
+            engine.add_wall(((0.0, 10.0), (3.0, 10.0)))       # far (up)
+            engine.add_wall(((target_x, -3.0), (target_x, 3.0)))  # lane
+            engine.add_wall(((0.0, -10.0), (3.0, -10.0)))     # far (down)
+            final_events = []
+            for _ in range(80):
+                final_events = engine.step(DT)
+                if engine.finished:
+                    break
+            self.assertTrue(engine.finished)
+            self.assertEqual(final_events[-1], ('crashed', 'wall'))
+            self.assertEqual(engine.result, 'crashed')
+            self.assertEqual(engine.pending, [])
+
+    def test_early_wall_crash_with_later_walls_present(self):
+        # Persistence lethality (the s11 engine-side mini): wall #1
+        # crosses the +x path; wall #2 is far away. Driving right from
+        # (0, 0) crashes on wall #1 even though a later wall is present,
+        # and BOTH walls remain in the accumulated set afterward.
+        engine = GameEngine(head=(0.0, 0.0), heading='right')
+        engine.add_wall(((3.0, -3.0), (3.0, 3.0)))       # wall #1 (path)
+        engine.add_wall(((40.0, 40.0), (45.0, 45.0)))    # wall #2 (far)
+        final_events = []
+        for _ in range(40):
+            final_events = engine.step(DT)
+            if engine.finished:
+                break
+        self.assertTrue(engine.finished)
+        self.assertEqual(final_events[-1], ('crashed', 'wall'))
+        self.assertEqual(engine.result, 'crashed')
+        # The accumulated set is intact — neither wall was consumed.
+        self.assertEqual(len(engine.walls), 2)
+        self.assertEqual(engine.walls[0], ((3.0, -3.0), (3.0, 3.0)))
+        self.assertEqual(engine.walls[1], ((40.0, 40.0), (45.0, 45.0)))
+
+    def test_boundary_precedes_multi_wall_crash(self):
+        # Environment-first precedence holds with a multi-wall set: a
+        # moved position that hits the margin box limit AND sits inside
+        # a wall halo emits 'boundary' (boundary, then wall).
+        #   Box ((-18, -18), (18, 18)) -> margin walls at +-17.0.
+        #   Two vertical walls at x = 17.1 and 17.2.
+        #   Head (16.8, 0.0) right -> post-move (17.1, 0.0): boundary
+        #   fires first; the walls would also fire but never run.
+        engine = GameEngine(head=(16.8, 0.0), heading='right',
+                            box_min=BOX_MIN, box_max=BOX_MAX)
+        engine.add_wall(((17.1, 2.0), (17.1, -2.0)))
+        engine.add_wall(((17.2, 2.0), (17.2, -2.0)))
+        events = engine.step(DT)
+        crash_events = [e for e in events if e[0] == 'crashed']
+        self.assertEqual(crash_events, [('crashed', 'boundary')])
+        self.assertTrue(engine.finished)
+        self.assertEqual(engine.result, 'crashed')
+
+    def test_multi_wall_precedes_body(self):
+        # Wall-over-body precedence holds with a multi-wall set: two
+        # walls lie ON a checked body-edge chord so one moved position
+        # triggers both hazards; 'wall' wins (wall, then body).
+        segs = [make_seg_at(0.3, 2.0, 'c0'), make_seg_at(0.3, -2.0, 'c1'),
+                make_seg_at(100.0, 100.0, 'c2'),
+                make_seg_at(200.0, 200.0, 'c3')]
+        engine = GameEngine(head=(0.0, 0.0), heading='right',
+                            segments=segs)
+        engine.add_wall(((0.3, 2.0), (0.3, -2.0)))
+        engine.add_wall(((0.35, 2.0), (0.35, -2.0)))
+        events = engine.step(DT)
+        crash_events = [e for e in events if e[0] == 'crashed']
+        self.assertEqual(crash_events, [('crashed', 'wall')])
+        self.assertTrue(engine.finished)
+        self.assertEqual(engine.result, 'crashed')
+
+    def test_no_walls_parity_with_legacy(self):
+        # An empty accumulated set (walls == []) is byte-identical to
+        # the shipped wall=None engine: a scripted capture + sweep +
+        # straight drive produces the SAME event stream on identically
+        # seeded engines (one bare, one with the explicit wall=None
+        # kwarg). Any wall-leg float arithmetic leaking into the stream
+        # would break this.
+        def drive(engine):
+            collected = []
+            collected.extend(engine.step(DT))  # capture tick
+            engine.request_direction('up')
+            for _ in range(game_engine.TURN_TICKS):
+                collected.extend(engine.step(DT))  # sweep ticks
+            collected.extend(engine.step(DT))
+            collected.extend(engine.step(DT))  # straight ticks
+            return collected
+
+        engine_a = GameEngine(head=(0.0, 0.0), heading='right',
+                              pickups=[make_pickup('p1', 2.5, 0.0,
+                                                   atoms_n=2)])
+        engine_b = GameEngine(head=(0.0, 0.0), heading='right',
+                              pickups=[make_pickup('p1', 2.5, 0.0,
+                                                   atoms_n=2)],
+                              wall=None)
+        self.assertEqual(engine_a.walls, [])
+        self.assertEqual(engine_b.walls, [])
+        self.assertIsNone(engine_b.wall)
+        events_a = drive(engine_a)
+        events_b = drive(engine_b)
+        # Sanity: the drive really exercised capture + sweep + moves.
+        names_a = [e[0] for e in events_a]
+        self.assertIn('stacked', names_a)
+        self.assertEqual(names_a.count('turning'), game_engine.TURN_TICKS)
+        self.assertEqual(names_a.count('moved'), 3)
+        # The parity pin: byte-identical event streams.
+        self.assertEqual(events_a, events_b)
+
+    def test_reset_and_clear_remove_all(self):
+        # reset() and clear_wall() both empty the WHOLE accumulated set
+        # (no walls survive an epoch); the wall= __init__/reset seam
+        # still plants a SINGLE-wall list; and the wall accessor is
+        # read-only (no setter — assignment raises AttributeError).
+        engine = GameEngine()
+        for i in range(4):
+            engine.add_wall(((i, 0), (i, 1)))
+        self.assertEqual(len(engine.walls), 4)
+        engine.reset()
+        self.assertEqual(engine.walls, [])
+        self.assertIsNone(engine.wall)
+        for i in range(4):
+            engine.add_wall(((i, 0), (i, 1)))
+        self.assertEqual(len(engine.walls), 4)
+        engine.clear_wall()
+        self.assertEqual(engine.walls, [])
+        self.assertIsNone(engine.wall)
+        # The wall= seam plants a single-element list.
+        engine.reset(wall=((2, 2), (4, 4)))
+        self.assertEqual(engine.walls, [((2.0, 2.0), (4.0, 4.0))])
+        self.assertEqual(engine.wall, ((2.0, 2.0), (4.0, 4.0)))
+        # Read-only accessor: NO setter exists.
+        with self.assertRaises(AttributeError):
+            engine.wall = ((0, 0), (1, 1))
+
+    def test_paused_inert_with_walls(self):
+        # A paused engine is inert regardless of accumulated walls:
+        # step() returns [] and the head never moves, so the wall leg
+        # never runs even with a wall ON the head's next-step path.
+        engine = GameEngine(head=(0.0, 0.0), heading='right')
+        engine.add_wall(((0.3, -3.0), (0.3, 3.0)))
+        engine.add_wall(((0.4, -3.0), (0.4, 3.0)))
+        engine.add_wall(((0.5, -3.0), (0.5, 3.0)))
+        engine.pause()
+        for _ in range(3):
+            self.assertEqual(engine.step(DT), [])
+        self.assertFalse(engine.finished)
+        self.assertEqual(engine.head, (0.0, 0.0))
+
+    def test_capture_radius_exceeds_wall_halo(self):
+        # Derived one-liner (the 5.1-06 derivation habit): a mol's
+        # capturable zone (PICKUP_RADIUS_A, 3.0, inclusive) is STRICTLY
+        # larger than a wall's lethal halo (WALL_COLLISION_RADIUS_A,
+        # 2.0, strict). An old accumulated wall's halo can therefore
+        # never swallow a nearby mol's capture zone — a mol spawning
+        # near an existing wall remains capturable by construction (the
+        # 9.1 fairness surface).
+        self.assertGreater(game_engine.PICKUP_RADIUS_A,
+                           game_engine.WALL_COLLISION_RADIUS_A)
+
+
 if __name__ == '__main__':
     unittest.main()
