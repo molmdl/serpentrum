@@ -1,5 +1,10 @@
 """Headless Windows PyMOL line-wall CHANNEL smoke — 09-08 (Phase 9).
 
+Accumulation revision 2026-10-15 (Phase 9.1, plan 9.1-06): STAGE2 + STAGE3
+were reworked from the one-wall replace channel to the indexed accumulate
+channel (the ONE-wall wording carried out of the repo); STAGE0/1/4/5/6 keep
+their sentinels.
+
 Run (from repo root; cwd is /mnt/c-backed so cmd.exe inherits C:\\ cwd):
     timeout 90 cmd.exe /c "C:\\src\\run-conda-pymol.bat -cq smoke\\15_line_wall_smoke.py"
 
@@ -8,12 +13,17 @@ verdicts are flushed sentinels grepped by tests/run_gates.py --smoke:
     STAGE0 BANNER ...            header (NO Qt app: CGO-only smoke)
     STAGE1 WALL-LOADED ...       load_line_wall -> srp_wall; extent xy ==
                                  endpoints +-1e-3; z span == (-5, +5)
-    STAGE2 WALL-REPLACE ...      delete-then-load MOVES the extent exactly
-                                 (the 07-09 replace contract)
-    STAGE3 WALL-SPAWN ...        scripted capture drive; on the resolution
-                                 mirror the controller seam (next_after ->
-                                 build_pickup_seed append -> next_wall ->
-                                 set_wall); both names public; per-atom gap
+    STAGE2 WALL-ACCUM ...        two indexed walls (srp_wall_1 + srp_wall_2)
+                                 load WITHOUT any delete and COEXIST under
+                                 distinct per-name extents (the 9.1
+                                 accumulate contract, superseding the
+                                 retired replace-with-delete stage)
+    STAGE3 WALL-ACCUM-SPAWN ...  scripted TWO-capture drive; on EACH
+                                 resolution mirror the accumulate seam
+                                 (next_after -> build_pickup_seed append ->
+                                 next_wall(existing_walls=...) -> indexed
+                                 'srp_wall_%d' load -> add_wall); both names
+                                 public with distinct extents; per-wall gap
                                  >= WALL_MOL_CLEARANCE_A
     STAGE4 WALL-CRASH ...        engine drive into a wall -> result
                                  'crashed', final event ('crashed', 'wall')
@@ -149,6 +159,41 @@ def _pickup_m16(record, centroid):
     return orientation.matrix_rt(identity, (cx, cy, 0.0), (-ox, -oy, -oz))
 
 
+_OPPOSITE_DIR = {'left': 'right', 'right': 'left',
+                 'up': 'down', 'down': 'up'}
+
+
+def _heading_name(engine):
+    """The engine's current heading as a DIRS name (s10/s11 shape)."""
+    hx, hy = engine.heading
+    if hx > 0.5:
+        return 'right'
+    if hx < -0.5:
+        return 'left'
+    return 'up' if hy > 0.5 else 'down'
+
+
+def _choose_dir(engine, target):
+    """Greedy axis steering toward ``target``; never a 180 reversal.
+
+    The deterministic s10/s11 steerer shape
+    (tests/test_phase5_integration.py:877-889): candidates ordered by
+    descending axis distance; the first that is not the forbidden
+    opposite of the current heading wins. Deterministic from the
+    smoke's fixed setup (no clock, no global RNG).
+    """
+    dx = target[0] - engine.head[0]
+    dy = target[1] - engine.head[1]
+    candidates = [(abs(dx), 'right' if dx > 0.0 else 'left'),
+                  (abs(dy), 'up' if dy > 0.0 else 'down')]
+    candidates.sort(key=lambda item: -item[0])
+    current = _heading_name(engine)
+    for _distance, direction in candidates:
+        if direction != _OPPOSITE_DIR[current]:
+            return direction
+    return candidates[0][1]
+
+
 def _cgo_extent(name):
     """Return ((lo3),(hi3)) or None when get_extent is unusable here.
 
@@ -213,37 +258,67 @@ def s1_wall_loaded():
     print('STAGE1 WALL-LOADED spans=%.3f,%.3f,%.3f' % sp, flush=True)
 
 
-def s2_wall_replace():
-    # Stage 2: the 07-09 delete-then-load replace contract — deleting
-    # srp_wall then loading new endpoints MOVES the extent exactly.
-    pb.delete_object(pb.WALL_NAME)
-    assert pb.WALL_NAME not in cmd.get_names('public_objects'), \
-        'srp_wall survived delete_object'
-    pb.load_line_wall((5.0, 20.0), (-15.0, -25.0))
-    assert pb.WALL_NAME in cmd.get_names('public_objects'), \
-        'srp_wall missing after replace'
-    ext = _cgo_extent(pb.WALL_NAME)
-    if ext is None:
-        print('STAGE2 WALL-REPLACE FALLBACK get_extent-unusable name-only',
-              flush=True)
+def s2_wall_accum():
+    # Stage 2 (9.1 revision): indexed COEXISTENCE, not delete-then-load
+    # replace. Two indexed walls load WITHOUT any delete and BOTH survive
+    # as public objects with DISTINCT per-name extents — the accumulate
+    # contract that supersedes the retired replace-with-delete stage. The
+    # old WALL-REPLACE sentinel and its FALLBACK string are gone.
+    pb.delete_walls()   # stage hygiene (idempotent; clears STAGE1's srp_wall)
+    names0 = cmd.get_names('public_objects')
+    assert pb.WALL_NAME not in names0, 'srp_wall survived delete_walls'
+    assert not [n for n in names0 if n.startswith('srp_wall')], \
+        'wall leftovers survived delete_walls'
+    pb.load_line_wall((-20.0, -10.0), (10.0, 15.0), name='srp_wall_1')
+    # Fixture note (9.1 revision): the wall-2 pair is NON-crossing with a
+    # ~20.6 A min segment-segment separation from wall 1 -- calibrated so
+    # the on-screen pair reads like a legal L5-era accumulated pair, not a
+    # rejected crossing; the extents remain clearly distinct.
+    pb.load_line_wall((30.0, 20.0), (50.0, 40.0), name='srp_wall_2')
+    names = cmd.get_names('public_objects')
+    assert 'srp_wall_1' in names, 'srp_wall_1 missing after accumulate load'
+    assert 'srp_wall_2' in names, 'srp_wall_2 missing after accumulate load'
+    # The singular default name is NOT required (and NOT loaded) -- the
+    # accumulate channel is indexed.
+    assert pb.WALL_NAME not in names, 'singular srp_wall loaded in accumulate'
+    ext1 = _cgo_extent('srp_wall_1')
+    ext2 = _cgo_extent('srp_wall_2')
+    if ext1 is None or ext2 is None:
+        print('STAGE2 WALL-ACCUM FALLBACK get_extent-unusable '
+              'names=srp_wall_1,srp_wall_2', flush=True)
         return
-    (lo, hi) = ext
-    assert abs(lo[0] - (-15.0)) <= 1e-3 and abs(hi[0] - 5.0) <= 1e-3, \
-        'x extent did not move: %r != (-15.0, 5.0)' % ((lo[0], hi[0]),)
-    assert abs(lo[1] - (-25.0)) <= 1e-3 and abs(hi[1] - 20.0) <= 1e-3, \
-        'y extent did not move: %r != (-25.0, 20.0)' % ((lo[1], hi[1]),)
-    assert abs(lo[2] - (-5.0)) <= 1e-3 and abs(hi[2] - 5.0) <= 1e-3, \
-        'z span %r != (-5.0, 5.0)' % ((lo[2], hi[2]),)
-    sp = _spans(ext)
-    print('STAGE2 WALL-REPLACE spans=%.3f,%.3f,%.3f' % sp, flush=True)
+    (lo1, hi1) = ext1
+    (lo2, hi2) = ext2
+    assert abs(lo1[0] - (-20.0)) <= 1e-3 and abs(hi1[0] - 10.0) <= 1e-3, \
+        'wall 1 x extent %r != (-20.0, 10.0)' % ((lo1[0], hi1[0]),)
+    assert abs(lo1[1] - (-10.0)) <= 1e-3 and abs(hi1[1] - 15.0) <= 1e-3, \
+        'wall 1 y extent %r != (-10.0, 15.0)' % ((lo1[1], hi1[1]),)
+    assert abs(lo2[0] - 30.0) <= 1e-3 and abs(hi2[0] - 50.0) <= 1e-3, \
+        'wall 2 x extent %r != (30.0, 50.0)' % ((lo2[0], hi2[0]),)
+    assert abs(lo2[1] - 20.0) <= 1e-3 and abs(hi2[1] - 40.0) <= 1e-3, \
+        'wall 2 y extent %r != (20.0, 40.0)' % ((lo2[1], hi2[1]),)
+    for ext in (ext1, ext2):
+        (lo, hi) = ext
+        assert abs(lo[2] - (-5.0)) <= 1e-3 and abs(hi[2] - 5.0) <= 1e-3, \
+            'z span %r != (-5.0, 5.0)' % ((lo[2], hi[2]),)
+    # Coexistence + non-replacement proof: the two per-name extents DIFFER.
+    assert ext1 != ext2, \
+        'wall 1 and wall 2 extents identical (replacement, not coexist)'
+    sp1 = _spans(ext1)
+    sp2 = _spans(ext2)
+    print('STAGE2 WALL-ACCUM srp_wall_1 spans=%.3f,%.3f,%.3f '
+          'srp_wall_2 spans=%.3f,%.3f,%.3f' % (sp1 + sp2), flush=True)
 
 
 def s3_wall_spawn():
-    # Stage 3: the controller-mirroring capture drive. A pickup sits on
-    # the straight +x path; when the engine reports 'stacked' we mirror
-    # the controller seam (next_after -> build_pickup_seed append ->
-    # next_wall -> set_wall) and materialize BOTH viewer objects. The
-    # wall policy's L2 leg guarantees the per-atom gap to the NEW mol.
+    # Stage 3 (9.1 revision): the controller-mirroring ACCUMULATE drive.
+    # A pickup sits on the straight +x path; driving straight captures it.
+    # On EACH 'stacked' event we mirror the accumulate seam: next_after ->
+    # build_pickup_seed append -> next_wall(existing_walls=list(engine.walls))
+    # -> indexed viewer load 'srp_wall_%d' -> engine.add_wall. TWO captures
+    # accumulate TWO distinct-named walls (srp_wall_1 + srp_wall_2) with
+    # per-wall L2 gaps to the mol each spawned with. The wall policy's L2
+    # leg guarantees each per-atom gap.
     records, errs = setloader.load_demo_set(
         setloader.package_data_dir(), 'set_a',
         setloader.default_stacking_path())
@@ -273,26 +348,36 @@ def s3_wall_spawn():
         cap=setup['win_cap_molecules'],
         atom_budget=setup['atom_budget'],
         speed_a_per_s=setup['speed'])
+    target_captures = 2
     ticks = 0
-    spawned = False
+    captures = 0
+    gaps = []
     new_pid = None
-    seed = None
-    while not engine.finished and not spawned:
-        events = engine.step(DT)
+    while not engine.finished and captures < target_captures:
         ticks += 1
-        assert ticks < 1000, 'drive did not capture in 1000 ticks'
+        assert ticks < 2000, 'drive did not accumulate 2 walls in 2000 ticks'
+        # Steering is needed only AFTER the first (straight-line) capture:
+        # a s10-style greedy axis steerer toward the newest live pickup
+        # centroid, deterministic from the smoke's fixed setup.
+        live = [p for p in engine.pickups
+                if p['id'] in engine.live_pickup_ids]
+        if captures >= 1 and live:
+            engine.request_direction(
+                _choose_dir(engine, live[-1]['centroid']))
+        events = engine.step(DT)
         for ev in events:
             if ev[0] != 'stacked':
                 continue
+            captures += 1
             engine.attach_segment(ev[1]['molecule_id'], ev[1]['centroid'],
                                   ev[1]['atoms'])
-            # --- controller seam (exact order) ---------------------
+            # --- controller accumulate seam (exact order) ----------
             chain_atoms = list(head_atoms)
             for seg in engine.segments:
                 chain_atoms.extend(seg['atoms'])
             live_centroids = [p['centroid'] for p in engine.pickups
                               if p['id'] in engine.live_pickup_ids]
-            result = spawner.next_after(engine.head, 'right',
+            result = spawner.next_after(engine.head, _heading_name(engine),
                                         chain_atoms, live_centroids)
             assert result is not None, 'next_after returned None'
             rec, new_pid, centroid = result
@@ -305,28 +390,43 @@ def s3_wall_spawn():
             for p in engine.pickups:
                 if p['id'] != new_pid and p['id'] in engine.live_pickup_ids:
                     live_atoms.extend(p['atoms'])
+            # The accumulated set is the EXPLICIT input (the 9.1-07 seam).
             wall = wall_spawner.next_wall(engine.head, seed['atoms'],
-                                          live_atoms)
-            engine.set_wall(wall)
-            # --- viewer materializations (both) --------------------
+                                          live_atoms, list(engine.walls))
+            assert wall is not None, \
+                'wall policy returned None (cap/exhaustion) at capture %d' \
+                % captures
+            # --- viewer materializations (viewer-write-first) -------
             pb.materialize_pickup(rec['file'], 'srp_pickup_%s' % new_pid,
                                   _pickup_m16(rec, centroid))
-            if wall is not None:
-                pb.load_line_wall(wall[0], wall[1])
-            spawned = True
-            break
-    assert spawned, 'no capture resolution occurred'
-    assert engine.wall is not None, 'wall policy returned None (exhaustion)'
+            ordinal = len(engine.walls) + 1
+            pb.load_line_wall(wall[0], wall[1],
+                              name='srp_wall_%d' % ordinal)
+            engine.add_wall(wall)
+            gaps.append(wall_mod.min_atom_clearance(wall, seed['atoms']))
+    assert captures == target_captures, \
+        'drive reached %d captures, expected %d' \
+        % (captures, target_captures)
     names = cmd.get_names('public_objects')
     assert ('srp_pickup_%s' % new_pid) in names, \
         'new pickup %r not public' % (new_pid,)
-    assert pb.WALL_NAME in names, 'srp_wall not loaded'
-    clearance = wall_mod.min_atom_clearance(engine.wall, seed['atoms'])
-    assert clearance >= wall_mod.WALL_MOL_CLEARANCE_A - 1e-3, \
-        'min per-atom clearance %.4f < %.4f' \
-        % (clearance, wall_mod.WALL_MOL_CLEARANCE_A)
-    print('STAGE3 WALL-SPAWN ticks=%d pickup=%s clearance=%.4f'
-          % (ticks, new_pid, clearance), flush=True)
+    assert 'srp_wall_1' in names, 'srp_wall_1 not loaded'
+    assert 'srp_wall_2' in names, 'srp_wall_2 not loaded'
+    assert pb.WALL_NAME not in names, 'singular srp_wall loaded'
+    ext1 = _cgo_extent('srp_wall_1')
+    ext2 = _cgo_extent('srp_wall_2')
+    if ext1 is not None and ext2 is not None:
+        assert ext1 != ext2, 'accumulated wall extents identical'
+    assert len(engine.walls) == 2, \
+        'engine holds %d walls (expected 2)' % len(engine.walls)
+    for gap in gaps:
+        assert gap >= wall_mod.WALL_MOL_CLEARANCE_A - 1e-3, \
+            'per-wall per-atom gap %.4f < %.4f' \
+            % (gap, wall_mod.WALL_MOL_CLEARANCE_A)
+    print('STAGE3 WALL-ACCUM-SPAWN ticks=%d pickups=%d walls=%d '
+          'gap0=%.4f gap1=%.4f'
+          % (ticks, len(engine.pickups), len(engine.walls),
+             gaps[0], gaps[1]), flush=True)
 
 
 def s4_wall_crash():
@@ -397,7 +497,7 @@ def s6_sceneclr_wall():
 for _name, _fn in [
     ('stage0_header', s0_header),
     ('stage1_wall_loaded', s1_wall_loaded),
-    ('stage2_wall_replace', s2_wall_replace),
+    ('stage2_wall_accum', s2_wall_accum),
     ('stage3_wall_spawn', s3_wall_spawn),
     ('stage4_wall_crash', s4_wall_crash),
     ('stage5_wall_delete', s5_wall_delete),

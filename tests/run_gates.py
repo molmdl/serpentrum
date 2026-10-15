@@ -75,8 +75,10 @@ REQUIRED_SMOKES = ('smoke/01_skeleton_smoke.py',
                     # -> setup round-trip, one headless run
                     'smoke/14_release_e2e_smoke.py',
                     # 15 = random line-wall render + wall-crash + restart
-                    # hygiene (Phase 9, plan 09-08) — viewer channel,
-                    # replace-per-spawn, cleanup sweep on every end path
+                    # hygiene (Phase 9, plan 09-08; Phase 9.1, plan 9.1-06:
+                    # walls ACCUMULATE per capture to a capped set) —
+                    # viewer channel, indexed srp_wall_<n> names, cleanup
+                    # sweep on every end path
                     'smoke/15_line_wall_smoke.py')
 
 SMOKE_BAT = 'C:\\src\\run-conda-pymol.bat'

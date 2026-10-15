@@ -528,8 +528,12 @@ def load_line_wall(p1_xy, p2_xy, color=DEFAULT_WALL_COLOR,
                    linewidth=DEFAULT_WALL_LINEWIDTH, name=WALL_NAME):
     """Build + load ONE line-wall CGO as ``name``.
 
-    Replace semantics live in the CALLER -- delete_object(name)/this
-    delete-then-load first (the 07-09 load_mode_arrows contract).
+    2026-10-15 (9.1): the spawn seam now loads a FRESH INDEXED
+    ``srp_wall_<n>`` per capture -- walls ACCUMULATE (no delete at
+    spawn). Delete-then-load replace remains an available caller
+    primitive (the 07-09 load_mode_arrows contract); the ``name=``
+    parameterization is unchanged. ``delete_walls`` (below) sweeps the
+    whole indexed family on every end path.
     Reads the ENGINE-owned 2D endpoints ((x, y) pairs); derives z
     from BOX_DISPLAY_Z (display-only -- the load_box precedent at
     the z-extension call): the wall spans floor-to-ceiling like the
