@@ -1275,12 +1275,15 @@ class GameTab(QtWidgets.QWidget):
         pymol_bridge.materialize_pickup(
             record['file'], name, self._pickup_m16(record, centroid))
         session['live_pickup_names'].append(name)
-        # --- Phase 9 wall seam: the wall swaps EXACTLY with each
-        # successful next-mol spawn (both _respawn_pickup call sites
-        # inherit this -- capture tail AND exhaust-cooldown resume; no
-        # mol spawn => no wall swap). Sits INSIDE the success branch so
-        # the can_spawn gate on a same-tick second invocation exits
-        # before it.
+        # --- Phase 9.1 wall seam: walls ACCUMULATE. Each successful
+        # next-mol spawn adds AT MOST ONE new accumulated wall (cap-then-
+        # stop via the spawner's WALL_MAX_LIVE_WALLS gate); the set
+        # persists for the whole run. Both _respawn_pickup call sites
+        # inherit this -- capture tail AND exhaust-cooldown resume; no mol
+        # spawn => no new wall. The viewer write PRECEDES the engine
+        # commit, so a failed load adds nothing (no invisible-but-lethal
+        # wall can persist). Sits INSIDE the success branch so the
+        # can_spawn gate on a same-tick second invocation exits before it.
         if engine.finished:
             return  # win-tick guard: no wall on the completion board
         wall_spawner = session.get('wall_spawner')
@@ -1291,20 +1294,36 @@ class GameTab(QtWidgets.QWidget):
             if (pickup['id'] in engine.live_pickup_ids
                     and pickup['id'] != seed['id']):
                 other_live_atoms.extend(pickup['atoms'])
+        existing = list(engine.walls)
         wall_endpoints = wall_spawner.next_wall(
-            engine.head, seed['atoms'], other_live_atoms)
+            engine.head, seed['atoms'], other_live_atoms, existing)
         if wall_endpoints is None:
-            return  # benign: keep the previous wall (32-draw miss)
-        engine.set_wall(wall_endpoints)
-        pymol_bridge.delete_walls()
-        pymol_bridge.load_line_wall(wall_endpoints[0], wall_endpoints[1])
+            # benign: keep the accumulated set (cap gate or 32-draw miss)
+            return
+        # Ordinal (target hazard (a)): MONOTONIC per run -- NEVER the
+        # rolled-back capture counter (refuses roll that counter back
+        # BEFORE this seam, so name keys would collide; D-WALL-TRIGGER (a)
+        # keeps walls spawning through refuses).
+        ordinal = len(engine.walls) + 1
+        # Viewer write FIRST (target hazard (b)): a fresh indexed name per
+        # wall; if this raises, control never reaches add_wall, so the
+        # engine keeps NO invisible-but-lethal wall (the outer
+        # _handle_stack_event try/except absorbs the error exactly as the
+        # None path does). NO delete before it -- prior walls persist.
+        pymol_bridge.load_line_wall(
+            wall_endpoints[0], wall_endpoints[1],
+            name='srp_wall_%d' % ordinal)
+        engine.add_wall(wall_endpoints)
         # All trace inputs compute UNCONDITIONALLY (33c13e7 discipline);
         # only the log call is SRP_DEBUG-gated. Raw sym-first 4-tuples
-        # feed both the gap math and next_wall (no (x, y) projection).
+        # feed both the gap math and next_wall (no (x, y) projection);
+        # wwgap (L5 wall-vs-wall) computes only when walls already exist.
         gap = wall_mod.min_atom_clearance(wall_endpoints, seed['atoms'])
+        wwgap = (wall_mod.min_wall_clearance(wall_endpoints, existing)
+                 if existing else None)
         trace = hud_logic.debug_wall_trace(
-            engine.molecules_stacked, wall_endpoints[0], wall_endpoints[1],
-            seed['id'], seed['centroid'], gap)
+            ordinal, wall_endpoints[0], wall_endpoints[1],
+            seed['id'], seed['centroid'], gap, wwgap=wwgap)
         if session.get('debug') and trace is not None:
             self._log(trace)
 
