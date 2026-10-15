@@ -1076,13 +1076,16 @@ class TestWallDebugTrace(unittest.TestCase):
 class TestWallWiring(unittest.TestCase):
     """Phase 9 (plan 09-07): the gui wall-seam source-scan pins.
 
-    The wall swaps EXACTLY with each successful next-mol spawn: the
-    WallSpawner is constructed at ONE site (_build_engine, seeded via
-    wall_seed_from_setup), carried on the session dict as
-    'wall_spawner', and the wall seam lives INSIDE _respawn_pickup's
-    success-branch tail (both capture-tail and cooldown-resume call
-    sites inherit the same-time pairing by construction). Walls die at
-    _teardown_round beside delete_pickups.
+    9.1 amendment (plan 9.1-07): the wall set ACCUMULATES per successful
+    next-mol spawn -- AT MOST ONE new accumulated wall per spawn
+    (cap-then-stop via the spawner's gate); the set persists for the
+    whole run instead of being replaced. The seam still lives INSIDE
+    _respawn_pickup's success-branch tail (both capture-tail and
+    cooldown-resume call sites inherit same-time pairing by
+    construction). The WallSpawner is constructed at ONE site
+    (_build_engine, seeded via wall_seed_from_setup), carried on the
+    session dict as 'wall_spawner'. Walls die at _teardown_round beside
+    delete_pickups.
 
     House pattern 5.3-04 / test_gui_pins.py: open the module source and
     count call forms + slice method bodies between ``def <name>``
@@ -1125,18 +1128,19 @@ class TestWallWiring(unittest.TestCase):
 
     def test_single_next_wall_call(self):
         # The _respawn_pickup success tail holds the ONLY next_wall call
-        # (the per-successful-spawn wall swap).
+        # (the per-successful-spawn accumulated add).
         source = self._gui_game_source()
         self.assertEqual(source.count('next_wall('), 1,
                          'exactly one next_wall respawn call '
                          '(_respawn_pickup success tail)')
 
     def test_single_load_line_wall_call(self):
-        # ONE load_line_wall call site (the delete-then-load wall swap).
+        # ONE load_line_wall call site (the indexed srp_wall_<n>
+        # accumulate load).
         source = self._gui_game_source()
         self.assertEqual(source.count('load_line_wall('), 1,
                          'exactly one pymol_bridge.load_line_wall call '
-                         '(the wall swap)')
+                         '(the indexed srp_wall_<n> accumulate load)')
 
     def test_single_debug_wall_trace_call(self):
         # The 09-04 builder has EXACTLY ONE gui call site (the
@@ -1180,6 +1184,72 @@ class TestWallWiring(unittest.TestCase):
         source = self._gui_game_source()
         self.assertNotIn('min_head_dist_a', source)
         self.assertNotIn('REFUSE_WALL', source)
+
+    def test_respawn_pickup_accumulates_without_deleting(self):
+        # 9.1 accumulate invariant (the mirror of the teardown pin): the
+        # seam must NOT wipe the accumulated set at spawn -- delete_walls
+        # stays the teardown seat only.
+        source = self._gui_game_source()
+        body = self._method_body(source, '    def _respawn_pickup(')
+        self.assertNotIn('delete_walls(', body,
+                         'the accumulate seam never deletes accumulated '
+                         'walls (teardown keeps the delete_walls seat)')
+
+    def test_respawn_pickup_commits_via_add_wall(self):
+        # The accumulate write is engine.add_wall(...); the legacy
+        # replace seam (engine.set_wall) is retired from production.
+        source = self._gui_game_source()
+        body = self._method_body(source, '    def _respawn_pickup(')
+        self.assertIn('engine.add_wall(', body,
+                      'the seam commits the new wall via engine.add_wall')
+        self.assertNotIn('engine.set_wall(', body,
+                         'the legacy replace seam (engine.set_wall) is '
+                         'retired from _respawn_pickup')
+
+    def test_wall_ordinal_is_monotonic_not_counter(self):
+        # Target hazard (a): the ordinal is len(engine.walls) + 1 -- a
+        # monotonic per-run count; it NEVER reads the rolled-back capture
+        # counter ('molecules_stacked' must not appear in the seam body:
+        # refuses roll it back, so name keys would collide).
+        source = self._gui_game_source()
+        body = self._method_body(source, '    def _respawn_pickup(')
+        self.assertIn("'srp_wall_%d'", body,
+                      'the viewer name is the indexed srp_wall_<n> form')
+        self.assertIn('len(engine.walls) + 1', body,
+                      'the ordinal is the accumulated count + 1')
+        self.assertNotIn('molecules_stacked', body,
+                         'the ordinal never reads the rolled-back '
+                         'capture counter')
+
+    def test_viewer_write_precedes_engine_commit(self):
+        # Target hazard (b): the indexed viewer write precedes the engine
+        # commit, so a failed load never leaves an invisible-but-lethal
+        # wall in the engine (the partial-failure ordering pin).
+        source = self._gui_game_source()
+        body = self._method_body(source, '    def _respawn_pickup(')
+        load_idx = body.index('load_line_wall(')
+        add_idx = body.index('engine.add_wall(')
+        self.assertLess(load_idx, add_idx,
+                        'viewer write precedes the engine add_wall commit')
+
+    def test_respawn_passes_accumulated_set_to_spawner(self):
+        # The accumulated set is the explicit existing_walls input: the
+        # seam snapshots list(engine.walls) into the next_wall call
+        # (cap gate + L5 wall-vs-wall both read it).
+        source = self._gui_game_source()
+        body = self._method_body(source, '    def _respawn_pickup(')
+        self.assertIn('list(engine.walls)', body,
+                      'the seam passes the accumulated set to the spawner')
+        self.assertIn('next_wall(', body,
+                      'the next_wall call sits inside _respawn_pickup')
+
+    def test_trace_carries_wwgap_input(self):
+        # The L5 wall-vs-wall audit kwarg flows from the seam into
+        # hud_logic.debug_wall_trace (the wwgap= suffix).
+        source = self._gui_game_source()
+        body = self._method_body(source, '    def _respawn_pickup(')
+        self.assertIn('wwgap=', body,
+                      'the seam feeds the wwgap= L5 audit into the trace')
 
 
 if __name__ == '__main__':
