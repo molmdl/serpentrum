@@ -9,7 +9,7 @@
     "gsd-project-researcher": { "model": "synthetic/hf:zai-org/GLM-5.3-Flash" },
     "gsd-research-synthesizer": { "model": "synthetic/hf:zai-org/GLM-5.3-Flash" },
     "gsd-codebase-mapper": { "model": "synthetic/hf:zai-org/GLM-5.3" },
-    "gsd-executor": { "model": "synthetic/hf:zai-org/GLM-5.3" },
+    "gsd-executor": { "model": "synthetic/hf:deepseek-ai/DeepSeek-V4.1-Flash" },
     "gsd-debugger": { "model": "synthetic/hf:zai-org/GLM-5.3" },
     "gsd-verifier": { "model": "synthetic/hf:zai-org/GLM-5.3-Flash" },
     "gsd-integration-checker": { "model": "synthetic/hf:zai-org/GLM-5.3-Flash" },
