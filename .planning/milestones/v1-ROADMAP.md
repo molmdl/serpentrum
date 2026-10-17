@@ -1,0 +1,514 @@
+# Milestone Archive: v1 — Playable Release
+
+**Status:** ✅ SHIPPED 2026-10-18 (UTC)
+**Phases:** 1–9 + inserted 5.1 / 5.2 / 5.3 / 9.1 — 13 phase directories, all COMPLETE + VERIFIED
+**Total Plans:** 127 (127/127 closed — every plan has a SUMMARY.md)
+**Requirements:** 46/46 Complete (owner-certified at GATE V, 2026-10-10)
+**Audit:** PASSED 2026-10-18 — requirements 46/46, phases 13/13, cross-phase seams 8/8, E2E flows 6/6, zero critical gaps (full report: `v1-MILESTONE-AUDIT.md` in this directory)
+
+## Overview
+
+serpentrum v1 delivers the complete core value: an installable PyMOL 2.5.0 plugin implementing an educational molecular snake game. The player steers a molecular head around a bounded box on a 2D locked-camera plane, picks up small molecules that stack onto the snake at cited, human-approved stacking geometry (π-stack at 3.60 Å @ 20°), dodges accumulating random line-wall obstacles, and on win or crash hands the assembled snake to a real, async, cancellable `xtb --ohess` calculation whose broadened IR spectrum is plotted, explored via a clickable frequency table with static vibrational-mode vectors, and exportable as PNG — end-to-end inside PyMOL, developed and tested from a WSL shell.
+
+**Release record:** GATE V owner sign-off 2026-10-10 (Section A data approval / Section B 6-button + educator round-trip / Section C release close incl. real xtb); 46/46 requirements flipped Complete with a 136-path evidence ledger. **Post-v1 gameplay refinements** shipped under the same milestone umbrella: Phase 9 Random Line-Wall Spawning (COMPLETE + VERIFIED 2026-10-13) and Phase 9.1 Accumulating Line-Walls (COMPLETE + VERIFIED 2026-10-17), both as dated route-(b) GAME-05 amendments — requirement coverage stayed 46/46 throughout, with the GATE V release record intact.
+
+The full original roadmap follows, verbatim (all 13 phase details, execution waves, coverage, and the closing progress table), followed by the milestone summary.
+
+---
+
+## Archived Roadmap (verbatim, as shipped)
+
+# Roadmap: serpentrum
+
+**Created:** 2026-09-06
+**Depth:** comprehensive (9 phases)
+**Coverage:** 46/46 v1 requirements mapped — 0 unmapped, 0 duplicated (44 original after the 41→44 count correction + GAME-11 with Phase 5.1 + STACK-06 promoted from v2 with Phase 5.2, 2026-09-20)
+
+## Overview
+
+A PyMOL plugin game: steer a molecular head around a bounded box, stack real small molecules onto the snake at cited noncovalent geometry, then compute and explore the assembled snake's IR spectrum via xtb — all end-to-end inside PyMOL 2.5.0 (Windows), developed from a WSL shell. The build order follows the researched dependency sequence (ARCHITECTURE.md's A–H with PITFALLS.md's pitfall→phase mapping folded in; research phase letters kept in parentheses so PITFALLS.md's mapping stays resolvable): traps that are expensive to retrofit (module identity, purity gates, modeless discipline) land first; the empirically de-risked xtb pipeline (`--ohess`, committed fixtures) runs as a parallel track; demo data ships only after citation pinning and explicit human approval.
+
+**Core value:** Playing snake by stacking real molecules with known stacking geometry, then seeing the IR spectrum of the molecule you assembled, computed end-to-end inside PyMOL via xtb.
+
+## Phases
+
+**Phase Numbering:**
+- Integer phases (1, 2, 3): Planned milestone work
+- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+
+- [x] **Phase 1: Plugin Skeleton & Purity Harness** - Installable plugin, single-instance modeless 3-tab dialog, purity/test harness built in from commit one *(research A)*
+- [x] **Phase 2: Pure Core — Game & Chemistry Logic** - All game/chemistry rules as stdlib-only WSL-tested modules; spectra parser fixture-first; demo-data approval track starts *(research B)*
+- [x] **Phase 3: Molecules in the Viewer & Setup Tab** - Configure a game in the Setup tab; box + head molecule materialize in the viewer; uploads gated *(research C)*
+- [x] **Phase 4: Game Loop & Input** - Arrow-key steered movement on a 2D locked-camera plane with countdown, HUD, pause/restart *(research D — input spike)*
+- [x] **Phase 5: Stacking & Game Rules Complete** - Pickups stack at cited geometry; rigid-pivot turns; collisions end runs; win/crash both reach spectra *(research E)*
+- [x] **Phase 5.1: Game Speed / Difficulty (INSERTED 2026-09-20)** - Setup-selectable constant speed tier (difficulty), persisted; owner feel-check amended the tier values (3.0/6.0/7.5/9.0 A/s, default 'normal' 6.0 — drafts all "too slow") *(owner insertion — playtesting feedback)*
+- [x] **Phase 5.2: Generic Upload Stacking Consent (INSERTED 2026-09-20)** - Opt-in generic π-stack geometry for ring-bearing uploads (illustrative, labeled); upload-only games become winnable *(owner insertion — promotes v2 STACK-06)* *(STACK-03 integrity guards: non-silent, labeled, human-approved geometry)*
+- [x] **Phase 5.3: Randomized Pickup Spawning (INSERTED 2026-09-26)** - Pickup spawn positions randomized across the box (owner: new molecules spawn too close to the snake = too simple) *(owner insertion — playtesting feedback; owner feel-check APPROVED 2026-09-26, MIN_HEAD_DIST_FACTOR 0.35 ships, edge-bias idea deferred)*
+- [x] **Phase 6: xtb Pipeline** - Async cancellable `xtb --ohess` with verified success contract and calibrated atom-budget guard *(research F — parallel track)*
+- [x] **Phase 7: Spectra UI** - Broadened IR plot, clickable frequency table → static mode vectors, streaming log, saveable plot *(research G)* — COMPLETE 2026-09-26 (verified 38/38 must-haves, 3/3 SCs; owner checkpoints: 07-06 plot APPROVED round 2 with amendments, 07-10 live flow APPROVED round 2 with optimized-frame + [TRAIN] sign-offs)
+- [x] **Phase 8: Demo Data, Docs & Release Audit** - Human-approved Set A + attribution, 6-button setup persistence, help/docs, end-to-end audit *(research H)*
+- [x] **Phase 9: Random Line-Wall Spawning (ADDED 2026-10-11)** - After picking up a mol, a random line-wall spawns within the box at the same time as the next mol's spawn — never overlapping the newly spawned mol *(owner request — post-v1 gameplay improvement)* — COMPLETE 2026-10-13 (verified 36/36 must-haves + 7/7 SCs; owner feel-check APPROVED over two live games, one retune: head launch clearance 12→8 Å; GAME-05 route-(b) dated amendment, coverage stays 46/46)
+- [x] **Phase 9.1: Accumulating Line-Walls (INSERTED 2026-10-14)** - Walls persist (possibly shorter) per capture instead of being replaced at each spawn — more eaten mols = more in-box walls *(owner GO on the 09-09 feel-check deferred candidate — gameplay-depth refinement of the shipped Phase 9 walls; design-contract change vs the one-live-wall design)* — COMPLETE 2026-10-17 (verified 78/78 must-haves + 8/8 SCs, zero gaps; owner feel-check APPROVED, constants as-shipped 5/0.35/8.0; GAME-05 route-(b) 9.1 amendment 757e849, coverage stays 46/46)
+
+## Phase Details
+
+### Phase 1: Plugin Skeleton & Purity Harness *(research phase A)*
+
+**Goal**: The plugin installs into real PyMOL and opens a stable, single-instance, modeless 3-tab dialog — with the purity gates and test harness every later phase must pass, built in from commit one.
+**Depends on**: Nothing (first phase)
+**Requirements**: SETUP-01, INFRA-01, INFRA-02, INFRA-03, INFRA-05, INFRA-06
+**Success Criteria** (what must be TRUE):
+  1. User can install via plugin path (or Plugin Manager) and click a single "serpentrum" menu item that opens the 3-tab dialog (Setup / Game / Spectra). [SETUP-01]
+  2. Opening the menu item twice, or reloading via Plugin Manager, still yields exactly one dialog with live controls — no duplicate controllers (live state anchored outside module globals). [INFRA-03]
+  3. The dialog is modeless: PyMOL's viewer and command line stay responsive while it is open. [INFRA-05]
+  4. The WSL python3.6 gate runs green: all modules py_compile under 3.6, pure modules import stdlib only (grep gate), Qt only via `pymol.Qt`. [INFRA-02, INFRA-06]
+  5. The environment contract holds: a headless Windows PyMOL smoke via cmd.exe exercises the plugin, the WSL python3.6 suite runs, and Windows xtb is invocable from WSL with path conversion. [INFRA-01]
+**Plans**: 6 plans (4 waves)
+
+Plans:
+- [x] 01-01-PLAN.md — Plugin package skeleton: anchored single-instance entry point + zero-stub import test (Wave 1)
+- [x] 01-02-PLAN.md — 3-tab modeless dialog shell, Setup / Game / Spectra placeholders (Wave 2, parallel)
+- [x] 01-03-PLAN.md — Purity gate: AST checker + run_gates runner (syntax walk, plugin-path safety, scoped unittest, --smoke) (Wave 2, parallel)
+- [x] 01-04-PLAN.md — Headless Windows PyMOL skeleton smoke: loader namespace, anchor reload/double-import, flushed sentinels (Wave 2, parallel)
+- [x] 01-05-PLAN.md — Offscreen dialog smoke + xtb probe gate (--xtb) + WSL→Windows path-conversion helper (Wave 3)
+- [x] 01-06-PLAN.md — AGENTS.md gate docs + full gate run + human-verify checkpoint: install, single instance, modeless (Wave 4)
+
+Notes: Avoids the expensive-to-retrofit traps — module identity double-singleton (Pitfall 5), dialog lifetime (7), modeless freeze pattern (2), epoch guards (9). Human-verify: plugin loads via plugin path; exactly one dialog.
+
+### Phase 2: Pure Core — Game & Chemistry Logic *(research phase B)*
+
+**Goal**: Every game and chemistry rule exists as a stdlib-only pure module, unit-tested on WSL python3.6 with zero stubs — spectra parsing driven by the committed real xtb fixtures (`.planning/research/xtb-spike-fixtures/`), and the human demo-data approval track started.
+**Depends on**: Phase 1
+**Requirements**: STACK-02 (this phase also builds the pure halves of later phases' requirements — flagged per criterion below)
+**Success Criteria** (what must be TRUE):
+  1. Stacking is data-driven: interaction mode + distance + citation load from a validated data file, never code constants; unit tests prove the placement math reproduces the file's stored geometry. [STACK-02]
+  2. The spectra parser, run against the committed real xtb fixtures (phenol, CO₂, π-stacked dimer), extracts frequencies, IR intensities and mode vectors — negatives and zero-intensity modes included — and fails loudly on the corrupt fixture. (Pure half of SPECTRA-03/05; user-facing in Phase 7.)
+  3. The xtb success contract (exit 0 + "normal termination" on stderr + expected output files) and `xtb`/`xtb.exe` detection are unit-tested pure functions. (Pure half of SPECTRA-02 / SETUP-05.)
+  4. The full python3.6 unittest suite passes on WSL with zero sys.modules stubs and stdlib-only pure modules. [holds the INFRA-02 discipline]
+**Plans**: 14 plans (4 waves)
+
+Plans:
+- [x] 02-01-PLAN.md — TDD g98.out spectra parser core + fixture copies into tests/fixtures/xtb/ (Wave 1)
+- [x] 02-02-PLAN.md — xtbenv: 3-leg success contract + xtb/xtb.exe detection (Wave 1, parallel)
+- [x] 02-03-PLAN.md — xyzio: .xyz writer/reader + fixture round-trips (Wave 1, parallel)
+- [x] 02-04-PLAN.md — TDD stacking placement math + clash gate (Wave 1, parallel)
+- [x] 02-05-PLAN.md — molecule_data: manifest + stacking-dataset schemas, validated loader (Wave 1, parallel)
+- [x] 02-06-PLAN.md — TDD game_engine core: continuous-2D state, movement, direction queue (Wave 1, parallel)
+- [x] 02-07-PLAN.md — setup_logic: defaults, validation, save/load schema, randomize (Wave 1, parallel)
+- [x] 02-08-PLAN.md — cgo_build: local CGO constants, box + mode-arrow builders (Wave 1, parallel)
+- [x] 02-09-PLAN.md — vibspectrum fallback parser + trivial-mode filter + CO₂ linear case (Wave 2)
+- [x] 02-10-PLAN.md — engine collisions + rules: boundary, self-collision, score/cap/budget (Wave 2, parallel)
+- [x] 02-11-PLAN.md — demo-data draft materialization + blocking decision checkpoint: pinned π-stack distance (Wave 2, parallel)
+- [x] 02-12-PLAN.md — spectra completion: Gaussian broadening + corrupt-fixture loud failures + index correspondence (Wave 3)
+- [x] 02-13-PLAN.md — engine rigid-pivot turn sweep with refusal pre-check (Wave 3, parallel)
+- [x] 02-14-PLAN.md — pure-core integration chain + full-suite gates green (Wave 4)
+
+Notes: Fixtures-first rule (Pitfalls 1/12); success contract as a pure function (Pitfall 3). **Parallel human track starts here:** π-stack distances pinned from CC0 COD CIFs (3.555/3.570/3.580 Å measured; Janiak abstract verifies 20° displacement + 3.8 Å bound) → explicit human approval (DATA-02) in plan 02-11's checkpoint — longest non-code lead time; gates Phase 8. See 02-RESEARCH-pure-core.md (fixture-exact parser spec, continuous-2D engine resolution) and 02-RESEARCH-demo-data.md (pinning record).
+
+### Phase 3: Molecules in the Viewer & Setup Tab *(research phase C)*
+
+**Goal**: The user can configure a game in the Setup tab — demo set or upload, box preset, head molecule, xtb path, win cap — and see the box and chosen head molecule materialize in the viewer, with unsafe uploads rejected at the load-time gate.
+**Depends on**: Phases 1, 2
+**Requirements**: SETUP-02, SETUP-03, SETUP-04, SETUP-05, SETUP-06, DATA-03, INFRA-04
+**Success Criteria** (what must be TRUE):
+  1. User can choose Demo Set A from the dropdown (or upload an SDF/mol2 set) and its molecules load into the scene; uploads exceeding 3 rings are rejected with a clear reason. [SETUP-02, DATA-03]
+  2. User can pick a preset box size and see a clearly visible boundary box, and the selected head molecule (default: Random) appears in the viewer. [SETUP-03, SETUP-04]
+  3. User can leave xtb path/env on auto-detect (handling both `xtb` and `xtb.exe`) or set a manual path that overrides detection. [SETUP-05]
+  4. The win cap defaults to the safe budget (~10 molecules / ~100 atoms) and shows the hessian-cost (~N³) warning when raised beyond it. [SETUP-06]
+  5. "Cleanup model" removes only game-generated `srp_*` objects (user molecules untouched) and still works in a fresh process after a session save/reload. [INFRA-04]
+**Plans**: 8 plans (5 waves)
+
+Plans:
+- [x] 03-01-PLAN.md — Purity checker: BRIDGE cmd-seam class + gui_setup GUI allowlist entry (Wave 1)
+- [x] 03-02-PLAN.md — TDD molfile: SDF V2000/mol2 readers, cyclomatic ring count, ring finder, ≤3-ring gate (Wave 1, parallel)
+- [x] 03-03-PLAN.md — Unify xtb path validation via xtbenv.validate_binary_path (Wave 1, parallel)
+- [x] 03-04-PLAN.md — TDD setloader: demo/upload molecule records, __upload__ skip keying, multi-record split (Wave 2)
+- [x] 03-05-PLAN.md — Demo Set A data: human SDF checkpoint + manifest build + real-file regression tests (Wave 2, parallel; HUMAN GATE)
+- [x] 03-06-PLAN.md — pymol_bridge cmd-seam + headless viewer smoke (.pse survival, wildcard cleanup) (Wave 3)
+- [x] 03-07-PLAN.md — SetupTab form + gui.py page-0 registration + anchored setup dict (Wave 4)
+- [x] 03-08-PLAN.md — Full gate pass + checkpoint:human-verify in real Windows PyMOL (Wave 5)
+
+Notes: Avoids molecule-hygiene traps (Pitfall 11) and cleanup semantics (8). Human-verify: uploaded set loads; box renders.
+
+### Phase 4: Game Loop & Input *(research phase D — research flag)*
+
+**Goal**: The snake moves under arrow-key control on a 2D locked-camera plane with countdown, HUD, pause and restart — the first playable (if not yet stackable) motion.
+**Depends on**: Phases 2, 3
+**Requirements**: GAME-01, GAME-02, GAME-03, GAME-07, GAME-08
+**Success Criteria** (what must be TRUE):
+  1. User clicks Start, the dialog switches to the Game tab, counts down 3-2-1, then the head moves forward continuously without stopping. [GAME-01]
+  2. User can steer with all four arrow keys (up/down spike resolved with the designed fallback if needed); movement never stops. [GAME-03]
+  3. Play happens on a 2D plane with a locked camera, and the boundary box stays clearly visible throughout. [GAME-02]
+  4. User sees the rolling info box, elapsed timer and molecules-remaining, and pause/resume + restart work mid-run. [GAME-07]
+  5. Speed is constant regardless of snake length. [GAME-08]
+**Plans**: 9 plans (5 waves)
+
+Plans:
+- [x] 04-01-PLAN.md — Purity classes: input.py → BRIDGE, gui_game.py → GUI (pre-registration before the modules land) (Wave 1, parallel)
+- [x] 04-02-PLAN.md — TDD pure HUD display helpers: hud_logic.format_elapsed/remaining_text + engine.molecules_remaining (Wave 1, parallel)
+- [x] 04-03-PLAN.md — Bridge per-tick movement + locked camera (move_head_delta/lock_camera/unlock_camera) + REQUIRED smoke 05 (Wave 1, parallel)
+- [x] 04-04-PLAN.md — Wizard steering input route (input.py, BRIDGE) + REQUIRED smoke 06 + real-GUI keys harness (Wave 2, parallel)
+- [x] 04-05-PLAN.md — GameTab HUD: epoch-guarded countdown + 100 ms tick + pause/restart + anchored game_session (Wave 2, parallel)
+- [x] 04-06-PLAN.md — Dialog wiring: temp Start button → start_requested → Game tab + begin_game (Wave 3, parallel)
+- [x] 04-07-PLAN.md — CHECKPOINT: early keys human-verify (wizard route vs eventFilter fallback — failure-cheap) (Wave 3)
+- [x] 04-08-PLAN.md — Play wiring: camera lock + input install at GO!, single _teardown_round, pause input-gating, focus auto-pause (Wave 4)
+- [x] 04-09-PLAN.md — Phase-closing gate pass (5 REQUIRED smokes) + final human-verify of the full playable loop (Wave 5)
+
+Notes: **Spike scheduled here (the one open mechanism question):** up/down `set_key` bindability + Wizard event-mask behavior + focus stealing; fallback = Qt application-level event filter (verified design). First human-verify of keys happens here so failure is cheap. Avoids Pitfalls 4, 5 (pause semantics), 9. Pickup stick rendering arrives with pickups in Phase 5.
+
+### Phase 5: Stacking & Game Rules Complete *(research phase E)*
+
+**Goal**: The complete v1 game: pickups stack onto the chain at cited geometry, turns pivot the whole chain rigidly, collisions end runs, and both wins and crashes hand a complete snake to the spectra stage.
+**Depends on**: Phase 4
+**Requirements**: GAME-04, GAME-05, GAME-06, GAME-09, GAME-10, STACK-01, STACK-03, STACK-04, STACK-05
+**Success Criteria** (what must be TRUE):
+  1. User picks up a molecule and it appends at the dataset-stored stacking geometry — the placed distance equals the cited value — with molecule/atom counts tracked, and the info box shows interaction name, distance, one-line explanation and citation. [GAME-04, STACK-01, STACK-04; dataset from STACK-02]
+  2. A turn sweeps the entire chain as a rigid body; a sweep that would hit the boundary or body is refused; 180° reversal is impossible. [GAME-10]
+  3. Hitting the boundary or the snake's own body (segment-based) ends the run but leaves the snake complete; the player wins when length exceeds the cap. [GAME-05, GAME-06]
+  4. On completion (win or crash): the viewer clears, the camera focuses the completed snake, length + score (molecule count) display, and "Get Spectra" activates. [GAME-09]
+  5. Pickups without a verified dataset entry are skipped with the reason in the info box, and the clash gate rejects placements that would collide. [STACK-03, STACK-05]
+**Plans**: 16 plans (7 waves)
+
+Plans:
+- [x] 05-01-PLAN.md — TDD ring_cycle: canonical planar 6-ring extractor in molfile (Wave 1, parallel)
+- [x] 05-02-PLAN.md — TDD orientation.py: verified TTT matrix layout + edge-on canonicalization (Wave 1, parallel)
+- [x] 05-03-PLAN.md — TDD spawn.py: deterministic seeded pickup spawn policy (Wave 1, parallel)
+- [x] 05-04-PLAN.md — TDD engine additive fix: reject-after-won un-finish (win-vs-clash desync) (Wave 1, parallel)
+- [x] 05-05-PLAN.md — TDD placement.py: pure controller seam — skip taxonomy, tail/growth policy, clash gate (Wave 1, parallel)
+- [x] 05-06-PLAN.md — Anchors: records/stacking_data/last_run on _serpentrum + gui_setup stacking_path wiring (Wave 1, parallel)
+- [x] 05-07-PLAN.md — Bridge primitives (apply_matrix/sweep_chain/completion) + REQUIRED smoke 07 (Wave 1, parallel)
+- [x] 05-08-PLAN.md — setloader stack_ring carry on demo records (Wave 2)
+- [x] 05-09-PLAN.md — TDD-style hud_logic STACK-04 content builders (Wave 2, parallel)
+- [x] 05-10-PLAN.md — Edge-on materialization (head + pickups as sticks) + REQUIRED smoke 08 real-data placement (Wave 2, parallel)
+- [x] 05-11-PLAN.md — GameTab begin_game: head mirror, spawn/seed/materialize, teardown pickup cleanup (Wave 3)
+- [x] 05-12-PLAN.md — Pure integration chain test: win/crash/refuse/skip/un-finish scenarios (Wave 3, parallel)
+- [x] 05-13-PLAN.md — GameTab 'stacked' capture seam + 'won' guard (Wave 4)
+- [x] 05-14-PLAN.md — GameTab 'turning' rigid sweep rendering + head mirror + budget line (Wave 5)
+- [x] 05-15-PLAN.md — Completion presenter + Get Spectra button/model-A signal (Wave 6)
+- [x] 05-16-PLAN.md — Phase-closing gates + consolidated human-verify checkpoint (Wave 7)
+
+Notes: The clash gate is a game rule, not a spectra afterthought (a clashing append makes xtb infer covalent bonds → garbage hessian; π-stack at 3.4 Å verified safe `[RUN]`). `transform_selection` matrix layout + one-call rigid sweep + placement exactness are researcher-VERIFIED (05-RESEARCH-pymol-mechanics.md) — plans wire them as-is, smokes replicate the probes as regression. Biphenyl ships with rings at 90° → every biphenyl stack clashes → it is the designed refuse-path demonstrator (data observation recorded, not fixed). Edge-on orientation lands at materialization BEFORE any stacking (locked 03-08 + 04-07). Avoids Pitfalls 9, 10, 4-restore, 11-aggregation.
+
+### Phase 5.1: Game Speed / Difficulty *(INSERTED 2026-09-20 — urgent insertion, owner request)*
+
+**Goal**: The Setup tab offers a game speed/difficulty selector; the chosen speed is constant within a run (GAME-08 intact) and persists via Save/Load Setup — the current baseline (0.3 Å/tick = 3.0 Å/s) remains the default tier.
+**Depends on**: Phase 5
+**Requirements**: GAME-11
+**Success Criteria** (what must be TRUE):
+  1. Setup tab shows a speed/difficulty selector with named tiers; default = the v1 baseline speed. [GAME-11]
+  2. The selected speed applies at GO! and stays constant for the whole run; Restart keeps the selection. [GAME-11]
+  3. Save Setup → Load Setup reproduces the chosen speed; setup files written before this feature load with the default tier (schema backcompat). [GAME-11]
+  4. A live human feel-check approves the final tier values (checkpoint). [GAME-11]
+**Plans**: 6 plans (3 waves; 2026-09-20 — planned per owner directive; STATE's "plan 5.2 first" superseded by the owner's explicit /gsd-plan-phase 5.1) — EXECUTED 2026-09-25 (owner moved 5.1 ahead of 5.2)
+
+Plans:
+- [x] 5.1-01-PLAN.md — TDD engine `speed_a_per_s` trailing kwarg + per-tier/determinism tests (Wave 1, parallel)
+- [x] 5.1-02-PLAN.md — TDD SPEED_TIERS table + merge_defaults backcompat + speed_tier_for (Wave 1, parallel)
+- [x] 5.1-03-PLAN.md — TDD hud_logic.speed_note pure builder (Wave 1, parallel)
+- [x] 5.1-04-PLAN.md — Setup-tab Speed QGroupBox + tier combo, box_combo pattern (Wave 2, parallel)
+- [x] 5.1-05-PLAN.md — _build_engine injection + once-per-run speed note (Wave 2, parallel)
+- [x] 5.1-06-PLAN.md — pure integration chain + gates + owner feel-check checkpoint (Wave 3, blocking)
+
+Notes: Inserted per owner playtesting feedback 2026-09-20 ("current speed is easy, kinda slow even with small box"). Draft tiers for planning (at the 100 ms tick): relaxed ≈ 2.0 Å/s, normal = 3.0 Å/s (current), fast ≈ 4.5 Å/s, expert ≈ 6.0 Å/s — final values approved by the owner at the feel-check (5.1-06 Task 2; values are data-only edits in setup_logic.SPEED_TIERS). Distinct from v2 GAME-10-v2 (speed increasing with snake length — still deferred). Planned 2026-09-20 after Phase 5 wrap-up via 2 parallel researchers (engine-speed plumbing / Setup-UI persistence) → 6 focused plans; shared-file sequencing with 5.2 handled by symbol-anchored plans + merge_defaults reuse-or-add executor note. Execution order with 5.2 remains sequential (no parallel waves across 5.2/5.1).
+
+### Phase 5.2: Generic Upload Stacking Consent *(INSERTED 2026-09-20 — urgent insertion, owner request; promotes v2 STACK-06 into v1)*
+
+**Goal**: Uploaded molecules with a canonical planar 6-ring can stack at the ALREADY-APPROVED idealized π-stack geometry (3.60 Å @ 20° off-normal — the DATA-02/Janiak-pinned Set-A entry) when the user explicitly opts in — clearly labeled "illustrative/generic" in-game — so upload-only and mixed games become winnable; uploads without a planar 6-ring still skip with a reason; the consent OFF default keeps today's honest skip behavior byte-identical.
+**Depends on**: Phase 5 (COMPLETE)
+**Requirements**: STACK-06
+**Success Criteria** (what must be TRUE):
+  1. Setup tab shows an opt-in control for generic upload stacking (OFF by default; a modal popup is purity-banned — use an inline Setup control, checkbox or combo); the choice persists via Save/Load Setup with schema backcompat (absent key = OFF). [STACK-06]
+  2. With consent ON: an upload carrying a canonical planar 6-ring captures and places at the approved idealized geometry (placed d = 3.60 Å verified by DBG capture line) with every HUD line/recap labeled "generic π-stack (illustrative geometry — user-approved) [Janiak 2000]"; the win path works in an upload-only game. [STACK-06]
+  3. With consent ON, an upload WITHOUT a planar 6-ring still skips with a specific reason ("no aromatic ring for generic π-stack" class); with consent OFF, behavior is byte-identical to today (skip, no invented chemistry). [STACK-03 integrity]
+  4. End-of-run recap groups generic placements under the labeled generic interaction (distinct from dataset entries); DATA-sources/docs wording updated to describe the generic mode. [STACK-04]
+  5. A live human feel-check approves the consent UX + labeling (checkpoint). [STACK-06]
+**Plans**: 9 plans in 5 waves (planned 2026-09-23):
+- [ ] 5.2-01-PLAN.md — TDD schema consent key `generic_stack_consent` + validate bool check (Wave 1, parallel)
+- [ ] 5.2-02-PLAN.md — TDD generic_stack module: generic entry, overlay builder, recap name, stackability helper (Wave 1, parallel)
+- [ ] 5.2-03-PLAN.md — TDD SKIP_GENERIC_NO_RING taxonomy branch (Wave 2, sequential)
+- [ ] 5.2-04-PLAN.md — TDD HUD surfaces: reason text, consent-aware stack_mode_note, generic_consent_note (Wave 3, sequential)
+- [ ] 5.2-05-PLAN.md — Setup consent checkbox + overlay anchor + absorbed C2 clause (Wave 4, parallel)
+- [ ] 5.2-06-PLAN.md — GameTab wiring: consent restamp, consent note slot, recap enrollment (Wave 4, parallel)
+- [ ] 5.2-07-PLAN.md — DATA_SOURCES.md generic-mode docs + literal consistency check (Wave 4, parallel)
+- [ ] 5.2-08-PLAN.md — Pure integration chains + upload-only win path + full gates (Wave 4, parallel)
+- [ ] 5.2-09-PLAN.md — Final gates + OFF-pin sweep + owner feel-check checkpoint (Wave 5, blocking)
+
+Notes: Inserted per owner question 2026-09-20 ("possible to have user accept a pre-defined stacking in a popup and allow play as usual?"). Repos rule honored: distance is NOT invented (reuses the human-approved DATA-02 geometry); consent is explicit and non-silent; labeling keeps educational integrity (the v2 "silent fallback" out-of-scope entry stays out of scope). Absorbs the debug-session's C2 soft-warning seam into the same Setup surface. **Plan BEFORE Phase 5.1 (owner choice 2026-09-20); execute Phase 5.2 → 5.1 sequentially** (both touch gui_setup/hud_logic — no parallel waves across the two phases). Eligibility reuses 05-01/05-19d machinery: canonical planar 6-ring extractor + edge-on parity.
+
+### Phase 5.3: Randomized Pickup Spawning *(INSERTED 2026-09-26 — urgent insertion, owner request)*
+
+**Goal**: Pickup spawn positions are seeded-randomized uniformly across the game box (instead of a LOOKAHEAD-anchored 10 Å bubble ahead of the heading) with a box-proportional minimum head distance — every capture demands real navigation while GAME-07 seeded determinism (same setup + same call sequence ⇒ identical positions) and the 2026-09-19b/c demote/cooldown machinery stay intact.
+**Depends on**: Phase 5 (COMPLETE) — executes after Phase 5.2, before Phase 6
+**Requirements**: (none new — refines the Phase 5 pickup spawn policy; coverage stays 46/46)
+**Success Criteria** (what must be TRUE):
+  1. New pickups spawn anywhere in the wall-margined box (seeded uniform sampling) — no longer confined to a bubble ahead of the snake's head.
+  2. Every spawn is at least a box-proportional minimum head distance away (≈0.35 × shrunk half-span ⇒ ≈11/18/28.5 Å on small/medium/large; clamp ≤ 0.8 × half-span), tunable via the `min_head_dist_a` ctor kwarg and the `MIN_HEAD_DIST_FACTOR` constant.
+  3. GAME-07 determinism holds: same setup + same call sequence ⇒ identical spawn positions (crc32 seeding, private random.Random); all clearance legs (wall margin, head floor, chain atoms, live pickups) intact; degenerate-box exhaustion semantics unchanged.
+  4. `PickupSpawner.__init__`/`first`/`next_after` signatures unchanged — gui_game.py/game_engine.py need ZERO edits; the demote-after-refuse + resumable exhaust-cooldown machinery and all non-geometry spawn pins stay green UNMODIFIED.
+  5. A live human feel-check approves the spawn randomness (checkpoint).
+**Plans**: 5 plans (3 waves; planned 2026-09-26):
+
+Plans:
+- [x] 5.3-01-PLAN.md — TDD uniform box-sampling candidate generator + min-head-distance floor (Wave 1)
+- [x] 5.3-02-PLAN.md — TDD seeded grid-fallback scan offset (kills corner-bias clustering) (Wave 2, sequential)
+- [x] 5.3-03-PLAN.md — s9 spawn+engine integration re-proof (randomized capture chain, derived expectations) (Wave 2, parallel)
+- [x] 5.3-04-PLAN.md — gui spawn call-site source-scan pins + zero-edit compatibility verdict (Wave 2, parallel)
+- [x] 5.3-05-PLAN.md — full gates + smokes + owner feel-check checkpoint (+ conditional factor retune) (Wave 3, blocking)
+
+Notes: Inserted per owner playtesting feedback 2026-09-26 ("the new mol to be eaten spawn too close to the current position, so its likely too simple. make it more random in the box"). Scope lives in 05-03's spawn.py — candidate-generator swap retiring LOOKAHEAD_A/LATERAL_MAX_A/LATERAL_QUANTUM_A/_draw_lateral while keeping MAX_DRAWS, GRID_STEP_A, the clearance legs, crc32 seeding, and the 2026-09-19b/c demote/cooldown machinery; no new requirement ID — coverage stays 46/46. Executes after 5.2 (planned first), before Phase 6; 5.3 touches NO 5.2/06-shared source file — gui_game.py is verified zero-edit by 5.3-04 (signatures preserved; symbol-anchored; disjoint from 06-06's `_present_completion`/`log_external` surface, so the 06 `depends_on: ["5.2-09"]` edges stay valid unchanged). Existing spawn determinism/position pins in tests/test_spawn.py are rewritten by the policy change; all other suites must stay green UNMODIFIED (5.1-01 convention). Owner-retunable: MIN_HEAD_DIST_FACTOR (0.35 default) via the min_head_dist_a ctor kwarg — precedent 5.1 tier retune (2026-09-25).
+
+### Phase 6: xtb Pipeline *(research phase F — parallel track, largely de-risked)*
+
+**Goal**: The final snake can be handed to a real, cancellable, async `xtb --ohess` run with a verified success contract and a calibrated atom-budget guard — while the UI never blocks.
+**Depends on**: Phase 2 only — **run in parallel with Phases 3–5** (F∥D/E from research); merge before Phase 7
+**Requirements**: SPECTRA-02, SPECTRA-06
+**Success Criteria** (what must be TRUE):
+  1. User launches a spectra run and `xtb --ohess` starts on the final snake in a fresh per-run temp dir, asynchronously — dialog and viewer stay responsive during the run. [SPECTRA-02]
+  2. User can cancel a running calculation, and a new run can start after cancel or completion (no double-runs). [SPECTRA-02]
+  3. Success is declared only on the verified contract (exit 0 + "normal termination" + expected output files); corrupted input surfaces a clear failure, never a fake success. [SPECTRA-02]
+  4. Before launch, the hidden molecule/atom counts are re-checked against the configured cap; exceeding it shows a warning. [SPECTRA-06]
+  5. A capped ~100-atom snake completes `--ohess` headless with measured wall time; warning threshold and OMP environment calibrated from the measurement. [SPECTRA-06]
+**Plans**: 12 plans in 4 waves (planned 2026-09-24 from 06-RESEARCH-runner/-guard; owner directive: fine-grained plans):
+
+Plans:
+- [ ] 06-01-PLAN.md — TDD budget_guard: SPECTRA-06 launch re-check (warn-and-proceed, head-inclusive counts) (Wave 1, parallel)
+- [ ] 06-02-PLAN.md — TDD xtb_run: state machine, env knobs, run-input builder, spectra_run record shape (Wave 1, parallel)
+- [ ] 06-03-PLAN.md — QProcess-in-conda gate smoke 09 (informational; unblocks the runner plans) (Wave 1, parallel)
+- [ ] 06-04-PLAN.md — bridge chain_atom_counts + REQUIRED chain-count smoke 10 (Wave 2, parallel; after 5.2 lands)
+- [ ] 06-05-PLAN.md — XtbRunController GUI shell + purity GUI_MODULES entry + spectra_run anchor attr (Wave 2, parallel)
+- [ ] 06-06-PLAN.md — completion anchors snake_xyz (engine-atom run input) + log_external channel (Wave 2, parallel)
+- [ ] 06-07-PLAN.md — calibration: ~104-atom --ohess wall-time sweep + 06-CALIBRATION.md (Wave 2, parallel)
+- [ ] 06-08-PLAN.md — runner contract smoke 11: success/cancel/no-double-run/failure paths (Wave 3, parallel)
+- [ ] 06-09-PLAN.md — launch pipeline interpose + placeholder status/cancel affordances (Wave 3, parallel)
+- [ ] 06-10-PLAN.md — pure integration chain tests (completion→input→guard→state→contract→record) (Wave 3, parallel)
+- [ ] 06-11-PLAN.md — calibration applied: HESSIAN_WARNING wording + runner thread default (Wave 3, parallel; after 5.2 lands)
+- [ ] 06-12-PLAN.md — final gates (--smoke/--xtb) + human-verify pipeline checkpoint (Wave 4, blocking)
+
+Notes: PyMOL-free; the only gameplay touchpoint is the final-snake xyz handoff — resolved as EQ-xyz-1: the run input is assembled at completion from ENGINE/SESSION atoms (05-RESEARCH-core-integration:151 forbids re-reads) and stashed on `last_run['snake_xyz']`; the viewer channel is a counts-only cross-check (06-04). Smoke first: the QProcess-in-conda smoke (06-03, informational) gates the runner plans 06-05/06-08 via depends_on; fallback = worker+queue+QTimer drain (documented, unbuilt). Shared-file rule: plans touching Phase-5.2 files (pymol_bridge, gui_game, setup_logic, __init__) carry depends_on: ["5.2-09"]. Avoids Pitfalls 1, 2, 3, 6, 11-assert, 12-fixtures. `[TRAIN]` items (OMP env) verified/measured by 06-07 + applied by 06-11. SPECTRA-tab UI verdicts defer to Phase 7 (EQ-checkpoint-1: the 06-12 checkpoint covers pipeline behavior via the temporary placeholder affordances).
+
+### Phase 7: Spectra UI *(research phase G)*
+
+**Goal**: The payoff screen: a broadened IR spectrum of the player's own snake, a clickable frequency table that draws mode vectors in 3D, live progress and a saveable plot.
+**Depends on**: Phases 5, 6
+**Requirements**: SPECTRA-01, SPECTRA-03, SPECTRA-04, SPECTRA-05
+**Success Criteria** (what must be TRUE):
+  1. User clicks "Get Spectra", the dialog switches to the Spectra tab, and the calculation's progress streams live into the log panel. [SPECTRA-01, SPECTRA-04]
+  2. User sees a Gaussian-broadened IR spectrum with axis labels and adjustable size, and Save Plot writes a PNG viewable outside PyMOL. [SPECTRA-03]
+  3. The frequency table lists every mode (negatives shown as imaginary, e.g. −31.9i; zero-intensity included), and clicking a row draws that mode's static displacement vectors on the snake in the viewer. [SPECTRA-05]
+**Plans**: 10 plans in 6 waves (planned 2026-09-25 from 07-RESEARCH-qt-plot/-spectra-seam; owner directive: fine-grained focused plans)
+
+Plans:
+- [x] 07-01-PLAN.md — TDD spectra_ui pure half: shared freq_label (-31.9i convention), table_rows (every mode, zero-intensity included), mode_arrow_primitives, run_status_lines (Wave 1, parallel)
+- [x] 07-02-PLAN.md — TDD plot_logic pure half: Scene builder over broaden + nice_ticks + size presets + caption; ascending axis pinned (Wave 1, parallel)
+- [x] 07-03-PLAN.md — bridge mode-vector seams (load_mode_arrows/load_xtbopt/zoom_mode_frame) + REQUIRED smoke 13 with always-on g98≡xtbopt overlay assertion (Wave 1, parallel)
+- [x] 07-04-PLAN.md — research-flagged seam gaps: XtbRunController.log_tail() public accessor + spectra_runner anchor field declaration (Wave 1, parallel)
+- [x] 07-05-PLAN.md — gui_plot.py: IrPlotWidget + paint_scene seam + SpectraPlotPanel + render_image save route + REQUIRED smoke 12 + single-writer GUI_MODULES registration (Wave 2)
+- [x] 07-06-PLAN.md — CHECKPOINT: early plot human-verify via real-GUI harness (fail cheap, 04-07 precedent) (Wave 3, blocking)
+- [x] 07-07-PLAN.md — SpectraTab shell + gui.py placeholder replacement: streaming log, status, Cancel/Run-again delegation; all 06-09 behaviors preserved (SPECTRA-01/04) (Wave 3, parallel)
+- [x] 07-08-PLAN.md — plot panel embed + run_finished → parse → build_scene → set_scene (SPECTRA-03 on-screen) (Wave 4)
+- [x] 07-09-PLAN.md — frequency table + row-click mode vectors on srp_xtbopt (OPTIMIZED frame — owner sign-off at 07-10) (SPECTRA-05) (Wave 5)
+- [x] 07-10-PLAN.md — phase-closing gates + consolidated human-verify checkpoint (live flow + optimized-frame sign-off + [TRAIN] discharges) (Wave 6, blocking)
+
+Notes: Pure parser already tested in Phase 2; UI is wiring plus the two verified QPainter precedents (`dynoplot.py`, `pmg_qt/volume.py`) and the probe-verified QImage save route (route A; `QWidget.grab()` demoted to documented fallback). Mode vectors draw on the OPTIMIZED frame (`srp_xtbopt` from record['xtbopt_path']; g98 ≡ xtbopt within 1e-6 Å probed; game frame wrong by up to 0.14 Å) — owner sign-off at the 07-10 checkpoint. Shared imaginary formatter lives in `spectra_ui.freq_label` (single convention; plot shows no raw frequency labels in v1). Avoids Pitfalls 12 (table↔vector index match), 2 (streaming + cancel UX), 5.
+
+### Phase 8: Demo Data, Docs & Release Audit *(research phase H)*
+
+**Goal**: The shippable release: human-approved demo data with verified attribution, educator-shareable setup persistence, complete help and docs, and an end-to-end audit proving every v1 requirement.
+**Depends on**: Phases 5, 6, 7 + the human-approval track (running since Phase 2)
+**Requirements**: DATA-01, DATA-02, DATA-04, SETUP-07, SETUP-08, DOCS-01, DOCS-02, DOCS-03, DOCS-04, DOCS-05
+**Success Criteria** (what must be TRUE):
+  1. Demo Set A ships with CID-cited PubChem 3D SDFs; every stacking distance pinned from a verified source and explicitly human-approved; DATA_SOURCES.md documents source DB, ID, DOI and license per molecule; no CSD/CCDC data redistributed. [DATA-01, DATA-02, DATA-04, DOCS-02]
+  2. All six bottom-row buttons work (Reset, Randomize, Save Setup, Load Setup, Cleanup model, Start), and Save Setup → Load Setup on a fresh install reproduces the exact game configuration. [SETUP-07, SETUP-08]
+  3. README documents install, usage and the demo set with the vibe-coding warning block intact (and the leftover "sECDpent" name fixed), and the doc-vs-code audit passes — README steps reproduce; help text matches real controls and dataset values. [DOCS-01, DOCS-04]
+  4. In-game help covers controls, the "click the 3D viewer" focus hint, what negative frequencies mean, and a next-action hint on every screen. [DOCS-03]
+  5. End-to-end release audit: the full flow (setup → play → complete → xtb → IR plot → save) passes headless with human checkpoints, and all v1 requirements are checked off with complete traceability. [DOCS-05]
+**Plans**: 13 plans (8 waves; revised 2026-09-28; owner insertion 2026-10-01 mid-GATE V: performance controls + student-facing help/copy; owner directive: consolidate ALL checkpoints into TWO gates — GATE D one decision sheet + GATE V one verification/release close)
+
+Plans:
+- [ ] 08-01-PLAN.md — **GATE D** (checkpoint:decision, blocking): one numbered decision sheet — Randomize scope, negative-freq wording+cutoffs, 'Under Development' sub-line, confirm-or-amend recorded defaults; Task 2 records verdicts + per-option contracts in 08-01-SUMMARY.md (Wave 1; the phase's ONLY decision gate)
+- [ ] 08-02-PLAN.md — Demo-pack completion: setloader end-to-end load proof test + DATA_SOURCES.md 3 content edits + audit chain (DRAFT-headed for GATE V) (Wave 1, parallel)
+- [ ] 08-03-PLAN.md — TDD doc-vs-code audit: tools/check_docs.py + tests/test_docs_audit.py in the gate suite (DOCS-04 leg A; post-08-08 literals, 'Apply / Show in Viewer' banned) (Wave 4)
+- [ ] 08-04-PLAN.md — REQUIRED smoke/14 release e2e chain (scripted win → xyz → fixture spectra → PNG → setup round-trip) + REQUIRED_SMOKES registration (Wave 1, parallel)
+- [ ] 08-05-PLAN.md — TDD pure persistence helpers (randomize_setup + normalize_loaded), reading the GATE D Randomize-scope verdict (Wave 2; read-decision)
+- [ ] 08-06-PLAN.md — TDD imaginary_note (spectra_ui) + TDD help_text.py PURE module (Start-only before_apply), reading the GATE D negative-freq verdict (Wave 2; read-decision)
+- [ ] 08-07-PLAN.md — README rewrite (DOCS-01; Start-only usage, no removed control), reading the GATE D sub-line verdict (Wave 2; read-decision)
+- [ ] 08-08-PLAN.md — 6-button bottom row GUI wiring (gui.py + gui_setup.py handlers) + temp-row removal + docstring refresh + source-pin test (Wave 3)
+- [ ] 08-09-PLAN.md — Help wiring: state-driven hints (Game/Setup/Spectra) + before_apply render site + negative-freq log line + stale-clause fix + coupled focus-hint test edit (Wave 4)
+- [ ] 08-10-PLAN.md — TDD tools/audit_requirements.py + Evidence column over all 46 IDs + 36-row checkbox reconciliation (DOCS-05 traceability; human tier cites GATE V) (Wave 5)
+- [ ] 08-11-PLAN.md — **GATE V** (checkpoint:human-verify, blocking, LAST wave): sectioned A data sign-off / B 6-button + educator round-trip / C release close incl. real xtb + SIGN-OFFs A/B → conditional approval flip + coupled DRAFT test-pin + amendments → 10-row ledger flip + final battery + roadmap close (Wave 6)
+- [ ] 08-12-PLAN.md — Owner insertion (Q2 + D2): TDD xtb_threads setup key + Performance GUI group (atom budget / xtb threads spinboxes) + launch argv seam + honest completion-line label (Wave 7)
+- [ ] 08-13-PLAN.md — Owner insertion (Q1 + D1/D3): hover tooltips on every Setup control + 6 buttons + humanized dataset explanation + README humanization w/ biphenyl reconciliation (Wave 8)
+
+Notes: Data ships only after citation pinning + human approval (repo hard rule — no fabrication; GATE V Section A is the data approval act; 08-02 only prepares the DRAFT doc). EXACTLY TWO gates: GATE D (08-01, checkpoint:decision) and GATE V (08-11, checkpoint:human-verify) — no other plan carries a checkpoint. Decision-dependent plans (08-05/08-06/08-07) use the read-decision pattern: their first task step reads the verdict from 08-01-SUMMARY.md and implements the chosen option's contract. Real xtb stays OUT of required smokes (06-12 EQ-smoke-1 disposition; smoke 14 is fixture-tailed). Parallel waves run under the worktree protocol with disjoint files_modified: Wave 1 (08-01/08-02/08-04), Wave 2 (08-05/08-06/08-07). 08-09 follows 08-08 to avoid the shared gui_setup.py race (the wave-3 parallelism that the prior structure omitted is now explicit: only one plan touches gui_setup.py per wave). Avoids Pitfalls 8 (.pse desync), 4 (leak check), UX table; honors the test_stacking_dataset.py 'DRAFT' marker-pin trap (same-commit coupling in GATE V Task 2).
+
+### Phase 9: Random Line-Wall Spawning *(added 2026-10-11 — owner request, post-v1 gameplay improvement; planned 2026-10-12)*
+
+**Goal**: Picking up a molecule spawns the NEXT molecule and exactly ONE seeded-random pure-red line-wall inside the box together (same event, both respawn paths) — the wall never overlaps the newly spawned mol (per-atom 3.0 Å clearance, the owner mandate, live-auditable via SRP_DEBUG), stays fair (ends inset from the box faces, 12.0 Å launch clearance from the head, off other live mols), and steering the head into it crashes the run through the existing completion path ('crashed into wall', snake still complete → Get Spectra); pickup spawning, the v1 release record, and GAME-07 replay determinism all stay byte-identical.
+**Depends on**: Phase 8 (COMPLETE — Phase 9 is post-release refinement; the GATE V release record is unaffected)
+**Requirements**: (none new — **D-MAP verdict route (b)**: dated amendment on GAME-05 mirroring the 5.3 "refines an existing rule" + quick-003 dated-amendment precedents — walls extend the GAME-05 lethal-collision class; the spawn pairing refines the 5.3 spawn cadence; coverage stays 46/46 with ZERO audit-tool churn; the amendment lands in plan 09-09 after the owner feel-check. Alternative route (a) GAME-12 mint was rejected: the v1 ledger is the closed, human-certified GATE V release record.)
+**Success Criteria** (what must be TRUE):
+  1. Every successful next-mol spawn swaps in exactly one red wall (srp_wall) on the same event at BOTH respawn call sites (capture tail + exhaust-cooldown resume); no mol spawn ⇒ no wall swap; never at run start; never on the win tick (engine.finished guard). [owner request verbatim]
+  2. The wall never overlaps the newly spawned mol — every translated atom keeps ≥ 3.0 Å from the wall segment; live-auditable via the SRP_DEBUG 'DBG wall spawn ... gap=...' line. [owner request verbatim]
+  3. Head contact emits ('crashed', 'wall') in the referee slot after boundary / before body; the run ends 'crashed' with the snake complete → the normal completion path; the GUI renders 'crashed into wall' with ZERO new crash-handler code. [GAME-05 class]
+  4. Fairness: endpoints ≥ 6.0 Å inset from every face, head launch clearance 12.0 Å, live-mol clearance 3.0 Å, length 0.45 × minor-axis span, arbitrary angle [0, π); the collision halo is WALL_COLLISION_RADIUS_A 2.0 — all constants owner-retunable in the single wall.py table at the feel-check.
+  5. GAME-07 holds for BOTH streams: same setup + same call sequence ⇒ identical pickup AND wall sequences (separate derived rng crc32(pickup_seed|'wall-v1')); spawn.py + test_spawn.py stay byte-identical/UNMODIFIED. [GAME-07]
+  6. Wall hygiene: gone from the completion view (delete_walls in _teardown_round — D-WALL-TEARDOWN (b), GAME-09 "the viewer clears"), gone after Restart (cleanup_srp), swept by Cleanup model in a fresh .pse process; help 'playing' hint names red walls as lethal. [GAME-09, DOCS-03]
+  7. A live owner feel-check APPROVES the wall experience + feel numbers (the ONE consolidated blocking checkpoint). [closure gate]
+**Plans**: 9 plans (4 waves; planned 2026-10-12 from the three 09-RESEARCH-* files; owner directive: fine-grained focused plans) — COMPLETE 2026-10-13 (executed waves 1-3 via worktree protocol + 09-01/09-09 direct-on-main; owner feel-check APPROVED; verified per 09-VERIFICATION.md: 36/36 must-haves + 7/7 SCs, zero gaps)
+
+Plans:
+- [x] 09-01-PLAN.md — TDD serpentrum/wall.py: wall_seed_from_setup + WallSpawner policy (constants table, 3-draw contract, 4 clearance legs, None semantics) + tests/test_wall.py (Wave 1, parallel)
+- [x] 09-02-PLAN.md — TDD engine wall state + collision: WALL_COLLISION_RADIUS_A, set_wall/clear_wall/reset, ('crashed','wall') leg after boundary before body + tests/test_engine_wall.py (Wave 1, parallel)
+- [x] 09-03-PLAN.md — TDD cgo_build.wall_cgo: 42-float 4-edge vertical LINES fence + TestWallCgo (Wave 1, parallel)
+- [x] 09-04-PLAN.md — TDD pure text surfaces: hud_logic.debug_wall_trace DBG builder (SRP_DEBUG no-overlap audit line) + help 'playing' wall clause with coupled pins (Wave 1, parallel)
+- [x] 09-05-PLAN.md — pymol_bridge wall channel: WALL_NAME/DEFAULT_WALL_* + load_line_wall + delete_walls ('srp_wall*' pattern) (Wave 2, parallel)
+- [x] 09-06-PLAN.md — s10 integration scenario: capture → synchronized next-mol + wall spawn → wall crash → completion counters → byte-identical GAME-07 re-run (+ docstring line; s10 NOT s9) (Wave 2, parallel)
+- [x] 09-07-PLAN.md — gui_game wiring: _build_engine WallSpawner + session 'wall_spawner' + _respawn_pickup success-tail wall seam (finished guard) + _teardown_round delete_walls + TestWallWiring source-scan pins (Wave 3, parallel)
+- [x] 09-08-PLAN.md — REQUIRED smoke/15_line_wall_smoke.py (6 stages: load/replace/spawn-pairing/crash/delete/scene-clear) + REQUIRED_SMOKES registration + full battery (Wave 3, parallel)
+- [x] 09-09-PLAN.md — Phase-close: battery recorded → BLOCKING owner feel-check (feel numbers + decision-table confirm-or-amend) → conditional constant retunes + REQUIREMENTS.md GAME-05 dated amendment (route b) (Wave 4, blocking)
+
+Notes: Owner request verbatim (2026-10-11): "improve gameplay experience by random spawn line as wall-within-box after picking up a mol, at the same time as the spawn of the next mol. the line-wall should not overlap with the newly spawn mol." Planning verdicts (2026-10-12, owner blesses/retunes at the ONE closing checkpoint 09-09): **D-MAP = route (b)** dated GAME-05 amendment (coverage stays 46/46; the closed GATE V ledger keeps its meaning; zero audit-tool churn); **D-WALL-TEARDOWN = (b) delete at _teardown_round** beside delete_pickups (GAME-09 requirement compliance — the box is static user-chosen arena, the wall is per-run spawned content kin to pickups; crash cause stays in the log) — ONE consistent contract across engine reset (09-02), the bridge delete seat (09-05), teardown wiring (09-07), smoke STAGE5/6 (09-08), and feel steps 5-6 (09-09). Other researched defaults encoded: head-only wall binding; ('crashed','wall') rides the generic crash→completion path with zero GUI crash-handler edits; one live wall replaced per spawn; separate derived rng stream (pre/post-Phase-9 pickup replays byte-identical — no feel-check confound); s10 scenario name avoids the existing test_phase5_integration s9 (5.3's chain pin); NO new Setup knob (5.3 precedent — constants are the tuning surface); docs stay hidden (README/check_docs families wall-neutral — verified; the ONLY user-visible text is the mandated DOCS-03 playing-hint clause). Prior suites stay green UNMODIFIED: test_spawn.py untouched (spawn.py byte-identical, checked per plan), engine suites untouched (wall pins live in the new test_engine_wall.py), s1-s9 untouched (s10 additive). Wave-1 runs FOUR parallel TDD plans (worktree protocol, Phase-5 batch-cap precedent).
+
+### Phase 9.1: Accumulating Line-Walls *(INSERTED 2026-10-14 — urgent insertion, owner request; the 09-09 feel-check deferred candidate picked up; planned 2026-10-14)*
+
+**Goal**: Walls PERSIST/ACCUMULATE per capture instead of being replaced at each spawn — more eaten mols = more in-box walls — under cap-then-stop semantics: every successful next-mol spawn (both respawn call sites) adds at most ONE new wall until the set reaches `WALL_MAX_LIVE_WALLS` (draft 5; feel-check grid 3/5/8), with walls #2+ at the shorter tier `WALL_ACCUM_LENGTH_FRACTION` (draft 0.35; wall #1 keeps the approved 0.45). This is a design-contract change vs Phase 9's one-live-wall design, shipped via the COMPAT route (engine `walls` list + `add_wall` + newest-wall `wall` property; `set_wall` keeps clear-and-plant-one so every Phase-9 pin stays green) plus: engine multi-wall state with a first-hit collision loop in the SAME referee slot, accumulation policy living in the spawner as an explicit `existing_walls` input (stateless spawner, deterministic set), a NEW wall-vs-wall clearance leg L5 (`WALL_WALL_CLEARANCE_A` draft 8.0; true segment-segment, crossings rejected; SRP_DEBUG-auditable via a new `wwgap=` trace field), `srp_wall_<n>` indexed bridge naming with a monotonic per-run ordinal (NEVER molecules_stacked — refuses roll that back) and viewer-write-before-engine-commit seam ordering (no stranded invisible wall), Phase-9 pin + smoke updates (s10 dated docstring note + additive s11; smoke STAGE2→WALL-ACCUM + multi-capture STAGE3). ALL FOUR Phase-9 clearance legs (box-face inset, new-mol no-overlap ≥ 3.0 Å SRP_DEBUG-auditable per wall by ordinal, head launch clearance 8.0, live-mol clearance), the GAME-07 separate wall-stream determinism (byte-identical pickup replays; spawn.py + test_spawn.py stay unmodified vs the 9.1 base; same seed + same play ⇒ same accumulated SET, salt stays 'wall-v1'), the ('crashed','wall') referee leg with its payload unchanged, and wall hygiene (teardown / Restart / fresh-.pse Cleanup model sweep — already indexed-name-capable) must hold for the WHOLE accumulated set. Feasibility of the draft late-game constants is Monte-Carlo probe-verified early (the Phase-9 /tmp-probe discipline re-run on accumulated fixtures); the owner blesses/retunes the three new constants at the closing feel-check.
+**Depends on**: Phase 9 (COMPLETE + VERIFIED 2026-10-13 — the shipped wall feature this phase refines)
+**Requirements**: **Route (b) DECIDED at planning (2026-10-14)** — a SECOND dated route-(b) GAME-05 supersede amendment (the 09-09 4c4e538 precedent): the Phase-9 "ONE random line-wall (replaced at each next-mol spawn…)" clause is superseded by the accumulated-set-under-cap contract (each new wall never overlaps the newly spawned mol, the head, any live mol, or any earlier wall); coverage stays 46/46; `tools/audit_requirements.py` + `tests/test_audit_requirements.py` stay byte-untouched. The amendment lands in plan 9.1-10 AFTER the owner feel-check. The alternative GAME-12 mint stays REJECTED on the Phase-9 verdict (the v1 GATE V ledger is a closed human-certified release record). DOCS-03 needs NO touch (the shipped help clause is already plural and count-neutral).
+**Success Criteria** (what must be TRUE):
+  1. Every successful capture leaves ONE MORE persistent red wall in the box (up to the cap) — earlier walls stay put at byte-identical endpoints; more eaten mols = more walls, exactly as the owner floated. [owner request verbatim]
+  2. At the cap the set FREEZES: later captures still spawn mols but add no new walls; the set persists unchanged to run end. [cap-then-stop semantics]
+  3. Fairness binds the WHOLE set: every added wall keeps all four Phase-9 legs (box-face inset, per-atom new-mol no-overlap ≥ 3.0 Å SRP_DEBUG-auditable per accumulated wall via the ordinal, head launch clearance, live-mol clearance) AND the new wall-vs-wall clearance ≥ 8.0 Å (crossings rejected, SRP_DEBUG `wwgap=` auditable); walls #2+ may be shorter (0.35 tier; wall #1 keeps the owner-approved 0.45 look). [fairness by construction, extended to the set]
+  4. Head contact with ANY accumulated wall (early walls included) emits ('crashed','wall') in the unchanged referee slot after boundary / before body; the run ends 'crashed' with the snake complete → the normal completion path; the GUI renders 'crashed into wall' with ZERO new crash-handler code. [GAME-05 class]
+  5. GAME-07 holds for both streams: same setup + same call sequence ⇒ byte-identical accumulated wall SET (salt stays 'wall-v1'; pickup replays byte-identical across all eras); spawn.py + test_spawn.py stay byte-identical/UNMODIFIED vs the pre-9.1 base. [GAME-07]
+  6. Wall hygiene for the whole set: all srp_wall* gone at completion (_teardown_round delete_walls), gone after Restart (cleanup_srp), swept by Cleanup model in a fresh .pse (INFRA-04 — indexed names already inside the reserved srp_ prefix); help wording unchanged (already plural); HUD silent; ZERO user-visible text changes. [GAME-09, DOCS-03]
+  7. The Phase-9 records stay green: the 09-VERIFICATION baseline holds minus only the dated rows (the accumulate supersede); set_wall keeps its replace pins (compat), s10 stays green with a dated docstring note, smoke/15 proves the accumulate channel (STAGE2 WALL-ACCUM + multi-capture STAGE3) with the SMOKE-OK LINE-WALL verdict unchanged; battery + requirements audit stay green at 46/46.
+  8. A live owner feel-check APPROVES the accumulate experience + feel numbers on two live games (the ONE blocking checkpoint; the three new constants are owner-retunable single-table constants, probe numbers on the sheet). [closure gate]
+**Plans**: 10 plans (6 waves; planned 2026-10-14 from the two 9.1-RESEARCH-* files; owner directive: fine-grained focused plans) — COMPLETE 2026-10-17 (executed: wave 1 = 4 parallel worktree executors merged zero-conflict, then SEQUENTIAL direct-on-main waves 2-6 per owner rate-limit directive; verified per 9.1-VERIFICATION.md: 78/78 must-haves + 8/8 SCs, zero gaps incl. live gates/smoke/xtb/audit re-runs)
+
+Plans:
+- [x] 9.1-01-PLAN.md — Accumulation feasibility Monte-Carlo probe (pure /tmp python3.6 script; late-game accumulated fixtures on all presets; GREEN/AMBER/RED verdict per draft constant; method + script appendix recorded) (Wave 1, parallel)
+- [x] 9.1-02-PLAN.md — TDD wall.py accumulation policy: WALL_MAX_LIVE_WALLS / WALL_ACCUM_LENGTH_FRACTION / WALL_WALL_CLEARANCE_A + min_wall_clearance (true segment-segment, crossings rejected) + next_wall existing_walls kwarg (cap gate zero-draws + two-tier half_len + L5) + additive test_wall.py classes (Wave 1, parallel)
+- [x] 9.1-03-PLAN.md — TDD engine accumulating wall state (compat route): walls list + add_wall/clear_walls + wall newest-property + first-hit collision loop in the same slot + reset generalization + additive TestMultipleWalls incl. the PICKUP>WALL capturable-by-construction derivation (Wave 1, parallel)
+- [x] 9.1-04-PLAN.md — TDD hud_logic.debug_wall_trace conditional wwgap suffix (the L5 audit field; 4 existing exact-format pins byte-stable; additive pins) (Wave 1, parallel)
+- [x] 9.1-05-PLAN.md — s11 accumulation integration scenario (7 captures → persistence → cap freeze → two-tier/L5 derived per wall → early-wall crash → byte-identical re-run) + s10 docstring dated note (compat; s1-s10 untouched) (Wave 2, parallel)
+- [x] 9.1-06-PLAN.md — smoke/15 accumulation rework (STAGE2 WALL-ACCUM indexed coexistence; STAGE3 ≥2-capture accumulate drive; STAGE1/4/5/6 keep) + run_gates dated comment + bridge docstring-only touch (Wave 2, parallel)
+- [x] 9.1-07-PLAN.md — gui_game accumulate seam rework (existing-set input, no spawn-side delete, srp_wall_<n> monotonic ordinal — hazard (a); viewer-write-first then add_wall commit — hazard (b); wwgap trace) + TestWallWiring dated message amendments + 6 new source-scan pins (Wave 3)
+- [x] 9.1-08-PLAN.md — Full battery recorded BEFORE the checkpoint (gates + count, 12/12 smokes incl. reworked LINE-WALL, xtb, audit 46/46, spawn + audit-tool byte-freeze proofs vs the pre-9.1 base) (Wave 4)
+- [x] 9.1-09-PLAN.md — **BLOCKING owner feel-check** (checkpoint:human-verify): two live games (medium/normal + small/expert, SRP_DEBUG=1), numbered script (accumulation visible, cap reached, wwgap audit, navigability, crash-on-old-wall → spectra, teardown/restart, optional .pse sweep) + feel-number rows (3/5/8, 0.25/0.35/0.45, 6/8/12 grids) + decision-confirm rows (Wave 5, blocking)
+- [x] 9.1-10-PLAN.md — Read-verdict continuation: apply retunes (single data lines, 7042602 procedure) + GAME-05 dated route-(b) supersede amendment (46/46, audit tooling byte-untouched) + phase record finalization with the phase-wrap one-liner (Wave 6)
+
+Notes: Inserted per the owner's GO on the parked 09-09 feel-check candidate (owner request 2026-10-14: "plan the accumulative wall option"; original float 2026-10-13: walls that persist (possibly shorter) instead of replace-per-spawn). Source records for planning: `.planning/phases/09-random-line-wall-spawning/09-09-SUMMARY.md` (Task 2 §5 candidate sketch + Task 3 shipped constants — WALL_HEAD_CLEARANCE_A ships at 8.0), `serpentrum/wall.py` constants table, `serpentrum/game_engine.py` (set_wall/clear_wall + ('crashed','wall') referee leg), `serpentrum/pymol_bridge.py` (load_line_wall/delete_walls — 'srp_wall*' pattern delete), the three 09-RESEARCH-* files, `09-VERIFICATION.md` (36/36 + 7/7 baseline this phase must keep green), and `REQUIREMENTS.md` GAME-05 dated amendment (4c4e538). **Planning verdicts (2026-10-14, owner blesses constants at the 9.1-09 closing feel-check, 5.3/9 precedent):** **D-ENGINE-ROUTE = COMPAT**: set_wall keeps clear-and-plant-one (all test_engine_wall.py classes + s10 stay green unmodified); additive `walls` list + `add_wall` + newest-wall `wall` property + first-hit loop — the break route bought no functional gain (RESEARCH-1 §2.2 verdict). **D-SEMANTICS = cap-then-stop** (A2 semantics, the spawn.MAX_LIVE_PICKUPS ceiling shape; unbounded violates the GO'd record; rolling-replace re-introduces the contract the owner removed). **D-CONSTANTS** (feel-check drafts in the single wall.py table, probe 9.1-01 validates late-game feasibility): cap 5 (grid 3/5/8; footprint 1.85× span on every preset = 46% of Phase 9's rejected crowding anchor), accum fraction 0.35 (wall #1 stays 0.45; grid 0.25/0.35/0.45=full), wall-wall clearance 8.0 (usable corridor 4.0 Å; grid 6/8/12). **D-L5 = true segment-segment** (crossings rejected; center-distance and no-constraint admit unfair geometry). **D-SPAWNER = explicit existing_walls input** (stateless spawner; cap gate returns None consuming zero draws, the degenerate-guard pattern; same-seed ⇒ same-set determinism free). **D-STREAM = keep WALL_SALT 'wall-v1'** (wall #1 replays the Phase-9 experience; a bump is the documented fresh-angles lever, costs one coupled pin — not owed by GAME-07, the 5.3-05:116 same-seed-only precedent). **D-ORDINAL = len(engine.walls) + 1** (monotonic; NEVER molecules_stacked — refuses roll it back → viewer-name collisions; RESEARCH-1 hazard (a)) with **viewer-write-first seam ordering** (load the indexed name, THEN commit add_wall — a failed load degrades like the None path, no invisible-but-lethal wall; RESEARCH-1 hazard (b)); both hazards carry dedicated source-scan pins (9.1-07). **D-HUD = silent + wwgap= audit field only** (zero user-visible text changes; help clause already plural). **D-KNOB = none** (constants over knobs, the 5.3/9 verdict). **D-PROOF = s10-dated-note + additive s11** (s10 keeps proving the legacy seam green; s11 proves the accumulate math: persistence, cap freeze, two-tier, L5, early-wall crash, byte-identical re-run). **D-DOC-SURFACE = zero user-visible changes** (shipped help clause is already accumulation-true; only the GAME-05 planning record changes). **D-AMENDMENT = route (b), lands in 9.1-10 after the feel-check** (46/46, audit tool + test byte-untouched). New fairness surface accepted as environment-class: a LATER mol may spawn near an OLD wall — capturable by construction (PICKUP_RADIUS_A 3.0 inclusive > WALL_COLLISION_RADIUS_A 2.0 strict), pinned as a derived engine axiom + a dedicated feel-check row; controller-side mol re-roll recorded as the escalation-only path (would break cross-version pickup identity — legal per 5.3-05:116 but seam-heavy). Not milestone-blocking; the v1 release record stays closed.
+
+## Execution Waves (parallelization: true)
+
+Dependency-driven waves:
+
+```
+Wave 1:  Phase 1                              (skeleton + harness)
+Wave 2:  Phase 2                              (pure core; starts human demo-data approval track)
+Wave 3:  Phase 3 → Phase 4 → Phase 5          (sequential chain)
+         ∥ Phase 6                             (xtb pipeline — depends only on Phase 2)
+Wave 4:  Phase 7                              (needs Phase 5 + 6)
+Wave 5:  Phase 8                              (needs Phases 5–7 + approvals resolved)
+```
+
+- **F∥D/E parallelism (from research):** Phase 6 is PyMOL-free and depends only on Phase 2 — schedule its plans concurrently with the Phase 3→4→5 chain. The only gameplay touchpoint is the final-snake xyz handoff.
+- **Worktree protocol:** whenever a wave runs ≥2 plans in parallel (e.g., Phase 6 alongside Phase 3/4/5 plans), each plan commits in its own worktree/branch per AGENTS.md, merged back in dependency order.
+- **Human track:** demo-set data prep (pin π-stack distances from Janiak 2000 full text or COD CIFs → human approval) starts at Phase 2 and gates Phase 8 — the longest non-code lead time; blocked on human decisions, not code research.
+- **Research flags for planning:** Phase 4 (input spike — up/down keys), Phase 6 (calibration only), Phase 5 (`transform_selection` matrix convention; fallback verified).
+
+## Coverage
+
+| Category | Requirements | Phases |
+|----------|--------------|--------|
+| Setup & Configuration | SETUP-01..08 | 1, 3, 8 |
+| Gameplay | GAME-01..11 | 4, 5, 5.1 |
+| Molecular Stacking | STACK-01..06 | 2, 5, 5.2 |
+| Spectra | SPECTRA-01..06 | 6, 7 |
+| Demo Data & Attribution | DATA-01..04 | 3, 8 |
+| Infrastructure & Environment | INFRA-01..06 | 1, 3 |
+| Documentation & Audit | DOCS-01..05 | 8 |
+
+**Total: 46/46 v1 requirements mapped — 0 unmapped, 0 duplicated** (44 original + GAME-11 via Phase 5.1 + STACK-06 promoted from v2 via Phase 5.2, 2026-09-20).
+
+> **Count note:** REQUIREMENTS.md previously said "41 total"; the listed ID ranges (SETUP-01..08, GAME-01..10, STACK-01..05, SPECTRA-01..06, DATA-01..04, INFRA-01..06, DOCS-01..05) sum to **44**. All 44 are mapped exactly once; REQUIREMENTS.md's Coverage block is corrected accordingly.
+
+## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
+(Phase 6 ran in parallel with Phases 3–5; Phase 9 was appended post-v1 and is COMPLETE; Phase 9.1 (INSERTED 2026-10-14) ran after Phase 9 and is COMPLETE 2026-10-17 — see Execution Waves.)
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 1. Plugin Skeleton & Purity Harness | 6/6 | Complete (verified 5/5 must-haves) | 2026-09-06 |
+| 2. Pure Core — Game & Chemistry Logic | 14/14 | Complete (verified 4/4 must-haves) | 2026-09-10 |
+| 3. Molecules in the Viewer & Setup Tab | 8/8 | Complete (verified 5/5 must-haves) | 2026-09-12 |
+| 4. Game Loop & Input | 9/9 | Complete (verified 5/5 must-haves) | 2026-09-14 |
+| 5. Stacking & Game Rules Complete | 16/16 | Complete (verified 48/48 plan truths, 3 owner-amended; 5/5 criteria; 9/9 reqs; 7-round human checkpoint) | 2026-09-20 |
+| 5.1. Game Speed / Difficulty (INSERTED 2026-09-20) | 6/6 | Complete (verified 17/17 plan truths, 3 owner-amended; 4/4 criteria; GAME-11 Complete; owner retuned tiers 3.0/6.0/7.5/9.0, default 'normal' 6.0) | 2026-09-25 |
+| 5.2. Generic Upload Stacking Consent (INSERTED 2026-09-20) | 9/9 | Complete (verified 5/5 SCs; owner feel-check APPROVED 11/11, literals as drafted; DBG d=3.6000 live) | 2026-09-26 |
+| 5.3. Randomized Pickup Spawning (INSERTED 2026-09-26) | 5/5 | Complete (verified 5/5 must-haves; owner feel-check APPROVED "good, all pass", factor 0.35 ships; edge-bias idea DEFERRED with sketch in 5.3-05-SUMMARY) | 2026-09-26 |
+| 6. xtb Pipeline | 12/12 | Complete (verified 5/5 SCs; owner live checkpoint APPROVED 12/12 with SRP_SPECTRA_DIR amendment; 796 unittests, 8/8 required smokes; DEFAULT_THREAD_ARG ('-P','4') ships; HESSIAN_WARNING measurement-derived) | 2026-09-26 |
+| 7. Spectra UI | 10/10 | Complete (verified 38/38 must-haves, 3/3 SCs; owner-approved plot options expanded at 07-06; 07-10 live checkpoint APPROVED round 2 — optimized frame signed off; 840 unittests, 10/10 required smokes, --xtb green) | 2026-09-26 |
+| 8. Demo Data, Docs & Release Audit | 13/13 | Complete (verified 5/5 SCs; 11 planned plans + owner insertions 08-12/08-13 mid-GATE V; GATE D verdicts + GATE V sign-off all approved): SC1 data approval flipped live (DATA_SOURCES.md APPROVED-headed 2026-10-10, commit 3fd30cf, UNVERIFIED quarantine intact); SC2 persistence checkpoint (GATE V Section B — 6-button row + educator round-trip PASS); SC3 README reproduce + doc-vs-code audit (GATE V Section C6 PASS); SC4 help surfaces incl. 08-13 tooltips + D3 dataset explanation (B/C PASS); SC5 release checkpoint + 46/46 requirement ledger Complete (owner "approved" 2026-10-10 UTC) | 2026-10-10 |
+| 9. Random Line-Wall Spawning (ADDED 2026-10-11) | 9/9 | Complete (verified 36/36 must-haves + 7/7 SCs; owner feel-check APPROVED over two live games with ONE retune — head launch clearance 12→8 Å, 7042602; GAME-05 route-(b) dated amendment 4c4e538, coverage stays 46/46; battery: 1050 unittests + 12/12 required smokes incl. LINE-WALL + xtb green + audit 46/46; one deferred idea recorded: accumulating walls) | 2026-10-13 |
+| 9.1. Accumulating Line-Walls (INSERTED 2026-10-14) | 10/10 | Complete (verified 78/78 must-haves + 8/8 SCs, zero gaps; owner feel-check APPROVED: steps 1-8 pass, 7b untested-live but headless-proven via smoke/15 STAGE6, constants APPROVED AS SHIPPED (cap 5 / fraction 0.35 / wall-wall 8.0 — zero retunes), bigger-box-cap exploration parked; GAME-05 9.1 amendment 757e849 em-dash-free per owner directive; battery: 1084 unittests + 12/12 required smokes incl. WALL-ACCUM LINE-WALL + xtb normal termination + audit 46/46; spawn + audit-tool byte-freezes EMPTY vs b6188fa) | 2026-10-17 |
+
+---
+
+## Milestone Summary
+
+### Decimal / Inserted Phases
+
+- Phase 5.1 Game Speed / Difficulty — INSERTED 2026-09-20 (owner playtesting feedback; new requirement GAME-11)
+- Phase 5.2 Generic Upload Stacking Consent — INSERTED 2026-09-20 (owner request; STACK-06 promoted v2 → v1)
+- Phase 5.3 Randomized Pickup Spawning — INSERTED 2026-09-26 (owner playtesting feedback; refines the Phase-5 spawn policy)
+- Phase 9 Random Line-Wall Spawning — ADDED 2026-10-11 (owner request; post-v1 gameplay improvement)
+- Phase 9.1 Accumulating Line-Walls — INSERTED 2026-10-14 (owner GO on the 09-09 feel-check deferred candidate)
+
+### Key Decisions (with outcomes)
+
+- Anchor live state on `pmg_tk.startup._serpentrum`, never module globals — survives Plugin-Manager reload + double import. ✓ Good
+- AST purity gates with explicit GUI/BRIDGE allowlists (pure modules import stdlib only; Qt only via `pymol.Qt`); zero external dependencies. ✓ Good — held green across all 13 phases
+- Refuse-and-skip chemistry integrity: no invented stacking anywhere; biphenyl kept as the designed REFUSE_ATOM clash demonstrator. ✓ Good
+- π-stack geometry human-approved at 3.60 Å @ 20° (Janiak 2000 qualitative rule + measured CC0 COD organics); stacking data ships as a data file, not code. ✓ Good — DATA-02 signed off at GATE V; Janiak metal-complex scope caveat recorded
+- Generic π-stack for ring-bearing uploads behind explicit Setup consent, labeled illustrative. ✓ Good — promoted from v2 at owner request; OFF by default
+- Turn model shipped owner-amended: rigid sweep + train-follow tail, immutable 3.60 Å spacing, 180°-only refusal. ✓ Good — verified as the replacement contract
+- xtb via async QProcess with a verified success contract (exit 0 + "normal termination" + expected output files); the UI thread never blocks. ✓ Good — calibrated 84–101 s @ 104 atoms, `-P 4`
+- Mode vectors drawn on the optimized frame (`srp_xtbopt`), never the game frame (up to 0.14 Å off). ✓ Good — owner sign-off at 07-10
+- Post-release changes via dated route-(b) requirement amendments instead of new IDs. ✓ Good — the closed GATE V ledger kept its meaning with zero audit-tool churn (GAME-05 Phases 9 + 9.1)
+- Fixed-size dialog + no move/resize handlers (Windows 200%-DPI geometry-negotiation fix). ✓ Good — flicker gone; owner verdict "pass this"
+- Parallel plan execution via git worktrees with disjoint `files_modified`. ✓ Good — zero merge conflicts across every parallel wave
+
+### Issues Resolved During the Milestone
+
+- Perpendicular-stack display bug (double-applied edge-on orientation in `_reset_head_viewer`) — fixed via fresh `reload_head`; SPANOFFS/PLANEPAR smoke pins added so distance-only checks can never hide it again
+- Ghost-point turn-lock + lagging tail (stationary chain) — resolved by the owner-directed rigid train-follow chain
+- Refusal storms near walls (pool-exhaust deadlocks) — replaced with a resumable exhaust-cooldown + `(xN)` HUD coalescing
+- Upload placement crash (`NoneType has no len()`) — made structurally impossible via pre-resolved skip taxonomy
+- 200%-DPI window move/resize flicker — root-caused (MINMAXINFO negotiation over a degenerate envelope) and fixed with the fixed-size-dialog contract
+- Dialog too tall after the frequency table landed — log/table height caps + screen-based dialog cap
+- Plot preset sticky-shrink (larger → smaller needed manual resize) — exact min/max pins at construction
+- xtb detection rule drift — unified through `xtbenv.validate_binary_path` (single source of rules)
+- Arrow-key spike (up/down never fire via `set_key`) — resolved with the KeySteerWizard `do_special` route (cmd.set_wizard save/restore; no global key leaks)
+
+### Issues Deferred (with recorded dispositions)
+
+- Edge-biased pickup spawn distribution — owner-deferred 2026-09-26 ("just mark it and move on"); sketch + GAME-07 seed-stream impact in 5.3-05-SUMMARY.md
+- Optional guidance line for small (<20i cm⁻¹) imaginary frequencies — owner declined at GATE D (two-tier wording shipped instead)
+- IR intensity plot title fix — owner flag 2026-10-10 ("fix later"); scope undefined until pickup
+- Per-box-preset wall-count cap — owner-floated at 9.1-09; needs owner GO; probe sizing recorded in 9.1-10-SUMMARY.md
+
+### Technical Debt Incurred (all non-blocking; full table: v1-MILESTONE-AUDIT.md §8)
+
+- smoke/02 stays an informational FAIL — the documented offscreen-Qt dead end (never retried)
+- Selector-Error zoom noise when vectors are absent + benign Qt DPI warning on first show — owner-approved with it visible (07-10)
+- No CO₂ g98 fixture; zero-intensity display coverage unit-level; g98≡xtbopt overlay generality = one fixture + an always-on smoke-13 assertion — accepted fixture limitations
+- Stale docstring at pymol_bridge.py:244-246 — cosmetic doc drift, zero wiring impact
+
+**Nothing here blocks the shipped product; every item is owner-accepted, parked pending an owner decision, or cosmetic.**
+
+---
+
+*For current project status, see `.planning/ROADMAP.md` and `.planning/STATE.md`. Shipment narrative + stats: `.planning/MILESTONES.md`.*

@@ -1,3 +1,14 @@
+# Requirements Archive: v1 — serpentrum Playable Release
+
+**Archived:** 2026-10-18 (UTC)
+**Status:** ✅ SHIPPED — 46/46 v1 requirements Complete (owner-certified at GATE V 2026-10-10; milestone audit re-attested 2026-10-18: `--release` AUDIT-OK, 136 evidence paths, checkbox↔table agreement, zero Pending)
+
+This is the archived requirements specification for v1, including the full v2 deferred list and the traceability evidence ledger. For current requirements, see `.planning/REQUIREMENTS.md` (recreated for the next milestone via `/gsd-new-milestone`).
+
+---
+
+## Archived Requirements (verbatim, as shipped)
+
 # Requirements: serpentrum
 
 **Defined:** 2026-09-06
@@ -190,3 +201,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 *2026-10-10 — **Phase 8 COMPLETE — v1 RELEASE SIGNED OFF**: GATE V (08-11) owner verdict "approved" 2026-10-10 (UTC; git commit dates authoritative) across all three sections; DATA_SOURCES.md flipped DRAFT → APPROVED (commit 3fd30cf) with the UNVERIFIED quarantine intact; 46/46 v1 requirements Complete with human-certified evidence; `audit_requirements.py --release` green.*
 *2026-10-13 — Phase 9 (Random Line-Wall Spawning) COMPLETE: GAME-05 amended (third lethal-collision class: the random line-wall); spawn-pairing policy refined on the 5.3 model. Coverage stays 46/46.*
 *2026-10-17 - Phase 9.1 (Accumulating Line-Walls) COMPLETE: GAME-05 amended (accumulated line-walls under a wall-count cap; supersedes the Phase-9 one-live-wall replacement clause); accumulation policy added on the 5.3/9 model. Coverage stays 46/46.*
+
+---
+
+## Milestone Summary
+
+**Shipped:** 46 of 46 v1 requirements — SETUP-01..08, GAME-01..11, STACK-01..06, SPECTRA-01..06, DATA-01..04, INFRA-01..06, DOCS-01..05 — every row Complete with mechanical + human evidence in the traceability table above.
+
+**Adjusted during implementation:**
+
+- **GAME-10** — owner-amended at the 05-16 live checkpoint (2026-09-20): rigid sweep with train-follow tail (immutable 3.60 Å spacing); turn pre-check refuses 180° only; REFUSE_WALL removed (chain may extend past the box; only the head is box-bound)
+- **GAME-11** — tier values owner-retuned twice by feel-check authority: 5.1-06 (2026-09-25) → 3.0/6.0/7.5/9.0; quick-003 Option C (2026-10-11) → 6.0/9.0 (default)/11.0/13.0 Å/s; mechanism and 4-tier structure unchanged; old saved files load as-is
+- **GAME-05** — two dated route-(b) amendments extending the lethal-collision class: Phase 9 line-wall (4c4e538, 2026-10-13), superseded by Phase 9.1 accumulated walls under cap 5 (757e849, 2026-10-17)
+- **STACK-06** — promoted from v2 to v1 (2026-09-20, owner request; shipped via Phase 5.2)
+- **Count corrections:** 41 → 44 during roadmap creation (2026-09-06, ID-range sum); coverage grew 44 → 46 with GAME-11 (Phase 5.1) and STACK-06 (Phase 5.2)
+
+**Dropped:** none. (The "Generate and export" button was dropped at spec time — recorded in Out of Scope, never a numbered v1 requirement.)
+
+**v2 deferred items (archived above, unchanged)** — DATA-05/06, GAME-09-v2 (mode animation), GAME-10-v2 (speed vs length), GAME-11-v2 (3D steering), STACK-07 (mixed interactions), SPECTRA-07 (Raman) — remain candidates for a future milestone; see PROJECT.md "Next Milestone Goals".
+
+---
+*Archived: 2026-10-18 as part of the v1 milestone completion.*
