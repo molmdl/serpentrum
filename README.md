@@ -8,6 +8,9 @@
 Classical snake game in (bio-) molecular viewer stacking molecules,  as an analogue of "self-assembly and spectra calculation".
 For students and educators who want an engaging way to explore and study molecular interactions.
 
+![Screenshots](screenshots/merged.png)
+
+
 ---
 
 ## Requirements
