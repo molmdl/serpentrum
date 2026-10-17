@@ -1,21 +1,21 @@
 ┌────────────────────────────────────────────────────────┐
 │                       OVERVIEW                         │
 ├────────────────────────────────────────────────────────┤
-│Sessions                                            324 │
-│Messages                                          8,699 │
-│Days                                                 40 │
+│Sessions                                            327 │
+│Messages                                          8,789 │
+│Days                                                 42 │
 └────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────┐
 │                    COST & TOKENS                       │
 ├────────────────────────────────────────────────────────┤
-│Total Cost                                      $393.55 │
-│Avg Cost/Day                                      $9.84 │
+│Total Cost                                      $395.53 │
+│Avg Cost/Day                                      $9.42 │
 │Avg Tokens/Session                                 2.4M │
 │Median Tokens/Session                              1.6M │
-│Input                                             68.3M │
+│Input                                             69.1M │
 │Output                                             9.3M │
-│Cache Read                                       699.7M │
+│Cache Read                                       706.5M │
 │Cache Write                                           0 │
 └────────────────────────────────────────────────────────┘
 
@@ -31,20 +31,20 @@
 │  Cost                                        $205.8556 │
 ├────────────────────────────────────────────────────────┤
 │ synthetic/hf:zai-org/GLM-5.3-Flash                     │
-│  Messages                                        2,551 │
+│  Messages                                        2,583 │
 │  Input Tokens                                    34.2M │
-│  Output Tokens                                    3.8M │
-│  Cache Read                                     172.4M │
+│  Output Tokens                                    3.9M │
+│  Cache Read                                     174.1M │
 │  Cache Write                                         0 │
-│  Cost                                         $13.9431 │
+│  Cost                                         $14.0313 │
 ├────────────────────────────────────────────────────────┤
 │ synthetic/hf:zai-org/GLM-5.3                           │
-│  Messages                                        1,284 │
-│  Input Tokens                                     8.6M │
-│  Output Tokens                                    1.9M │
-│  Cache Read                                     153.1M │
+│  Messages                                        1,299 │
+│  Input Tokens                                     9.3M │
+│  Output Tokens                                    2.0M │
+│  Cache Read                                     155.5M │
 │  Cache Write                                         0 │
-│  Cost                                         $60.3059 │
+│  Cost                                         $61.9859 │
 ├────────────────────────────────────────────────────────┤
 │ synthetic/hf:zai-org/GLM-5.2                           │
 │  Messages                                          763 │
@@ -55,24 +55,24 @@
 │  Cost                                        $109.5812 │
 ├────────────────────────────────────────────────────────┤
 │ synthetic/hf:deepseek-ai/DeepSeek-V4.1-Flash           │
-│  Messages                                          534 │
-│  Input Tokens                                     3.3M │
-│  Output Tokens                                  545.9K │
-│  Cache Read                                      40.8M │
+│  Messages                                          571 │
+│  Input Tokens                                     3.5M │
+│  Output Tokens                                  573.3K │
+│  Cache Read                                      43.5M │
 │  Cache Write                                         0 │
-│  Cost                                          $3.8605 │
+│  Cost                                          $4.0721 │
 ├────────────────────────────────────────────────────────┤
 [1A└────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────┐
 │                      TOOL USAGE                        │
 ├────────────────────────────────────────────────────────┤
-│ bash               ████████████████████ 5208 (46.7%)   │
-│ read               ██████████           2862 (25.6%)   │
-│ edit               ██████               1692 (15.2%)   │
-│ write              ██                   547 ( 4.9%)    │
+│ bash               ████████████████████ 5279 (46.8%)   │
+│ read               ██████████           2888 (25.6%)   │
+│ edit               ██████               1718 (15.2%)   │
+│ write              ██                   551 ( 4.9%)    │
 │ grep               █                    373 ( 3.3%)    │
-│ task               █                    311 ( 2.8%)    │
+│ task               █                    314 ( 2.8%)    │
 │ webfetch           █                     66 ( 0.6%)    │
 │ glob               █                     61 ( 0.5%)    │
 │ question           █                     24 ( 0.2%)    │
